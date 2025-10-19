@@ -1,0 +1,199 @@
+{
+    "name": "code-trace-tree",
+    "displayName": "Code Trace Tree",
+    "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished",
+        "onCommand:codeTraceTree.createTracePoint"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "code-trace-tree-container",
+                    "title": "Code Trace Tree",
+                    "icon": "icons/code_trace_tree_icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "code-trace-tree-container": [
+                {
+                    "id": "codeTraceTree.view",
+                    "name": "Trace Points"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "codeTraceTree.createTracePoint",
+                "title": "Create Code Trace Point",
+                "icon": "$(add)"
+            },
+            {
+                "command": "codeTraceTree.updateTracePoint",
+                "title": "Update Selected Trace Point"
+            },
+            {
+                "command": "codeTraceTree.moveUp",
+                "title": "Move Up",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "codeTraceTree.moveDown",
+                "title": "Move Down",
+                "icon": "$(arrow-down)"
+            },
+            {
+                "command": "codeTraceTree.expandSelected",
+                "title": "Expand Selected",
+                "icon": "$(expand-all)"
+            },
+            {
+                "command": "codeTraceTree.collapseAll",
+                "title": "Collapse All",
+                "icon": "$(collapse-all)"
+            },
+            {
+                "command": "codeTraceTree.toggleHighlights",
+                "title": "Toggle Highlights",
+                "icon": "$(eye)"
+            },
+            {
+                "command": "codeTraceTree.toggleDescription",
+                "title": "Toggle Description Area",
+                "icon": "$(info)"
+            },
+            {
+                "command": "codeTraceTree.exportTracePoints",
+                "title": "Export Trace Points",
+                "icon": "$(cloud-upload)"
+            },
+            {
+                "command": "codeTraceTree.importTracePoints",
+                "title": "Import Trace Points",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "codeTraceTree.goToTracePoint",
+                "title": "Go to Trace Point",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "codeTraceTree.renameTracePoint",
+                "title": "Rename Trace Point"
+            },
+            {
+                "command": "codeTraceTree.deleteTracePoints",
+                "title": "Delete Trace Points"
+            },
+            {
+                "command": "codeTraceTree.addChildTracePoint",
+                "title": "Add Child Trace Point"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "codeTraceTree.createTracePoint",
+                    "group": "navigation",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.moveUp",
+                    "group": "navigation@100",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.moveDown",
+                    "group": "navigation@200",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.expandSelected",
+                    "group": "navigation@300",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.collapseAll",
+                    "group": "navigation@400",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.toggleHighlights",
+                    "group": "navigation@500",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.toggleDescription",
+                    "group": "navigation@600",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.exportTracePoints",
+                    "group": "navigation@700",
+                    "when": "view == codeTraceTree.view"
+                },
+                {
+                    "command": "codeTraceTree.importTracePoints",
+                    "group": "navigation@800",
+                    "when": "view == codeTraceTree.view"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "codeTraceTree.goToTracePoint",
+                    "group": "inline",
+                    "when": "view == codeTraceTree.view && viewItem == traceable"
+                },
+                {
+                    "command": "codeTraceTree.renameTracePoint",
+                    "group": "inline@100",
+                    "when": "view == codeTraceTree.view && viewItem == traceable"
+                },
+                {
+                    "command": "codeTraceTree.deleteTracePoints",
+                    "group": "inline@200",
+                    "when": "view == codeTraceTree.view && viewItem == traceable"
+                },
+                {
+                    "command": "codeTraceTree.addChildTracePoint",
+                    "group": "inline@300",
+                    "when": "view == codeTraceTree.view && viewItem == traceable"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "codeTraceTree.createTracePoint",
+                    "group": "navigation"
+                },
+                {
+                    "command": "codeTraceTree.updateTracePoint",
+                    "group": "navigation@100"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "yarn run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/node": "16.x",
+        "@types/vscode": "^1.80.0",
+        "typescript": "^5.1.6"
+    },
+    "dependencies": {
+        "uuid": "^13.0.0",
+        "xml-js": "^1.6.11"
+    }
+}
