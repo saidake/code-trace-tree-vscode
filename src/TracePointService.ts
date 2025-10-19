@@ -47,14 +47,21 @@ export class TracePointService {
     }
 
     private async initConfigFile() {
-        if (vscode.workspace.workspaceFolders?.[0]) {
-            const root = vscode.workspace.workspaceFolders[0].uri;
-            this.configFileUri = vscode.Uri.joinPath(root, '.vscode', 'code-trace-tree-config.xml');
-            try {
-                await vscode.workspace.fs.stat(this.configFileUri);
-            } catch {
-                await this.saveState(); // Create empty file
-            }
+        const key = 'tracePointState';
+
+        const stored = vscode.workspace.workspaceFolders?.[0]
+            ? this.context.workspaceState.get(key)
+            : undefined;
+
+        if (!stored) {
+            const initialState = {
+                tracePoints: [],
+                selectedTracePointIds: [],
+                expandedTracePointIds: [],
+                highlightingEnabled: true,
+                descriptionAreaOpened: false,
+            };
+            await this.context.workspaceState.update(key, initialState);
         }
     }
 
