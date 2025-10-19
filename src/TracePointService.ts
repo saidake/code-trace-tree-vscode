@@ -47,10 +47,8 @@ export class TracePointService {
     }
 
     private async initConfigFile() {
-        const key = 'tracePointState';
-
         const stored = vscode.workspace.workspaceFolders?.[0]
-            ? this.context.workspaceState.get(key)
+            ? this.context.workspaceState.get(CODE_TRACE_TREE_STATE_KEY)
             : undefined;
 
         if (!stored) {
@@ -61,7 +59,7 @@ export class TracePointService {
                 highlightingEnabled: true,
                 descriptionAreaOpened: false,
             };
-            await this.context.workspaceState.update(key, initialState);
+            await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, initialState);
         }
     }
 

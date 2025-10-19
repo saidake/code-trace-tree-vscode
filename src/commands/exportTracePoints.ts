@@ -5,7 +5,7 @@ import { serializeXml } from '../utils/xmlUtils';
 export function registerExportTracePoints(context: vscode.ExtensionContext, service: TracePointService) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {
     // Read state
-    const state = context.workspaceState.get<any>('tracePointState') || {
+    const state = context.workspaceState.get<any>(CODE_TRACE_TREE_STATE_KEY) || {
       tracePoints: [],
       selectedTracePointIds: [],
       expandedTracePointIds: [],
