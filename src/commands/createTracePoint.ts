@@ -10,9 +10,9 @@ export function registerCreateTracePoint(context: vscode.ExtensionContext, servi
       return;
     }
     const lineNumber = editor.selection.active.line + 1;
-    const name = await vscode.window.showInputBox({ prompt: 'Enter name for the trace point' });
-    if (!name) return;
-    await service.addTracePoint(name, editor.document.uri, lineNumber);
+    const name = await vscode.window.showInputBox({ prompt: 'Enter name for the trace point (optional)', placeHolder: 'Leave empty for no name' });
+    // Allow empty string or undefined
+    await service.addTracePoint(name ?? '', editor.document.uri, lineNumber);
     treeDataProvider.refresh();
   }));
 }

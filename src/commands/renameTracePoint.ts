@@ -11,10 +11,9 @@ export function registerRenameTracePoint(context: vscode.ExtensionContext, servi
     }
     const tp = service.getTracePoints().find(tp => tp.id === selected[0].id);
     if (!tp) return;
-    const newName = await vscode.window.showInputBox({ prompt: 'Enter new name', value: tp.name });
-    if (newName) {
-      await service.renameTracePoint(tp.id, newName);
-      treeDataProvider.refresh();
-    }
+    const newName = await vscode.window.showInputBox({ prompt: 'Enter new name (optional)', placeHolder: 'Leave empty for no name', value: tp.name });
+    // Allow empty string or undefined
+    await service.renameTracePoint(tp.id, newName ?? '');
+    treeDataProvider.refresh();
   }));
 }
