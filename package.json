@@ -145,11 +145,6 @@
             ],
             "view/item/context": [
                 {
-                    "command": "codeTraceTree.goToTracePoint",
-                    "group": "navigation",
-                    "when": "view == codeTraceTree.view && viewItem == traceable"
-                },
-                {
                     "command": "codeTraceTree.renameTracePoint",
                     "group": "navigation@100",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
