@@ -38,6 +38,11 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             item.contextValue = 'traceable';
             item.description = tp.description ? tp.description.substring(0, 50) + '...' : '';
             item.tooltip = undefined; // Explicitly disable tooltip on hover
+            item.command = {
+                command: 'codeTraceTree.goToTracePoint',
+                title: 'Go to Trace Point',
+                arguments: [item]
+            };
             if (!tp.isValid) item.label = `~~${item.label}~~`; // Strikethrough for invalid
             this.treeItems.set(tp.id, item);
             const parentId = tp.parentId || 'root';

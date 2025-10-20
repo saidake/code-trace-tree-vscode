@@ -181,7 +181,7 @@ export class TracePointService {
             description,
         };
         this.tracePoints.push(tracePoint);
-        this.attachListenersAndHighlight(document);
+        this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
     }
@@ -205,30 +205,19 @@ export class TracePointService {
     }
 
     async deleteTracePoints(ids: string[]) {
-        const deletedFiles = new Set(this.tracePoints.filter(tp => ids.includes(tp.id)).map(tp => tp.fileName));
         this.tracePoints = this.tracePoints.filter(tp => !ids.includes(tp.id));
         ids.forEach(id => {
             this.selectedTracePointIds.delete(id);
             this.expandedTracePointIds.delete(id);
         });
-        deletedFiles.forEach(async (fileName) => {
-            const fileUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, fileName);
-            const doc = await vscode.workspace.openTextDocument(fileUri);
-            this.removeHighlights(doc.uri.fsPath);
-            this.highlightTracePointsInFile(doc);
-        });
+        this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
     }
 
     async updateTracePoints(newTracePoints: TracePoint[]) {
         this.tracePoints = newTracePoints;
-        const fileNames = [...new Set(newTracePoints.map(tp => tp.fileName))];
-        fileNames.forEach(async (fileName) => {
-            const fileUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, fileName);
-            const doc = await vscode.workspace.openTextDocument(fileUri);
-            this.attachListenersAndHighlight(doc);
-        });
+        this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
     }
@@ -245,7 +234,7 @@ export class TracePointService {
     }
 
     async attachListenersAndHighlight(document: vscode.TextDocument) {
-        // Listeners are global (onDidChangeTextDocument), so no per-doc attachment needed
+        // Global listener handles this; just highlight if relevant
         if (this.tracePoints.some(tp => tp.fileName === vscode.workspace.asRelativePath(document.uri))) {
             this.highlightTracePointsInFile(document);
         }
@@ -258,7 +247,7 @@ export class TracePointService {
         this.removeHighlights(document.uri.fsPath);
 
         const decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: new vscode.ThemeColor('editorHoverWidget.background'), // VSCode handles light/dark
+            backgroundColor: new vscode.ThemeColor('editor.findMatchBackground'),
             isWholeLine: true,
         });
 
@@ -269,7 +258,8 @@ export class TracePointService {
                 ranges.push(line.range);
             }
         });
-        vscode.window.visibleTextEditors.filter(editor => editor.document.uri.fsPath === document.uri.fsPath)
+        vscode.window.visibleTextEditors
+            .filter(editor => editor.document.uri.fsPath === document.uri.fsPath)
             .forEach(editor => editor.setDecorations(decorationType, ranges));
         this.highlighters.set(document.uri.fsPath, decorationType);
     }
@@ -300,10 +290,39 @@ export class TracePointService {
 
         const updatedTracePoints = this.tracePoints.map(tp => {
             if (tp.fileName !== filePath) return tp;
-            // Similar logic to original: adjust line numbers, content, validity based on changes
-            // For brevity, re-validate all for now
-            return tp;
+
+            // Adjust line number based on cumulative deltas
+            let adjustedLine0 = tp.lineNumber - 1;
+            for (const change of event.contentChanges) {
+                const oldLines = change.range.end.line - change.range.start.line + 1;
+                const newLines = change.text.split(/\r?\n/).length;
+                const delta = newLines - oldLines;
+                if (adjustedLine0 > change.range.end.line) {
+                    adjustedLine0 += delta;
+                }
+            }
+            const adjustedLine = adjustedLine0 + 1;
+
+            if (adjustedLine < 1 || adjustedLine > event.document.lineCount) {
+                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+            }
+
+            const currentContent = event.document.lineAt(adjustedLine0).text.trim();
+            if (currentContent !== tp.lineContent) {
+                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+            }
+
+            const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, tp.lineContent);
+            const occurrenceIndex = matchingLines.indexOf(adjustedLine) + 1;
+            return {
+                ...tp,
+                lineNumber: adjustedLine,
+                totalOccurrenceCount: totalOccurrences,
+                occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0,
+                isValid: true
+            };
         });
+
         this.tracePoints = updatedTracePoints;
         this.highlightTracePointsInFile(event.document);
         this.notifyListeners();
