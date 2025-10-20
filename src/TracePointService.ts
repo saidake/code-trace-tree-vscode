@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { parseXml, serializeXml } from './utils/xmlUtils';
+import { CODE_TRACE_TREE_STATE_KEY } from './domain/constants';
 
 export interface TracePoint {
     id: string;
@@ -33,10 +33,11 @@ export class TracePointService {
     private expandedTracePointIds: Set<string> = new Set();
     private highlighters: Map<string, vscode.TextEditorDecorationType> = new Map(); // Key: fileUri
     private listeners: ((tracePoints: TracePoint[], expandedIds: string[]) => void)[] = [];
-    private configFileUri: vscode.Uri | undefined;
+    private _highlightingEnabled: boolean = true;
+    private _descriptionAreaOpened: boolean = false;
 
     private constructor(private context: vscode.ExtensionContext) {
-        this.initConfigFile();
+        this.initConfig();
     }
 
     static getInstance(context: vscode.ExtensionContext): TracePointService {
@@ -46,13 +47,10 @@ export class TracePointService {
         return TracePointService.instance;
     }
 
-    private async initConfigFile() {
-        const stored = vscode.workspace.workspaceFolders?.[0]
-            ? this.context.workspaceState.get(CODE_TRACE_TREE_STATE_KEY)
-            : undefined;
-
-        if (!stored) {
-            const initialState = {
+    private async initConfig() {
+        const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
+        if (!state) {
+            const initialState: TracePointState = {
                 tracePoints: [],
                 selectedTracePointIds: [],
                 expandedTracePointIds: [],
@@ -64,32 +62,31 @@ export class TracePointService {
     }
 
     async loadState() {
-        if (!this.configFileUri) return;
         try {
-            const data = await vscode.workspace.fs.readFile(this.configFileUri);
-            const xml = new TextDecoder().decode(data);
-            const state = parseXml(xml) as { TracePointState: TracePointState };
-            this.tracePoints = state.TracePointState.tracePoints || [];
-            this.selectedTracePointIds = new Set(state.TracePointState.selectedTracePointIds || []);
-            this.expandedTracePointIds = new Set(state.TracePointState.expandedTracePointIds || []);
-            await this.validateTracePointsOnLoad();
-            this.notifyListeners();
+            const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
+            if (state) {
+                this.tracePoints = state.tracePoints || [];
+                this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
+                this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
+                this._highlightingEnabled = state.highlightingEnabled;
+                this._descriptionAreaOpened = state.descriptionAreaOpened;
+                await this.validateTracePointsOnLoad();
+                this.notifyListeners();
+            }
         } catch (e) {
             vscode.window.showErrorMessage(`Failed to load trace points: ${e}`);
         }
     }
 
     async saveState() {
-        if (!this.configFileUri) return;
         const state: TracePointState = {
             tracePoints: this.tracePoints,
             selectedTracePointIds: Array.from(this.selectedTracePointIds),
             expandedTracePointIds: Array.from(this.expandedTracePointIds),
-            highlightingEnabled: this.isHighlightingEnabled(),
-            descriptionAreaOpened: this.isDescriptionAreaOpened(),
+            highlightingEnabled: this._highlightingEnabled ?? true,
+            descriptionAreaOpened: this._descriptionAreaOpened ?? false,
         };
-        const xml = serializeXml({ TracePointState: state });
-        await vscode.workspace.fs.writeFile(this.configFileUri, new TextEncoder().encode(xml));
+        await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, state);
     }
 
     getTracePoints(): TracePoint[] {
@@ -129,25 +126,21 @@ export class TracePointService {
     }
 
     isHighlightingEnabled(): boolean {
-        const state = this.getState();
-        return state.highlightingEnabled ?? true;
+        return this._highlightingEnabled;
     }
 
     setHighlightingEnabled(enabled: boolean) {
-        const state = this.getState();
-        state.highlightingEnabled = enabled;
+        this._highlightingEnabled = enabled;
         this.applyHighlightsToAllEditors();
         this.saveState();
     }
 
     isDescriptionAreaOpened(): boolean {
-        const state = this.getState();
-        return state.descriptionAreaOpened ?? false;
+        return this._descriptionAreaOpened;
     }
 
     setDescriptionAreaOpened(opened: boolean) {
-        const state = this.getState();
-        state.descriptionAreaOpened = opened;
+        this._descriptionAreaOpened = opened;
         this.saveState();
     }
 
@@ -327,7 +320,7 @@ export class TracePointService {
                 const currentContent = document.lineAt(tp.lineNumber - 1).text.trim();
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, tp.lineContent);
                 const occurrenceIndex = matchingLines.indexOf(tp.lineNumber) + 1;
-                return { ...tp, totalOccurrenceCount: 0, occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0, isValid: true };
+                return { ...tp, totalOccurrenceCount: totalOccurrences, occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0, isValid: true };
             } catch {
                 return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
             }

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { serializeXml } from '../utils/xmlUtils';
+import { CODE_TRACE_TREE_STATE_KEY } from '../domain/constants';
 
 export function registerExportTracePoints(context: vscode.ExtensionContext, service: TracePointService) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {

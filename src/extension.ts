@@ -49,4 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc));
 }
 
-export function deactivate() {}
+export function deactivate() {
+  // Save state when the extension is deactivated (e.g., VSCode closes)
+  service.saveState();
+}
