@@ -146,22 +146,22 @@
             "view/item/context": [
                 {
                     "command": "codeTraceTree.goToTracePoint",
-                    "group": "inline",
+                    "group": "navigation",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
                 },
                 {
                     "command": "codeTraceTree.renameTracePoint",
-                    "group": "inline@100",
+                    "group": "navigation@100",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
                 },
                 {
                     "command": "codeTraceTree.deleteTracePoints",
-                    "group": "inline@200",
+                    "group": "navigation@200",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
                 },
                 {
                     "command": "codeTraceTree.addChildTracePoint",
-                    "group": "inline@300",
+                    "group": "navigation@300",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
                 }
             ],
