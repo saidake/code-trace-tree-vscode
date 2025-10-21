@@ -68,6 +68,10 @@ export class TracePointService {
                 this.tracePoints = state.tracePoints || [];
                 this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
+                // this.tracePoints =  [];
+                // this.selectedTracePointIds =  new Set([]);
+                // this.expandedTracePointIds =  new Set([]);
+                
                 this._highlightingEnabled = state.highlightingEnabled;
                 this._descriptionAreaOpened = state.descriptionAreaOpened;
                 await this.validateTracePointsOnLoad();

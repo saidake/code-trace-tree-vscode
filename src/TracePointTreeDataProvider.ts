@@ -30,9 +30,11 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
         this.childrenMap.clear();
         const tracePoints = this.service.getTracePoints();
         tracePoints.forEach(tp => {
+            // Check if the trace point has children
+            const hasChildren = tracePoints.some(child => child.parentId === tp.id);
             const item = new vscode.TreeItem(
-                `${tp.name} (${tp.fileName.split('/').pop()}: ${tp.lineNumber})`,
-                tp.isValid ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+                `${tp.name || ''} (${tp.fileName.split('/').pop()}: ${tp.lineNumber})`,
+                tp.isValid && hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
             item.id = tp.id;
             item.contextValue = 'traceable';
@@ -62,16 +64,76 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
     async handleDrop(target: vscode.TreeItem | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
         const transferred = dataTransfer.get('application/vnd.code.tree.codetracetree')?.value as string[] | undefined;
-        if (!transferred || !target) return;
+        if (!transferred) return;
+
         const draggedIds = transferred;
-        const targetId = target.id!;
         const tracePoints = this.service.getTracePoints();
+
+        // If dropping into empty space (root level), position after original parent
+        if (!target) {
+            const updatedTracePoints = [];
+            const rootTracePoints = tracePoints.filter(tp => !tp.parentId);
+            const nonRootTracePoints = tracePoints.filter(tp => tp.parentId);
+
+            // Build new root list, placing dragged items after their original parents
+            const processedIds = new Set<string>();
+            for (const tp of rootTracePoints) {
+                updatedTracePoints.push(tp);
+                processedIds.add(tp.id);
+                if (draggedIds.includes(tp.id)) {
+                    // If the root item itself is dragged, it stays in place
+                    continue;
+                }
+                // Add any dragged children of this parent
+                const draggedChildren = nonRootTracePoints.filter(child => child.parentId === tp.id && draggedIds.includes(child.id));
+                for (const child of draggedChildren) {
+                    updatedTracePoints.push({ ...child, parentId: undefined });
+                    processedIds.add(child.id);
+                }
+            }
+            // Add remaining non-dragged root items and non-dragged non-root items
+            for (const tp of tracePoints) {
+                if (!processedIds.has(tp.id)) {
+                    updatedTracePoints.push(draggedIds.includes(tp.id) ? { ...tp, parentId: undefined } : tp);
+                }
+            }
+
+            await this.service.updateTracePoints(updatedTracePoints);
+            return;
+        }
+
+        const targetId = target.id!;
+
+        // Check if any dragged item is an ancestor of the target
+        const isDescendantDrop = draggedIds.some(draggedId => this.isAncestor(draggedId, targetId, tracePoints));
+        if (isDescendantDrop) {
+            // Do nothing if dropping into a descendant
+            return;
+        }
+
+        // Update parentId for valid drops
         const updated = tracePoints.map(tp => {
             if (draggedIds.includes(tp.id)) {
                 return { ...tp, parentId: targetId };
             }
             return tp;
         });
+
         await this.service.updateTracePoints(updated);
+    }
+
+    private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
+        // If targetId is not in tracePoints, it can't be a descendant
+        const target = tracePoints.find(tp => tp.id === targetId);
+        if (!target) return false;
+
+        // Traverse up the parent chain from targetId
+        let currentId = target.parentId;
+        while (currentId) {
+            if (currentId === parentId) return true;
+            const current = tracePoints.find(tp => tp.id === currentId);
+            currentId = current?.parentId;
+        }
+        return false;
     }
 }
