@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { TracePointService } from './TracePointService';
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider';
-import { registerCreateTracePoint } from './commands/createTracePoint';
+import { registerCreateRootTracePoint } from './commands/createRootTracePoint'; 
+import { registerCreateSelectedTracePoint } from './commands/createSelectedTracePoint'; 
 import { registerUpdateTracePoint } from './commands/updateTracePoint';
 import { registerMoveUp } from './commands/moveUp';
 import { registerMoveDown } from './commands/moveDown';
@@ -14,7 +15,6 @@ import { registerImportTracePoints } from './commands/importTracePoints';
 import { registerGoToTracePoint } from './commands/goToTracePoint';
 import { registerRenameTracePoint } from './commands/renameTracePoint';
 import { registerDeleteTracePoints } from './commands/deleteTracePoints';
-import { registerAddChildTracePoint } from './commands/addChildTracePoint';
 
 let service: TracePointService;
 let treeDataProvider: TracePointTreeDataProvider;
@@ -26,7 +26,8 @@ export function activate(context: vscode.ExtensionContext) {
   treeView = vscode.window.createTreeView('codeTraceTree.view', { treeDataProvider, canSelectMany: true, dragAndDropController: treeDataProvider });
 
   // Register all commands
-  registerCreateTracePoint(context, service, treeDataProvider);
+  registerCreateRootTracePoint(context, service, treeDataProvider);
+  registerCreateSelectedTracePoint(context, service, treeDataProvider,treeView); 
   registerUpdateTracePoint(context, service, treeView);
   registerMoveUp(context, service, treeView, treeDataProvider);
   registerMoveDown(context, service, treeView, treeDataProvider);
@@ -39,7 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
   registerGoToTracePoint(context, service, treeView);
   registerRenameTracePoint(context, service, treeView, treeDataProvider);
   registerDeleteTracePoints(context, service, treeView, treeDataProvider);
-  registerAddChildTracePoint(context, service, treeView, treeDataProvider);
 
   // Load initial state
   service.loadState().then(() => treeDataProvider.refresh());
@@ -50,6 +50,5 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  // Save state when the extension is deactivated (e.g., VSCode closes)
   service.saveState();
 }

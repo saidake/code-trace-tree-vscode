@@ -39,8 +39,24 @@
                 "icon": "$(add)"
             },
             {
+                "command": "codeTraceTree.createRootTracePoint",
+                "title": "Create a Root Code Trace Point"
+            },
+            {
+                "command": "codeTraceTree.createSelectedTracePoint",
+                "title": "Create Code Trace Point (Under selected)"
+            },
+            {
                 "command": "codeTraceTree.updateTracePoint",
                 "title": "Update Selected Trace Point"
+            },
+            {
+                "command": "codeTraceTree.renameTracePoint",
+                "title": "Rename Trace Point"
+            },
+            {
+                "command": "codeTraceTree.deleteTracePoints",
+                "title": "Delete Trace Points"
             },
             {
                 "command": "codeTraceTree.moveUp",
@@ -86,18 +102,6 @@
                 "command": "codeTraceTree.goToTracePoint",
                 "title": "Go to Trace Point",
                 "icon": "$(go-to-file)"
-            },
-            {
-                "command": "codeTraceTree.renameTracePoint",
-                "title": "Rename Trace Point"
-            },
-            {
-                "command": "codeTraceTree.deleteTracePoints",
-                "title": "Delete Trace Points"
-            },
-            {
-                "command": "codeTraceTree.addChildTracePoint",
-                "title": "Add Child Trace Point"
             }
         ],
         "menus": {
@@ -153,17 +157,16 @@
                     "command": "codeTraceTree.deleteTracePoints",
                     "group": "navigation@200",
                     "when": "view == codeTraceTree.view && viewItem == traceable"
-                },
-                {
-                    "command": "codeTraceTree.addChildTracePoint",
-                    "group": "navigation@300",
-                    "when": "view == codeTraceTree.view && viewItem == traceable"
                 }
             ],
             "editor/context": [
                 {
-                    "command": "codeTraceTree.createTracePoint",
+                    "command": "codeTraceTree.createRootTracePoint",
                     "group": "navigation"
+                },
+                {
+                    "command": "codeTraceTree.createSelectedTracePoint",
+                    "group": "navigation@50"
                 },
                 {
                     "command": "codeTraceTree.updateTracePoint",
