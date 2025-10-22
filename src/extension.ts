@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { TracePointService } from './TracePointService';
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider';
-import { registerCreateRootTracePoint } from './commands/createRootTracePoint'; 
-import { registerCreateSelectedTracePoint } from './commands/createSelectedTracePoint'; 
+import { registerCreateRootTracePoint } from './commands/createRootTracePoint';
+import { registerCreateSelectedTracePoint } from './commands/createSelectedTracePoint';
 import { registerUpdateTracePoint } from './commands/updateTracePoint';
 import { registerMoveUp } from './commands/moveUp';
 import { registerMoveDown } from './commands/moveDown';
@@ -27,12 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register all commands
   registerCreateRootTracePoint(context, service, treeDataProvider);
-  registerCreateSelectedTracePoint(context, service, treeDataProvider,treeView); 
+  registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);
   registerUpdateTracePoint(context, service, treeView);
   registerMoveUp(context, service, treeView, treeDataProvider);
   registerMoveDown(context, service, treeView, treeDataProvider);
-  registerExpandSelected(context, treeView);
-  registerCollapseAll(context, treeView);
+  registerExpandSelected(context, treeView, treeDataProvider);
+  registerCollapseAll(context, treeView, treeDataProvider);
   registerToggleHighlights(context, service);
   registerToggleDescription(context, service, treeDataProvider);
   registerExportTracePoints(context, service);

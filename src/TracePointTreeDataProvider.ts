@@ -136,4 +136,89 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
         }
         return false;
     }
+
+
+    // Add these methods to the TracePointTreeDataProvider class (at the end, before the closing brace)
+
+    private async expandItemRecursively(
+        treeView: vscode.TreeView<vscode.TreeItem>,
+        item: vscode.TreeItem
+    ): Promise<void> {
+        // Expand current item
+        await treeView.reveal(item, { expand: true, focus: false, select: false });
+
+        // Get all children recursively and expand them
+        const allChildren = this.getAllChildrenRecursively(item.id!);
+        for (const child of allChildren) {
+            await treeView.reveal(child, { expand: true, focus: false, select: false });
+        }
+    }
+
+    /**
+     * Get all children of an item recursively
+     */
+    getAllChildrenRecursively(itemId: string): vscode.TreeItem[] {
+        const allChildren: vscode.TreeItem[] = [];
+
+        const getChildrenRecursive = (id: string) => {
+            const childrenIds = this.childrenMap.get(id) || [];
+            childrenIds.forEach(childId => {
+                const childItem = this.treeItems.get(childId);
+                if (childItem) {
+                    allChildren.push(childItem);
+                    getChildrenRecursive(childId);
+                }
+            });
+        };
+
+        getChildrenRecursive(itemId);
+        return allChildren;
+    }
+
+
+    /**
+     * Get all root items
+     */
+    getRootItems(): vscode.TreeItem[] {
+        return (this.childrenMap.get('root') || []).map(id => this.treeItems.get(id)!);
+    }
+
+    /**
+     * Expand selected items and all their children recursively
+     */
+    async expandSelectedAndChildren(treeView: vscode.TreeView<vscode.TreeItem>): Promise<number> {
+        const selected = await treeView.selection;
+        if (selected.length === 0) return 0;
+
+        let expandedCount = 0;
+        for (const item of selected) {
+            await this.expandItemRecursively(treeView, item);
+            expandedCount++;
+        }
+        return expandedCount;
+    }
+
+    getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
+        if (!element.id) return undefined;
+
+        const tracePoints = this.service.getTracePoints();
+        const currentTp = tracePoints.find(tp => tp.id === element.id);
+        if (!currentTp || !currentTp.parentId) return undefined;
+
+        // Find parent trace point
+        const parentTp = tracePoints.find(tp => tp.id === currentTp.parentId);
+        if (!parentTp) return undefined;
+
+        // Return parent TreeItem
+        return this.treeItems.get(parentTp.id);
+    }
+
+
+    /**
+     * Collapse all items and their children recursively
+     */
+    async collapseAll(): Promise<void> {
+        await vscode.commands.executeCommand('workbench.actions.treeView.codeTraceTree.view.collapseAll');
+    }
+
 }
