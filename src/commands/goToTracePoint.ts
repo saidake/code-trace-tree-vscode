@@ -11,6 +11,9 @@ export function registerGoToTracePoint(context: vscode.ExtensionContext, service
     const tp = service.getTracePoints().find(tp => tp.id === selected[0].id);
     if (tp) {
       await service.navigateToTracePoint(tp);
+      // Re-select and focus the tree item to retain blue highlight
+      service.selectTracePoints([selected[0].id!]);
+      await treeView.reveal(selected[0], { select: true, focus: true });
     }
   }));
 }
