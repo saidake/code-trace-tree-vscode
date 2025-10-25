@@ -104,6 +104,11 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
         const targetId = target.id!;
 
+        // Prevent dropping an item onto itself
+        if (draggedIds.includes(targetId)) {
+            return; // Ignore the drop to avoid circular reference
+        }
+
         // Check if any dragged item is an ancestor of the target
         const isDescendantDrop = draggedIds.some(draggedId => this.isAncestor(draggedId, targetId, tracePoints));
         if (isDescendantDrop) {
@@ -121,7 +126,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
         await this.service.updateTracePoints(updated);
     }
-
+    
     private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
         // If targetId is not in tracePoints, it can't be a descendant
         const target = tracePoints.find(tp => tp.id === targetId);
