@@ -29,7 +29,7 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
     public updateView() {
         if (!this._view) return;
 
-        const selectedIds = Array.from(this.service.getSelectedTracePointIds());
+        const selectedIds = this.service.getSelectedTracePointIds();
         if (selectedIds.length !== 1) {
             this._view.webview.postMessage({
                 command: 'updateDescription',

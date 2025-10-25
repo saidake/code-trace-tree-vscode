@@ -363,7 +363,34 @@ export class TracePointService {
     }
 
 
-    getSelectedTracePointIds(): Set<string> {
-        return new Set(this.selectedTracePointIds);
+    getSelectedTracePointIds(): string[] {
+        return Array.from(this.selectedTracePointIds);
+    }
+
+    async deleteTracePointsWithChildren(ids: string[]) {
+        // Collect all IDs to delete, including descendants
+        const allIdsToDelete = new Set<string>(ids);
+        const collectChildren = (parentId: string) => {
+            const children = this.tracePoints.filter(tp => tp.parentId === parentId);
+            children.forEach(child => {
+                allIdsToDelete.add(child.id);
+                collectChildren(child.id);
+            });
+        };
+        ids.forEach(id => collectChildren(id));
+        // console.log(`[CodeTraceTree] Total IDs to delete (including children): ${Array.from(allIdsToDelete).join(', ')}`);
+        // Filter out the trace points to delete
+        this.tracePoints = this.tracePoints.filter(tp => !allIdsToDelete.has(tp.id));
+
+        // Remove from selected and expanded sets
+        allIdsToDelete.forEach(id => {
+            this.selectedTracePointIds.delete(id);
+            this.expandedTracePointIds.delete(id);
+        });
+
+        // Update highlights and notify
+        this.applyHighlightsToAllEditors();
+        this.notifyListeners();
+        await this.saveState();
     }
 }
