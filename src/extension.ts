@@ -41,6 +41,11 @@ export function activate(context: vscode.ExtensionContext) {
         treeView.onDidChangeSelection(e => {
             const selectedIds = e.selection.map(item => item.id!).filter(id => id !== undefined);
             service.selectTracePoints(selectedIds);
+            // Re-select and focus the tree item to retain blue highlight
+            const selected = treeView.selection;
+            if(selected.length==1){
+              treeView.reveal(selected[0], { select: true, focus: true });
+            }
         })
     );
 

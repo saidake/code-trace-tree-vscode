@@ -65,12 +65,12 @@ export class TracePointService {
         try {
             const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
             if (state) {
-                // this.tracePoints = state.tracePoints || [];
-                // this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
-                // this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
-                this.tracePoints = [];
-                this.selectedTracePointIds = new Set([]);
-                this.expandedTracePointIds = new Set([]);
+                this.tracePoints = state.tracePoints || [];
+                this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
+                this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
+                // this.tracePoints = [];
+                // this.selectedTracePointIds = new Set([]);
+                // this.expandedTracePointIds = new Set([]);
 
                 this._highlightingEnabled = state.highlightingEnabled;
                 this._descriptionAreaOpened = state.descriptionAreaOpened;
