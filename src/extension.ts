@@ -9,7 +9,6 @@ import { registerMoveDown } from './commands/moveDown';
 import { registerExpandSelected } from './commands/expandSelected';
 import { registerCollapseAll } from './commands/collapseAll';
 import { registerToggleHighlights } from './commands/toggleHighlights';
-import { registerToggleDescription } from './commands/toggleDescription';
 import { registerExportTracePoints } from './commands/exportTracePoints';
 import { registerImportTracePoints } from './commands/importTracePoints';
 import { registerGoToTracePoint } from './commands/goToTracePoint';
@@ -41,7 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
   registerExpandSelected(context, treeView, treeDataProvider);
   registerCollapseAll(context, treeView, treeDataProvider);
   registerToggleHighlights(context, service);
-  registerToggleDescription(context, service, treeDataProvider);
   registerExportTracePoints(context, service);
   registerImportTracePoints(context, service, treeDataProvider);
   registerGoToTracePoint(context, service, treeView);

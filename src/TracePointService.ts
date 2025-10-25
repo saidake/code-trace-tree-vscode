@@ -65,13 +65,13 @@ export class TracePointService {
         try {
             const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
             if (state) {
-                this.tracePoints = state.tracePoints || [];
-                this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
-                this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
-                // this.tracePoints =  [];
-                // this.selectedTracePointIds =  new Set([]);
-                // this.expandedTracePointIds =  new Set([]);
-                
+                // this.tracePoints = state.tracePoints || [];
+                // this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
+                // this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
+                this.tracePoints = [];
+                this.selectedTracePointIds = new Set([]);
+                this.expandedTracePointIds = new Set([]);
+
                 this._highlightingEnabled = state.highlightingEnabled;
                 this._descriptionAreaOpened = state.descriptionAreaOpened;
                 await this.validateTracePointsOnLoad();
@@ -182,7 +182,7 @@ export class TracePointService {
             isValid: !!lineContent,
             totalOccurrenceCount: totalOccurrences,
             occurrenceIndex,
-            description,
+            description, // Defaults to empty string
         };
         this.tracePoints.push(tracePoint);
         this.applyHighlightsToAllEditors();
@@ -360,5 +360,10 @@ export class TracePointService {
         const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0);
         editor.selection = new vscode.Selection(range.start, range.end);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+    }
+
+
+    getSelectedTracePointIds(): Set<string> {
+        return new Set(this.selectedTracePointIds);
     }
 }

@@ -88,11 +88,6 @@
                 "icon": "$(eye)"
             },
             {
-                "command": "codeTraceTree.toggleDescription",
-                "title": "Toggle Description Area",
-                "icon": "$(info)"
-            },
-            {
                 "command": "codeTraceTree.exportTracePoints",
                 "title": "Export Trace Points",
                 "icon": "$(cloud-upload)"
@@ -133,11 +128,6 @@
                 {
                     "command": "codeTraceTree.toggleHighlights",
                     "group": "navigation@500",
-                    "when": "view == codeTraceTree.view"
-                },
-                {
-                    "command": "codeTraceTree.toggleDescription",
-                    "group": "navigation@600",
                     "when": "view == codeTraceTree.view"
                 },
                 {
