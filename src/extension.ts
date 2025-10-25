@@ -21,39 +21,52 @@ let treeDataProvider: TracePointTreeDataProvider;
 let treeView: vscode.TreeView<vscode.TreeItem>;
 
 export function activate(context: vscode.ExtensionContext) {
-  service = TracePointService.getInstance(context);
-  treeDataProvider = new TracePointTreeDataProvider(service);
-  treeView = vscode.window.createTreeView('codeTraceTree.view', { treeDataProvider, canSelectMany: true,showCollapseAll: true, dragAndDropController: treeDataProvider });
+    service = TracePointService.getInstance(context);
+    treeDataProvider = new TracePointTreeDataProvider(service);
+    treeView = vscode.window.createTreeView('codeTraceTree.view', {
+        treeDataProvider,
+        canSelectMany: true,
+        showCollapseAll: true,
+        dragAndDropController: treeDataProvider
+    });
 
-  // description Webview
-  const descProvider = new DescriptionViewProvider(context.extensionUri, service);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
-  );
+    // description Webview
+    const descProvider = new DescriptionViewProvider(context.extensionUri, service);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
+    );
 
-  // Register all commands
-  registerCreateRootTracePoint(context, service, treeDataProvider);
-  registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);
-  registerUpdateTracePoint(context, service, treeView);
-  registerMoveUp(context, service, treeView, treeDataProvider);
-  registerMoveDown(context, service, treeView, treeDataProvider);
-  registerExpandSelected(context, treeView, treeDataProvider);
-  registerCollapseAll(context, treeView, treeDataProvider);
-  registerToggleHighlights(context, service);
-  registerExportTracePoints(context, service);
-  registerImportTracePoints(context, service, treeDataProvider);
-  registerGoToTracePoint(context, service, treeView);
-  registerRenameTracePoint(context, service, treeView, treeDataProvider);
-  registerDeleteTracePoints(context, service, treeView, treeDataProvider);
+    // Listen to tree view selection changes
+    context.subscriptions.push(
+        treeView.onDidChangeSelection(e => {
+            const selectedIds = e.selection.map(item => item.id!).filter(id => id !== undefined);
+            service.selectTracePoints(selectedIds);
+        })
+    );
 
-  // Load initial state
-  service.loadState().then(() => treeDataProvider.refresh());
+    // Register all commands
+    registerCreateRootTracePoint(context, service, treeDataProvider);
+    registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);
+    registerUpdateTracePoint(context, service, treeView);
+    registerMoveUp(context, service, treeView, treeDataProvider);
+    registerMoveDown(context, service, treeView, treeDataProvider);
+    registerExpandSelected(context, treeView, treeDataProvider);
+    registerCollapseAll(context, treeView, treeDataProvider);
+    registerToggleHighlights(context, service);
+    registerExportTracePoints(context, service);
+    registerImportTracePoints(context, service, treeDataProvider);
+    registerGoToTracePoint(context, service, treeView);
+    registerRenameTracePoint(context, service, treeView, treeDataProvider);
+    registerDeleteTracePoints(context, service, treeView, treeDataProvider);
 
-  // Listen for document changes/openings
-  vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e));
-  vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc));
+    // Load initial state
+    service.loadState().then(() => treeDataProvider.refresh());
+
+    // Listen for document changes/openings
+    vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e));
+    vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc));
 }
 
 export function deactivate() {
-  service.saveState();
+    service.saveState();
 }

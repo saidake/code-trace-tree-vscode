@@ -32,7 +32,8 @@
                 },
                 {
                     "id": "codeTraceTree.description",
-                    "name": "Description"
+                    "name": "Description",
+                    "type": "webview"
                 }
             ]
         },
