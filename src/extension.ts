@@ -15,6 +15,7 @@ import { registerImportTracePoints } from './commands/importTracePoints';
 import { registerGoToTracePoint } from './commands/goToTracePoint';
 import { registerRenameTracePoint } from './commands/renameTracePoint';
 import { registerDeleteTracePoints } from './commands/deleteTracePoints';
+import { DescriptionViewProvider } from './DescriptionViewProvider';
 
 let service: TracePointService;
 let treeDataProvider: TracePointTreeDataProvider;
@@ -23,7 +24,13 @@ let treeView: vscode.TreeView<vscode.TreeItem>;
 export function activate(context: vscode.ExtensionContext) {
   service = TracePointService.getInstance(context);
   treeDataProvider = new TracePointTreeDataProvider(service);
-  treeView = vscode.window.createTreeView('codeTraceTree.view', { treeDataProvider, canSelectMany: true, dragAndDropController: treeDataProvider });
+  treeView = vscode.window.createTreeView('codeTraceTree.view', { treeDataProvider, canSelectMany: true,showCollapseAll: true, dragAndDropController: treeDataProvider });
+
+  // description Webview
+  const descProvider = new DescriptionViewProvider(context.extensionUri, service);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
+  );
 
   // Register all commands
   registerCreateRootTracePoint(context, service, treeDataProvider);

@@ -19,7 +19,7 @@
             "activitybar": [
                 {
                     "id": "code-trace-tree-container",
-                    "title": "\u200B",
+                    "title": "Code Trace Tree",
                     "icon": "icons/code_trace_tree_icon.svg"
                 }
             ]
@@ -28,7 +28,11 @@
             "code-trace-tree-container": [
                 {
                     "id": "codeTraceTree.view",
-                    "name": ""
+                    "name": "Trace Points"
+                },
+                {
+                    "id": "codeTraceTree.description",
+                    "name": "Description"
                 }
             ]
         },
