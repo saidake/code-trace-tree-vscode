@@ -8,50 +8,96 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
         private _extensionUri: vscode.Uri,
         private service: TracePointService
     ) {
-        // Listen to trace point and selection changes
         this.service.addListener(() => this.updateView());
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true };
-        this.updateView(); // Initial render
+
+        webviewView.webview.html = this._getHtml();
 
         webviewView.webview.onDidReceiveMessage(async msg => {
             if (msg.command === 'descriptionChanged') {
                 await this.service.updateTracePointDescription(msg.itemId, msg.description);
             }
         });
+
+        this.updateView();
     }
 
     public updateView() {
         if (!this._view) return;
 
         const selectedIds = Array.from(this.service.getSelectedTracePointIds());
-        let html: string;
-
         if (selectedIds.length !== 1) {
-            // Disable textarea when no trace point or multiple trace points are selected
-            html = this._getHtml('', '', true);
-        } else {
-            const tp = this.service.getTracePoints().find(tp => tp.id === selectedIds[0]);
-            html = this._getHtml(tp?.id || '', tp?.description || '', false);
+            this._view.webview.postMessage({
+                command: 'updateDescription',
+                description: '',
+                disabled: true,
+                itemId: '',
+            });
+            return;
         }
 
-        this._view.webview.html = html;
+        const tp = this.service.getTracePoints().find(tp => tp.id === selectedIds[0]);
+        this._view.webview.postMessage({
+            command: 'updateDescription',
+            description: tp?.description || '',
+            disabled: false,
+            itemId: tp?.id || '',
+        });
     }
 
-    private _getHtml(itemId: string, description: string, disabled: boolean): string {
+    private _getHtml(): string {
         return `
         <html>
-        <body style="padding: 10px;">
+        <body style="padding: 10px; height: 100vh;">
             <textarea 
-                style="width: 100%; height: 100%; resize: none; font-family: inherit;" 
-                ${disabled ? 'disabled' : ''} 
-                oninput="vscode.postMessage({command: 'descriptionChanged', description: this.value, itemId: '${itemId}'})"
-            >${description}</textarea>
+                id="desc"
+                style="
+                    width: 100%;
+                    height: 100%;
+                    resize: none;
+                    font-family: inherit;
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    color: var(--vscode-editor-foreground);
+                    background-color: rgba(240, 240, 240, 0.1);
+                    transition: background-color 0.2s ease;
+                "
+                disabled
+                oninput="vscode.postMessage({command: 'descriptionChanged', description: this.value, itemId: window.currentItemId})"
+            ></textarea>
+            <style>
+                textarea:not(:disabled) {
+                    background-color: rgba(240, 240, 240, 0.15);
+                }
+
+                textarea:disabled {
+                    background-color: rgba(128, 128, 128, 0.15);
+                    color: rgba(200, 200, 200, 0.6);
+                    cursor: not-allowed;
+                    opacity: 0.7;
+                }
+
+                textarea:focus {
+                    outline: 1px solid var(--vscode-focusBorder);
+                    background-color: rgba(240, 240, 240, 0.2);
+                }
+            </style>
             <script>
                 const vscode = acquireVsCodeApi();
+                window.currentItemId = '';
+
+                window.addEventListener('message', event => {
+                    const { command, description, disabled, itemId } = event.data;
+                    if (command === 'updateDescription') {
+                        const textarea = document.getElementById('desc');
+                        textarea.value = description;
+                        textarea.disabled = disabled;
+                        window.currentItemId = itemId;
+                    }
+                });
             </script>
         </body>
         </html>`;
