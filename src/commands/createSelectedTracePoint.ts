@@ -23,10 +23,9 @@ export function registerCreateSelectedTracePoint(context: vscode.ExtensionContex
       prompt: 'Enter name for the child trace point (optional)', 
       placeHolder: 'Leave empty for no name' 
     });
-    
-    if (name !== undefined) {
-      await service.addTracePoint(name ?? '', editor.document.uri, lineNumber, parentId);
-      treeDataProvider.refresh();
-    }
+
+    // Allow empty string or undefined
+    await service.addTracePoint(name ?? '', editor.document.uri, lineNumber, parentId);
+    treeDataProvider.refresh();
   }));
 }
