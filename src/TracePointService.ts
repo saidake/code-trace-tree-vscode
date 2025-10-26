@@ -54,13 +54,15 @@ export class TracePointService {
                 this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
                 // this.tracePoints = [];
+                // this.selectedTracePointIds = new Set([]);
+                // this.expandedTracePointIds = new Set([]);
+
+
                 this.tracePointMap = new Map(state.tracePoints.map(tp => [tp.id, tp]));
                 this.rebuildChildrenMap(state.tracePoints);
                 this.rebuildTreeItemMap(state.tracePoints);
 
-                // this.selectedTracePointIds = new Set([]);
-                // this.expandedTracePointIds = new Set([]);
-
+         
                 // this.tracePointMap = new Map();
                 // this.tracePointChildrenMap = new Map();
 
@@ -170,7 +172,7 @@ export class TracePointService {
             projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
             lineContent,
             isValid: true,
-            totalOccurrenceCount: totalOccurrences,
+            totalOccurrences: totalOccurrences,
             occurrenceIndex,
             description, // Defaults to empty string
         };
@@ -295,10 +297,10 @@ export class TracePointService {
 
     async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
         const filePath = vscode.workspace.asRelativePath(event.document.uri);
-        const affectedTracePoints = this.tracePoints.filter(tp => tp.filePath === filePath);
+        const affectedTracePoints: TracePoint[] = this.tracePoints.filter(tp => tp.filePath === filePath);
         if (affectedTracePoints.length === 0) return;
 
-        const updatedTracePoints = this.tracePoints.map(tp => {
+        const updatedTracePoints : TracePoint[] = this.tracePoints.map(tp => {
             if (tp.filePath !== filePath) return tp;
 
             let adjustedLine0 = tp.lineNumber - 1;
@@ -348,17 +350,17 @@ export class TracePointService {
 
     private async validateTracePointsOnLoad() {
         const updatedTracePoints = await Promise.all(this.tracePoints.map(async tp => {
-            if (!tp.id || !tp.filePath || !tp.projectPath) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+            if (!tp.id || !tp.filePath || !tp.projectPath) return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.filePath));
             try {
                 const document = await vscode.workspace.openTextDocument(fileUri);
-                if (tp.lineNumber > document.lineCount) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+                if (tp.lineNumber > document.lineCount) return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
                 const currentContent = document.lineAt(tp.lineNumber - 1).text;
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, tp.lineContent);
                 const occurrenceIndex = matchingLines.indexOf(tp.lineNumber) + 1;
-                return { ...tp, totalOccurrenceCount: totalOccurrences, occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0, isValid: true };
+                return { ...tp, totalOccurrences: totalOccurrences, occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0, isValid: true };
             } catch {
-                return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+                return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
         }));
         this.tracePoints = updatedTracePoints;

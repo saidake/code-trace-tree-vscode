@@ -22,7 +22,7 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
     const selectedIds = selected.map(item => item.id!);
     const updatedTracePoints = service.getTracePoints().map(tp => {
       if (selectedIds.includes(tp.id)) {
-        return { ...tp, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrenceCount: totalOccurrences, occurrenceIndex };
+        return { ...tp, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex };
       }
       return tp;
     });

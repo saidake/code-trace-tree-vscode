@@ -9,10 +9,12 @@ export interface TracePoint {
     childCount : number;
 
     projectPath: string;
+    
     lineContent?: string;
     isValid: boolean;
-    totalOccurrenceCount: number;
+    totalOccurrences: number;
     occurrenceIndex: number;
+
     description: string;
 }
 
