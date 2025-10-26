@@ -21,11 +21,11 @@ export function registerImportTracePoints(
       const data = await vscode.workspace.fs.readFile(uri[0]);
       const xml = new TextDecoder().decode(data);
       const parsed: TracePointExportState = parseXml(xml);
-      console.log("[CraigTest] parsed: ",parsed);
+      // console.log("[CraigTest] parsed: ",parsed);
 
       const state = parsed.TracePointState;
 
-      const tracePointsArray = state.tracePointsContainer?.tracePoint ?? [];
+      const tracePointsArray = state.tracePoints?.tracePoint ?? [];
 
       const currentProjectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
 
@@ -35,7 +35,8 @@ export function registerImportTracePoints(
       }));
 
       await service.updateTracePoints(updatedTracePoints);
-      service.setExpandedTracePointIds(state.expandedTracePointIds || []);
+      const expandedIdsArray = state.expandedTracePointIds.id || [];
+      service.setExpandedTracePointIds(new Set(expandedIdsArray));
       service.setHighlightingEnabled(state.highlightingEnabled ?? true);
 
       treeDataProvider.refresh();

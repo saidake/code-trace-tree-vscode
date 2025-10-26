@@ -22,10 +22,12 @@ export interface TracePointState {
 
 export interface TracePointExportState {
     TracePointState: {
-        tracePointsContainer: {
+        tracePoints: {
             tracePoint: TracePoint[]; 
         };
-        expandedTracePointIds: string[];
+        expandedTracePointIds:  {
+            id: string[]; 
+        };
         highlightingEnabled: boolean;
     };
 }

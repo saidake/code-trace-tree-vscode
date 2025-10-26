@@ -44,12 +44,26 @@ export function activate(context: vscode.ExtensionContext) {
             service.selectTracePoints(selectedIds);
             // Re-select and focus the tree item to retain blue highlight
             const selected = treeView.selection;
-            if(selected.length==1){
-              treeView.reveal(selected[0], { select: true, focus: true });
+            if (selected.length == 1) {
+                treeView.reveal(selected[0], { select: true, focus: true });
             }
         })
     );
-
+    // Listen to tree view expand/collapse events
+    context.subscriptions.push(
+        treeView.onDidExpandElement(e => {
+            const id = e.element.id!;
+            const expanded = service.getExpandedTracePointIds();
+            expanded.add(id);
+            service.setExpandedTracePointIds(expanded);
+        }),
+        treeView.onDidCollapseElement(e => {
+            const id = e.element.id!;
+            const expanded = service.getExpandedTracePointIds();
+            expanded.delete(id);
+            service.setExpandedTracePointIds(expanded);
+        })
+    );
     // Register all commands
     registerCreateRootTracePoint(context, service, treeDataProvider);
     registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);

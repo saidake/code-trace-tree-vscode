@@ -24,10 +24,12 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
     // Convert state to xml data
     const exportState: TracePointExportState = {
       TracePointState: {
-        tracePointsContainer: {
+        tracePoints: {
           tracePoint: state.tracePoints
         },
-        expandedTracePointIds: service.getExpandedTracePointIds(),
+        expandedTracePointIds: {
+          id: Array.from(service.getExpandedTracePointIds())
+        },
         highlightingEnabled: state.highlightingEnabled,
       },
     };

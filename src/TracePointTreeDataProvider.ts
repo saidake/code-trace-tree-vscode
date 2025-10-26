@@ -11,7 +11,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     private childrenMap: Map<string, string[]> = new Map();
 
     constructor(private service: TracePointService) {
-        this.service.addListener((tracePoints, expandedIds) => this.refresh());
+        this.service.addListener((tracePoints) => this.refresh());
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -27,15 +27,26 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     }
 
     private buildTree(): vscode.TreeItem[] {
+        console.log("[Test] buildTree triggered")
         this.treeItems.clear();
         this.childrenMap.clear();
         const tracePoints = this.service.getTracePoints();
+        const expandedIds = this.service.getExpandedTracePointIds(); // Get expanded IDs
+
         tracePoints.forEach(tp => {
             // Check if the trace point has children
             const hasChildren = tracePoints.some(child => child.parentId === tp.id);
+            // Determine collapsible state based on expandedIds
+            let collapsibleState = vscode.TreeItemCollapsibleState.None;
+            if (tp.isValid && hasChildren) {
+                collapsibleState = expandedIds.has(tp.id)
+                    ? vscode.TreeItemCollapsibleState.Expanded
+                    : vscode.TreeItemCollapsibleState.Collapsed;
+            }
+
             const item = new vscode.TreeItem(
                 `${tp.name || ''} (${tp.fileName}: ${tp.lineNumber})`,
-                tp.isValid && hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+                collapsibleState
             );
             item.id = tp.id;
             item.contextValue = 'traceable';
@@ -56,8 +67,15 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     }
 
     refresh(): void {
-        this._onDidChangeTreeData.fire(undefined); // refreshes entire tree
+        this._onDidChangeTreeData.fire(undefined); 
     }
+    // refresh(item: vscode.TreeItem): void {
+    //     this._onDidChangeTreeData.fire(item); 
+    // }
+
+    // refreshAll(): void {
+    //     this._onDidChangeTreeData.fire(undefined); 
+    // }
 
     handleDrag(source: readonly vscode.TreeItem[], dataTransfer: vscode.DataTransfer): void {
         dataTransfer.set('application/vnd.code.tree.codetracetree', new vscode.DataTransferItem(source.map(item => item.id)));
@@ -127,7 +145,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
         await this.service.updateTracePoints(updated);
     }
-    
+
     private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
         // If targetId is not in tracePoints, it can't be a descendant
         const target = tracePoints.find(tp => tp.id === targetId);

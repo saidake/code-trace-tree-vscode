@@ -13,7 +13,7 @@ export class TracePointService {
     private selectedTracePointIds: Set<string> = new Set();
     private expandedTracePointIds: Set<string> = new Set();
     private highlighters: Map<string, vscode.TextEditorDecorationType> = new Map(); // Key: fileUri
-    private listeners: ((tracePoints: TracePoint[], expandedIds: string[]) => void)[] = [];
+    private listeners: ((tracePoints: TracePoint[]) => void)[] = [];
     private _highlightingEnabled: boolean = true;
     private _descriptionAreaOpened: boolean = false;
 
@@ -96,14 +96,12 @@ export class TracePointService {
         this.saveState();
     }
 
-    getExpandedTracePointIds(): string[] {
-        return Array.from(this.expandedTracePointIds);
+    getExpandedTracePointIds(): Set<string> {
+        return this.expandedTracePointIds;
     }
 
-    setExpandedTracePointIds(ids: string[]) {
-        this.expandedTracePointIds.clear();
-        ids.forEach(id => this.expandedTracePointIds.add(id));
-        this.notifyListeners();
+    setExpandedTracePointIds(expandedTracePointIds: Set<string>) {
+        this.expandedTracePointIds=expandedTracePointIds;
         this.saveState();
     }
 
@@ -135,12 +133,12 @@ export class TracePointService {
         };
     }
 
-    addListener(listener: (tracePoints: TracePoint[], expandedIds: string[]) => void) {
+    addListener(listener: (tracePoints: TracePoint[]) => void) {
         this.listeners.push(listener);
     }
 
     private notifyListeners() {
-        this.listeners.forEach(listener => listener(this.getTracePoints(), this.getExpandedTracePointIds()));
+        this.listeners.forEach(listener => listener(this.getTracePoints()));
     }
 
     async addTracePoint(name: string, file: vscode.Uri, lineNumber: number, parentId?: string, description = '') {
