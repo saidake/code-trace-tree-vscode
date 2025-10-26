@@ -153,7 +153,7 @@ export class TracePointService {
 
     async addTracePoint(name: string, file: vscode.Uri, lineNumber: number, parentId?: string, description = '') {
         const document = await vscode.workspace.openTextDocument(file);
-        const lineContent = document.lineAt(lineNumber - 1).text.trim();
+        const lineContent = document.lineAt(lineNumber - 1).text;
         const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent);
         const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
 
@@ -198,8 +198,8 @@ export class TracePointService {
         const tp = this.getTracePointById(id);
         if (tp) {
             tp.description = newDescription;
-            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
             this.updateTreeItem(tp);
+            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
             this.saveState();
         }
     }
@@ -207,9 +207,10 @@ export class TracePointService {
     async renameTracePoint(id: string, newName: string) {
         const tp = this.getTracePointById(id);
         if (tp) {
-            tp.name == newName;
-            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
+            tp.name = newName;
             this.updateTreeItem(tp);
+            console.log("[TEST] renameTracePoint, tp: ",tp, " newName: ",newName)
+            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
             this.saveState();
         }
     }
@@ -236,7 +237,7 @@ export class TracePointService {
         if (!content) return [0, []];
         const matchingLines: number[] = [];
         for (let i = 0; i < document.lineCount; i++) {
-            if (document.lineAt(i).text.trim() === content) {
+            if (document.lineAt(i).text === content) {
                 matchingLines.push(i + 1);
             }
         }
@@ -315,7 +316,7 @@ export class TracePointService {
                 return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
 
-            const currentContent = event.document.lineAt(adjustedLine0).text.trim();
+            const currentContent = event.document.lineAt(adjustedLine0).text;
             if (currentContent !== tp.lineContent) {
                 return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
@@ -333,8 +334,8 @@ export class TracePointService {
 
         this.tracePoints = updatedTracePoints;
         this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
-        // this.rebuildChildrenMap(updatedTracePoints)
-        // this.rebuildTreeItemMap(updatedTracePoints);
+        this.rebuildChildrenMap(updatedTracePoints)
+        this.rebuildTreeItemMap(updatedTracePoints);
         this.highlightTracePointsInFile(event.document);
         const parentIdsToUpdate = affectedTracePoints.map(tp => tp.parentId ?? 'root');
         if (parentIdsToUpdate.includes('root')) {
@@ -352,7 +353,7 @@ export class TracePointService {
             try {
                 const document = await vscode.workspace.openTextDocument(fileUri);
                 if (tp.lineNumber > document.lineCount) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
-                const currentContent = document.lineAt(tp.lineNumber - 1).text.trim();
+                const currentContent = document.lineAt(tp.lineNumber - 1).text;
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, tp.lineContent);
                 const occurrenceIndex = matchingLines.indexOf(tp.lineNumber) + 1;
                 return { ...tp, totalOccurrenceCount: totalOccurrences, occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0, isValid: true };
@@ -459,6 +460,7 @@ export class TracePointService {
             title: 'Go to Trace Point',
             arguments: [item]
         };
+        // item.iconPath = new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
         if (!tp.isValid) item.label = `~~${item.label}~~`; // Strikethrough for invalid
 
         this.treeItemMap.set(tp.id, item);
