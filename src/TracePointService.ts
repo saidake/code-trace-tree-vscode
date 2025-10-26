@@ -3,28 +3,9 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { parseXml, serializeXml } from './utils/xmlUtils';
 import { CODE_TRACE_TREE_STATE_KEY } from './domain/constants';
+import { TracePoint, TracePointState } from './domain/types';
 
-export interface TracePoint {
-    id: string;
-    name: string;
-    fileName: string;
-    lineNumber: number;
-    parentId?: string;
-    projectPath: string;
-    lineContent?: string;
-    isValid: boolean;
-    totalOccurrenceCount: number;
-    occurrenceIndex: number;
-    description: string;
-}
 
-interface TracePointState {
-    tracePoints: TracePoint[];
-    selectedTracePointIds: string[];
-    expandedTracePointIds: string[];
-    highlightingEnabled: boolean;
-    descriptionAreaOpened: boolean;
-}
 
 export class TracePointService {
     private static instance: TracePointService;
@@ -55,7 +36,6 @@ export class TracePointService {
                 selectedTracePointIds: [],
                 expandedTracePointIds: [],
                 highlightingEnabled: true,
-                descriptionAreaOpened: false,
             };
             await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, initialState);
         }
@@ -73,7 +53,6 @@ export class TracePointService {
                 // this.expandedTracePointIds = new Set([]);
 
                 this._highlightingEnabled = state.highlightingEnabled;
-                this._descriptionAreaOpened = state.descriptionAreaOpened;
                 await this.validateTracePointsOnLoad();
                 this.notifyListeners();
             }
@@ -88,7 +67,6 @@ export class TracePointService {
             selectedTracePointIds: Array.from(this.selectedTracePointIds),
             expandedTracePointIds: Array.from(this.expandedTracePointIds),
             highlightingEnabled: this._highlightingEnabled ?? true,
-            descriptionAreaOpened: this._descriptionAreaOpened ?? false,
         };
         await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, state);
     }
@@ -154,7 +132,6 @@ export class TracePointService {
             selectedTracePointIds: Array.from(this.selectedTracePointIds),
             expandedTracePointIds: Array.from(this.expandedTracePointIds),
             highlightingEnabled: this.isHighlightingEnabled(),
-            descriptionAreaOpened: this.isDescriptionAreaOpened(),
         };
     }
 
@@ -171,10 +148,14 @@ export class TracePointService {
         const lineContent = document.lineAt(lineNumber - 1).text.trim();
         const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent);
         const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
+
+        const filePath = vscode.workspace.asRelativePath(file); 
+        const fileName = path.basename(filePath);
         const tracePoint: TracePoint = {
             id: uuidv4(),
             name,
-            fileName: vscode.workspace.asRelativePath(file),
+            filePath,
+            fileName,
             lineNumber,
             parentId,
             projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
@@ -239,7 +220,7 @@ export class TracePointService {
 
     async attachListenersAndHighlight(document: vscode.TextDocument) {
         // Global listener handles this; just highlight if relevant
-        if (this.tracePoints.some(tp => tp.fileName === vscode.workspace.asRelativePath(document.uri))) {
+        if (this.tracePoints.some(tp => tp.filePath === vscode.workspace.asRelativePath(document.uri))) {
             this.highlightTracePointsInFile(document);
         }
     }
@@ -247,7 +228,7 @@ export class TracePointService {
     async highlightTracePointsInFile(document: vscode.TextDocument) {
         if (!this.isHighlightingEnabled()) return;
         const filePath = vscode.workspace.asRelativePath(document.uri);
-        const relevantTracePoints = this.tracePoints.filter(tp => tp.fileName === filePath && tp.isValid);
+        const relevantTracePoints = this.tracePoints.filter(tp => tp.filePath === filePath && tp.isValid);
         this.removeHighlights(document.uri.fsPath);
 
         const decorationType = vscode.window.createTextEditorDecorationType({
@@ -289,11 +270,11 @@ export class TracePointService {
 
     async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
         const filePath = vscode.workspace.asRelativePath(event.document.uri);
-        const affectedTracePoints = this.tracePoints.filter(tp => tp.fileName === filePath);
+        const affectedTracePoints = this.tracePoints.filter(tp => tp.filePath === filePath);
         if (affectedTracePoints.length === 0) return;
 
         const updatedTracePoints = this.tracePoints.map(tp => {
-            if (tp.fileName !== filePath) return tp;
+            if (tp.filePath !== filePath) return tp;
 
             // Adjust line number based on cumulative deltas
             let adjustedLine0 = tp.lineNumber - 1;
@@ -335,8 +316,8 @@ export class TracePointService {
 
     private async validateTracePointsOnLoad() {
         const updatedTracePoints = await Promise.all(this.tracePoints.map(async tp => {
-            if (!tp.id || !tp.fileName || !tp.projectPath) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
-            const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.fileName));
+            if (!tp.id || !tp.filePath || !tp.projectPath) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+            const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.filePath));
             try {
                 const document = await vscode.workspace.openTextDocument(fileUri);
                 if (tp.lineNumber > document.lineCount) return { ...tp, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
@@ -354,7 +335,7 @@ export class TracePointService {
     }
 
     async navigateToTracePoint(tp: TracePoint) {
-        const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.fileName));
+        const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.filePath));
         const doc = await vscode.workspace.openTextDocument(fileUri);
         const editor = await vscode.window.showTextDocument(doc);
         const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0);

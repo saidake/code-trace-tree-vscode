@@ -1,9 +1,21 @@
-import * as xmljs from 'xml-js';
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
+
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  parseTagValue: true,   
+  trimValues: true,      
+});
+
+const builder = new XMLBuilder({
+  ignoreAttributes: false,
+  format: true,          
+  indentBy: '  ',
+});
 
 export function parseXml(xml: string): any {
-  return xmljs.xml2js(xml, { compact: true });
+  return parser.parse(xml);
 }
 
 export function serializeXml(obj: any): string {
-  return xmljs.js2xml(obj, { compact: true, spaces: 2 });
+  return builder.build(obj);
 }

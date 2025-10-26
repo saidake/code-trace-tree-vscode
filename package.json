@@ -181,7 +181,7 @@
         "typescript": "^5.1.6"
     },
     "dependencies": {
-        "uuid": "^13.0.0",
-        "xml-js": "^1.6.11"
+        "fast-xml-parser": "^5.3.0",
+        "uuid": "^13.0.0"
     }
 }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { TracePointService, TracePoint } from './TracePointService';
+import { TracePointService } from './TracePointService';
+import { TracePoint } from './domain/types';
 
 export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.TreeDragAndDropController<vscode.TreeItem> {
     private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | undefined>();
@@ -33,7 +34,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             // Check if the trace point has children
             const hasChildren = tracePoints.some(child => child.parentId === tp.id);
             const item = new vscode.TreeItem(
-                `${tp.name || ''} (${tp.fileName.split('/').pop()}: ${tp.lineNumber})`,
+                `${tp.name || ''} (${tp.fileName}: ${tp.lineNumber})`,
                 tp.isValid && hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
             );
             item.id = tp.id;
@@ -145,7 +146,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
     // Add these methods to the TracePointTreeDataProvider class (at the end, before the closing brace)
 
-    private async expandItemRecursively(
+    async expandItemRecursively(
         treeView: vscode.TreeView<vscode.TreeItem>,
         item: vscode.TreeItem
     ): Promise<void> {
