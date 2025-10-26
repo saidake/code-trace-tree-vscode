@@ -7,11 +7,9 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     onDidChangeTreeData = this._onDidChangeTreeData.event;
     dropMimeTypes = ['application/vnd.code.tree.codetracetree'];
     dragMimeTypes = ['application/vnd.code.tree.codetracetree'];
-    private treeItems: Map<string, vscode.TreeItem> = new Map();
-    private childrenMap: Map<string, string[]> = new Map();
 
     constructor(private service: TracePointService) {
-        this.service.addListener((tracePoints) => this.refresh());
+        this.service.addListener((tracePoints, changeType, affectedIds) => this.refresh(changeType, affectedIds));
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -19,63 +17,31 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     }
 
     getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
-        if (!element) {
-            return this.buildTree();
+        const childrenMap = this.service.getTracePointChildrenMap();
+        const treeItemMap = this.service.getTreeItemMap();
+        console.log("[Test] getChildren triggered, element: ", element, "tracePoints: ", this.service.getTracePoints());
+        return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
+    }
+
+
+    // Update the tree view when the command is executed.
+    private refresh(changeType?: 'add' | 'update' | 'delete' | 'select' | 'description-update' | 'all', affectedIds: string[] = []): void {
+        const treeItemMap = this.service.getTreeItemMap();
+        if (changeType === 'all' || !changeType) {
+            console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePoints(), "affectedIds: ", affectedIds)
+            this._onDidChangeTreeData.fire(undefined); // Full refresh
+            return;
         }
-        const id = element.id!;
-        return (this.childrenMap.get(id) || []).map(childId => this.treeItems.get(childId)!);
+
+        if (changeType === 'add' || changeType === 'update' || changeType === 'description-update' || changeType === 'delete') {
+            console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePoints(), "affectedIds: ", affectedIds)
+            affectedIds.forEach(id => {
+                console.log("[Test] refresh - treeItemMap.get(id): ", treeItemMap.get(id))
+                this._onDidChangeTreeData.fire(treeItemMap.get(id));
+            });
+        }
     }
 
-    private buildTree(): vscode.TreeItem[] {
-        console.log("[Test] buildTree triggered")
-        this.treeItems.clear();
-        this.childrenMap.clear();
-        const tracePoints = this.service.getTracePoints();
-        const expandedIds = this.service.getExpandedTracePointIds(); // Get expanded IDs
-
-        tracePoints.forEach(tp => {
-            // Check if the trace point has children
-            const hasChildren = tracePoints.some(child => child.parentId === tp.id);
-            // Determine collapsible state based on expandedIds
-            let collapsibleState = vscode.TreeItemCollapsibleState.None;
-            if (tp.isValid && hasChildren) {
-                collapsibleState = expandedIds.has(tp.id)
-                    ? vscode.TreeItemCollapsibleState.Expanded
-                    : vscode.TreeItemCollapsibleState.Collapsed;
-            }
-
-            const item = new vscode.TreeItem(
-                `${tp.name || ''} (${tp.fileName}: ${tp.lineNumber})`,
-                collapsibleState
-            );
-            item.id = tp.id;
-            item.contextValue = 'traceable';
-            item.description = tp.description ? tp.description.substring(0, 50) + '...' : '';
-            item.tooltip = undefined; // Explicitly disable tooltip on hover
-            item.command = {
-                command: 'codeTraceTree.goToTracePoint',
-                title: 'Go to Trace Point',
-                arguments: [item]
-            };
-            if (!tp.isValid) item.label = `~~${item.label}~~`; // Strikethrough for invalid
-            this.treeItems.set(tp.id, item);
-            const parentId = tp.parentId || 'root';
-            if (!this.childrenMap.has(parentId)) this.childrenMap.set(parentId, []);
-            this.childrenMap.get(parentId)!.push(tp.id);
-        });
-        return (this.childrenMap.get('root') || []).map(id => this.treeItems.get(id)!);
-    }
-
-    refresh(): void {
-        this._onDidChangeTreeData.fire(undefined); 
-    }
-    // refresh(item: vscode.TreeItem): void {
-    //     this._onDidChangeTreeData.fire(item); 
-    // }
-
-    // refreshAll(): void {
-    //     this._onDidChangeTreeData.fire(undefined); 
-    // }
 
     handleDrag(source: readonly vscode.TreeItem[], dataTransfer: vscode.DataTransfer): void {
         dataTransfer.set('application/vnd.code.tree.codetracetree', new vscode.DataTransferItem(source.map(item => item.id)));
@@ -117,7 +83,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                 }
             }
 
-            await this.service.updateTracePoints(updatedTracePoints);
+            await this.service.setTracePoints(updatedTracePoints);
             return;
         }
 
@@ -143,7 +109,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             return tp;
         });
 
-        await this.service.updateTracePoints(updated);
+        await this.service.setTracePoints(updated);
     }
 
     private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
@@ -183,11 +149,12 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
      */
     getAllChildrenRecursively(itemId: string): vscode.TreeItem[] {
         const allChildren: vscode.TreeItem[] = [];
-
+        const childrenMap = this.service.getTracePointChildrenMap();
+        const treeItemMap = this.service.getTreeItemMap();
         const getChildrenRecursive = (id: string) => {
-            const childrenIds = this.childrenMap.get(id) || [];
+            const childrenIds = childrenMap.get(id) || [];
             childrenIds.forEach(childId => {
-                const childItem = this.treeItems.get(childId);
+                const childItem = treeItemMap.get(childId);
                 if (childItem) {
                     allChildren.push(childItem);
                     getChildrenRecursive(childId);
@@ -204,7 +171,9 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
      * Get all root items
      */
     getRootItems(): vscode.TreeItem[] {
-        return (this.childrenMap.get('root') || []).map(id => this.treeItems.get(id)!);
+        const childrenMap = this.service.getTracePointChildrenMap();
+        const treeItemMap = this.service.getTreeItemMap();
+        return (childrenMap.get('root') || []).map(id => treeItemMap.get(id)!);
     }
 
     /**
@@ -224,17 +193,13 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
 
     getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
         if (!element.id) return undefined;
-
-        const tracePoints = this.service.getTracePoints();
-        const currentTp = tracePoints.find(tp => tp.id === element.id);
-        if (!currentTp || !currentTp.parentId) return undefined;
-
+        const treeItemMap = this.service.getTreeItemMap();
+        const tracePointMap = this.service.getTracePointMap();
         // Find parent trace point
-        const parentTp = tracePoints.find(tp => tp.id === currentTp.parentId);
-        if (!parentTp) return undefined;
-
+        const currentTp = tracePointMap.get(element.id);
+        if (!currentTp || !currentTp.parentId || currentTp.parentId == "root") return undefined;
         // Return parent TreeItem
-        return this.treeItems.get(parentTp.id);
+        return treeItemMap.get(currentTp.parentId);
     }
 
 

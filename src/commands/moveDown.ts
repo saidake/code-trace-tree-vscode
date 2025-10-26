@@ -29,8 +29,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
         }
       });
     });
-    await service.updateTracePoints(updated);
+    await service.setTracePoints(updated);
     service.selectTracePoints(selectedIds);
-    treeDataProvider.refresh();
   }));
 }

@@ -26,6 +26,5 @@ export function registerCreateSelectedTracePoint(context: vscode.ExtensionContex
 
     // Allow empty string or undefined
     await service.addTracePoint(name ?? '', editor.document.uri, lineNumber, parentId);
-    treeDataProvider.refresh();
   }));
 }

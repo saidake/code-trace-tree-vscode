@@ -3,7 +3,7 @@ import { TracePointService } from './TracePointService';
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider';
 import { registerCreateRootTracePoint } from './commands/createRootTracePoint';
 import { registerCreateSelectedTracePoint } from './commands/createSelectedTracePoint';
-import { registerUpdateTracePoint } from './commands/updateTracePoint';
+// import { registerUpdateTracePoint } from './commands/updateTracePoint';
 import { registerMoveUp } from './commands/moveUp';
 import { registerMoveDown } from './commands/moveDown';
 import { registerExpandSelected } from './commands/expandSelected';
@@ -42,11 +42,6 @@ export function activate(context: vscode.ExtensionContext) {
             const selectedIds = e.selection.map(item => item.id!).filter(id => id !== undefined);
             // console.log(`[CodeTraceTree] Selection changed. Selected IDs: ${selectedIds.join(', ')}`);
             service.selectTracePoints(selectedIds);
-            // Re-select and focus the tree item to retain blue highlight
-            const selected = treeView.selection;
-            if (selected.length == 1) {
-                treeView.reveal(selected[0], { select: true, focus: true });
-            }
         })
     );
     // Listen to tree view expand/collapse events
@@ -67,7 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register all commands
     registerCreateRootTracePoint(context, service, treeDataProvider);
     registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);
-    registerUpdateTracePoint(context, service, treeView);
+    // registerUpdateTracePoint(context, service, treeView);
     registerMoveUp(context, service, treeView, treeDataProvider);
     registerMoveDown(context, service, treeView, treeDataProvider);
     registerExpandSelected(context, treeView, treeDataProvider);
@@ -80,7 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerDeleteTracePoints(context, service, treeView, treeDataProvider);
 
     // Load initial state
-    service.loadState().then(() => treeDataProvider.refresh());
+    service.loadState();
 
     // Listen for document changes/openings
     vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e));

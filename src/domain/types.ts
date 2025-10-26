@@ -4,7 +4,10 @@ export interface TracePoint {
     fileName: string;
     filePath: string;
     lineNumber: number;
+
     parentId?: string;
+    childCount : number;
+
     projectPath: string;
     lineContent?: string;
     isValid: boolean;

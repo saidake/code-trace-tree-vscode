@@ -1,3 +1,5 @@
+// src/TracePointService.ts
+
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,11 +11,14 @@ import { TracePoint, TracePointState } from './domain/types';
 
 export class TracePointService {
     private static instance: TracePointService;
+    private treeItemMap: Map<string, vscode.TreeItem> = new Map();
     private tracePoints: TracePoint[] = [];
+    private tracePointMap: Map<string, TracePoint> = new Map();
+    private tracePointChildrenMap: Map<string, string[]> = new Map();
     private selectedTracePointIds: Set<string> = new Set();
     private expandedTracePointIds: Set<string> = new Set();
     private highlighters: Map<string, vscode.TextEditorDecorationType> = new Map(); // Key: fileUri
-    private listeners: ((tracePoints: TracePoint[]) => void)[] = [];
+    private listeners: ((tracePoints: TracePoint[], changeType?: 'add' | 'update' | 'delete' | 'all' | 'select' | 'description-update', affectedIds?: string[]) => void)[] = [];
     private _highlightingEnabled: boolean = true;
     private _descriptionAreaOpened: boolean = false;
 
@@ -49,8 +54,16 @@ export class TracePointService {
                 this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
                 // this.tracePoints = [];
+                this.tracePointMap = new Map(state.tracePoints.map(tp => [tp.id, tp]));
+                this.rebuildChildrenMap(state.tracePoints);
+                this.rebuildTreeItemMap(state.tracePoints);
+
                 // this.selectedTracePointIds = new Set([]);
                 // this.expandedTracePointIds = new Set([]);
+
+                // this.tracePointMap = new Map();
+                // this.tracePointChildrenMap = new Map();
+
 
                 this._highlightingEnabled = state.highlightingEnabled;
                 await this.validateTracePointsOnLoad();
@@ -72,7 +85,7 @@ export class TracePointService {
     }
 
     getTracePoints(): TracePoint[] {
-        return [...this.tracePoints];
+        return this.tracePoints;
     }
 
     isTracePointSelected(id: string): boolean {
@@ -80,28 +93,29 @@ export class TracePointService {
     }
 
     selectTracePoints(ids: string[]) {
-        this.selectedTracePointIds.clear();
-        ids.forEach(id => this.selectedTracePointIds.add(id));
-        this.notifyListeners();
+        this.selectedTracePointIds = new Set(ids);
+        this.notifyListeners('select', ids);
         this.saveState();
     }
 
-    toggleTracePointSelection(id: string) {
-        if (this.selectedTracePointIds.has(id)) {
-            this.selectedTracePointIds.delete(id);
-        } else {
-            this.selectedTracePointIds.add(id);
-        }
-        this.notifyListeners();
-        this.saveState();
-    }
 
     getExpandedTracePointIds(): Set<string> {
         return this.expandedTracePointIds;
     }
 
+    getTracePointChildrenMap(): Map<string, string[]> {
+        return this.tracePointChildrenMap;
+    }
+    getTracePointMap(): Map<string, TracePoint> {
+        return this.tracePointMap;
+    }
+
+    getTreeItemMap(): Map<string, vscode.TreeItem> {
+        return this.treeItemMap;
+    }
+
     setExpandedTracePointIds(expandedTracePointIds: Set<string>) {
-        this.expandedTracePointIds=expandedTracePointIds;
+        this.expandedTracePointIds = expandedTracePointIds;
         this.saveState();
     }
 
@@ -119,27 +133,23 @@ export class TracePointService {
         return this._descriptionAreaOpened;
     }
 
-    setDescriptionAreaOpened(opened: boolean) {
-        this._descriptionAreaOpened = opened;
-        this.saveState();
-    }
 
-    private getState(): TracePointState {
-        return {
-            tracePoints: this.tracePoints,
-            selectedTracePointIds: Array.from(this.selectedTracePointIds),
-            expandedTracePointIds: Array.from(this.expandedTracePointIds),
-            highlightingEnabled: this.isHighlightingEnabled(),
-        };
-    }
-
-    addListener(listener: (tracePoints: TracePoint[]) => void) {
+    addListener(listener: (tracePoints: TracePoint[], changeType?: 'add' | 'update' | 'delete' | 'select' | 'description-update' | 'all', affectedIds?: string[]) => void) {
         this.listeners.push(listener);
     }
 
-    private notifyListeners() {
-        this.listeners.forEach(listener => listener(this.getTracePoints()));
+    private notifyListeners(changeType: 'add' | 'update' | 'delete' | 'select' | 'description-update' | 'all' = 'all', affectedIds: string[] = []) {
+        this.listeners.forEach(listener => listener(this.getTracePoints(), changeType, affectedIds));
     }
+
+    private addTracePointToParentMap(tracePoint: TracePoint) {
+        const parentId = tracePoint.parentId || 'root';
+        if (!this.tracePointChildrenMap.has(parentId)) {
+            this.tracePointChildrenMap.set(parentId, []);
+        }
+        this.tracePointChildrenMap.get(parentId)!.push(tracePoint.id);
+    }
+
 
     async addTracePoint(name: string, file: vscode.Uri, lineNumber: number, parentId?: string, description = '') {
         const document = await vscode.workspace.openTextDocument(file);
@@ -147,7 +157,7 @@ export class TracePointService {
         const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent);
         const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
 
-        const filePath = vscode.workspace.asRelativePath(file); 
+        const filePath = vscode.workspace.asRelativePath(file);
         const fileName = path.basename(filePath);
         const tracePoint: TracePoint = {
             id: uuidv4(),
@@ -156,54 +166,71 @@ export class TracePointService {
             fileName,
             lineNumber,
             parentId,
+            childCount: 0,
             projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
             lineContent,
-            isValid: !!lineContent,
+            isValid: true,
             totalOccurrenceCount: totalOccurrences,
             occurrenceIndex,
             description, // Defaults to empty string
         };
+        if (parentId) {
+            let pT = this.tracePointMap.get(parentId);
+            if (pT) pT.childCount += 1;
+        }
         this.tracePoints.push(tracePoint);
+        this.tracePointMap.set(tracePoint.id, tracePoint);
+        this.addTracePointToParentMap(tracePoint);
+        this.updateTreeItem(tracePoint);
+
         this.applyHighlightsToAllEditors();
-        this.notifyListeners();
+        tracePoint.parentId ? this.notifyListeners('add', [tracePoint.parentId]) : this.notifyListeners();
         this.saveState();
+    }
+    getTracePointById(id: string) {
+        return this.tracePointMap.get(id);
+    }
+    getTracePointParentIdById(id: string) {
+        return this.tracePointMap.get(id)?.parentId ?? "root";
     }
 
     async updateTracePointDescription(id: string, newDescription: string) {
-        const index = this.tracePoints.findIndex(tp => tp.id === id);
-        if (index >= 0) {
-            this.tracePoints[index].description = newDescription;
-            this.notifyListeners();
+        const tp = this.getTracePointById(id);
+        if (tp) {
+            tp.description = newDescription;
+            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
+            this.updateTreeItem(tp);
             this.saveState();
         }
     }
 
     async renameTracePoint(id: string, newName: string) {
-        const index = this.tracePoints.findIndex(tp => tp.id === id);
-        if (index >= 0) {
-            this.tracePoints[index].name = newName;
-            this.notifyListeners();
+        const tp = this.getTracePointById(id);
+        if (tp) {
+            tp.name == newName;
+            this.notifyListeners('update', [this.getTracePointParentIdById(id)]);
+            this.updateTreeItem(tp);
             this.saveState();
         }
     }
 
-    async deleteTracePoints(ids: string[]) {
-        this.tracePoints = this.tracePoints.filter(tp => !ids.includes(tp.id));
-        ids.forEach(id => {
-            this.selectedTracePointIds.delete(id);
-            this.expandedTracePointIds.delete(id);
-        });
+    async setTracePoints(newTracePoints: TracePoint[]) {
+        this.tracePoints = newTracePoints;
+        this.tracePointMap = new Map(newTracePoints.map(tp => [tp.id, tp]));
+        this.rebuildChildrenMap(newTracePoints);
+        this.rebuildTreeItemMap(newTracePoints);
+
         this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
     }
 
-    async updateTracePoints(newTracePoints: TracePoint[]) {
-        this.tracePoints = newTracePoints;
-        this.applyHighlightsToAllEditors();
-        this.notifyListeners();
-        this.saveState();
-    }
+    // async updateTracePoints(ids: string[]) {
+    //     this.applyHighlightsToAllEditors();
+    //     this.notifyListeners('update', ids);
+    //     this.saveState();
+    // }
+
 
     getLineOccurrences(document: vscode.TextDocument, content?: string): [number, number[]] {
         if (!content) return [0, []];
@@ -217,7 +244,6 @@ export class TracePointService {
     }
 
     async attachListenersAndHighlight(document: vscode.TextDocument) {
-        // Global listener handles this; just highlight if relevant
         if (this.tracePoints.some(tp => tp.filePath === vscode.workspace.asRelativePath(document.uri))) {
             this.highlightTracePointsInFile(document);
         }
@@ -274,7 +300,6 @@ export class TracePointService {
         const updatedTracePoints = this.tracePoints.map(tp => {
             if (tp.filePath !== filePath) return tp;
 
-            // Adjust line number based on cumulative deltas
             let adjustedLine0 = tp.lineNumber - 1;
             for (const change of event.contentChanges) {
                 const oldLines = change.range.end.line - change.range.start.line + 1;
@@ -287,12 +312,12 @@ export class TracePointService {
             const adjustedLine = adjustedLine0 + 1;
 
             if (adjustedLine < 1 || adjustedLine > event.document.lineCount) {
-                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
 
             const currentContent = event.document.lineAt(adjustedLine0).text.trim();
             if (currentContent !== tp.lineContent) {
-                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrenceCount: 0, occurrenceIndex: 0 };
+                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
 
             const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, tp.lineContent);
@@ -300,15 +325,23 @@ export class TracePointService {
             return {
                 ...tp,
                 lineNumber: adjustedLine,
-                totalOccurrenceCount: totalOccurrences,
+                totalOccurrences: totalOccurrences,
                 occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0,
                 isValid: true
             };
         });
 
         this.tracePoints = updatedTracePoints;
+        this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
+        // this.rebuildChildrenMap(updatedTracePoints)
+        // this.rebuildTreeItemMap(updatedTracePoints);
         this.highlightTracePointsInFile(event.document);
-        this.notifyListeners();
+        const parentIdsToUpdate = affectedTracePoints.map(tp => tp.parentId ?? 'root');
+        if (parentIdsToUpdate.includes('root')) {
+            this.notifyListeners('update', ['root']);
+        } else {
+            this.notifyListeners('update', parentIdsToUpdate);
+        }
         this.saveState();
     }
 
@@ -328,48 +361,130 @@ export class TracePointService {
             }
         }));
         this.tracePoints = updatedTracePoints;
+        this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
         this.applyHighlightsToAllEditors();
         this.notifyListeners();
     }
 
-    async navigateToTracePoint(tp: TracePoint) {
+    async navigateToTracePoint(tp: TracePoint, treeView: vscode.TreeView<vscode.TreeItem>) {
         const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.filePath));
         const doc = await vscode.workspace.openTextDocument(fileUri);
         const editor = await vscode.window.showTextDocument(doc);
         const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0);
         editor.selection = new vscode.Selection(range.start, range.end);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+        // Re-select and focus the tree item to retain blue highlight
+        const selected = treeView.selection;
+        if (selected.length == 1) {
+            treeView.reveal(selected[0], { select: true, focus: true });
+        }
     }
-
 
     getSelectedTracePointIds(): string[] {
         return Array.from(this.selectedTracePointIds);
     }
 
     async deleteTracePointsWithChildren(ids: string[]) {
-        // Collect all IDs to delete, including descendants
+        // Collect child ids.
         const allIdsToDelete = new Set<string>(ids);
+        const parentIdsToUpdate = new Set<string>();
+        // Check if the item to be deleted has any children.
         const collectChildren = (parentId: string) => {
-            const children = this.tracePoints.filter(tp => tp.parentId === parentId);
-            children.forEach(child => {
-                allIdsToDelete.add(child.id);
-                collectChildren(child.id);
-            });
+            if (this.tracePointChildrenMap.get(parentId)) {
+                for (const childId of this.tracePointChildrenMap.get(parentId)!) {
+                    allIdsToDelete.add(childId);
+                    collectChildren(childId);
+                }
+            }
         };
         ids.forEach(id => collectChildren(id));
-        // console.log(`[CodeTraceTree] Total IDs to delete (including children): ${Array.from(allIdsToDelete).join(', ')}`);
-        // Filter out the trace points to delete
-        this.tracePoints = this.tracePoints.filter(tp => !allIdsToDelete.has(tp.id));
 
-        // Remove from selected and expanded sets
+        this.tracePoints = this.tracePoints.filter(tp => !allIdsToDelete.has(tp.id));
         allIdsToDelete.forEach(id => {
+            parentIdsToUpdate.add(this.tracePointMap.get(id)?.parentId || 'root');
             this.selectedTracePointIds.delete(id);
             this.expandedTracePointIds.delete(id);
+            this.tracePointMap.delete(id);
+            this.tracePointChildrenMap.delete(id);
+            this.treeItemMap.delete(id);
         });
 
-        // Update highlights and notify
+        if (parentIdsToUpdate.has("root")) {
+            parentIdsToUpdate.clear();
+            parentIdsToUpdate.add("root");
+        } else {
+            // Remove deleted parent ids.
+            for (const parentId of Array.from(parentIdsToUpdate)) {
+                if (!this.tracePointMap.has(parentId)) {
+                    parentIdsToUpdate.delete(parentId);
+                }
+            }
+        }
+
+        // Update tracePointChildrenMap to remove deleted children.
+        for (const parentId of this.tracePointChildrenMap.keys()) {
+            const children = this.tracePointChildrenMap.get(parentId)!;
+            this.tracePointChildrenMap.set(
+                parentId,
+                children.filter(childId => !allIdsToDelete.has(childId))
+            );
+        }
+
         this.applyHighlightsToAllEditors();
-        this.notifyListeners();
+        this.notifyListeners('delete', Array.from(parentIdsToUpdate));
         await this.saveState();
+    }
+
+
+    private updateTreeItem(tp: TracePoint) {
+        // Determine collapsible state based on expandedIds
+        let collapsibleState = vscode.TreeItemCollapsibleState.None;
+        const hasChildren = (this.tracePointChildrenMap.get(tp.id)?.length ?? 0) > 0;
+        if (tp.isValid && hasChildren) {
+            collapsibleState = this.expandedTracePointIds.has(tp.id)
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed;
+        }
+
+        const item = new vscode.TreeItem(
+            `${tp.name || ''} (${tp.fileName}: ${tp.lineNumber})`,
+            collapsibleState
+        );
+        item.id = tp.id;
+        item.contextValue = 'traceable';
+        item.description = tp.description ? tp.description.substring(0, 50) + '...' : '';
+        item.tooltip = undefined; // Explicitly disable tooltip on hover
+        item.command = {
+            command: 'codeTraceTree.goToTracePoint',
+            title: 'Go to Trace Point',
+            arguments: [item]
+        };
+        if (!tp.isValid) item.label = `~~${item.label}~~`; // Strikethrough for invalid
+
+        this.treeItemMap.set(tp.id, item);
+        if (tp.parentId) {
+            const pTp = this.treeItemMap.get(tp.parentId);
+            if (pTp) {
+                pTp.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+            }
+        }
+    }
+
+    private rebuildChildrenMap(tracePoints: TracePoint[]) {
+        this.tracePointChildrenMap = new Map();
+        for (const tp of tracePoints) {
+            const parentId = tp.parentId || 'root';
+            if (!this.tracePointChildrenMap.has(parentId)) {
+                this.tracePointChildrenMap.set(parentId, []);
+            }
+            this.tracePointChildrenMap.get(parentId)!.push(tp.id);
+        }
+    }
+
+    private rebuildTreeItemMap(tracePoints: TracePoint[]) {
+        this.treeItemMap = new Map();
+        for (const tp of tracePoints) {
+            this.updateTreeItem(tp);
+        }
     }
 }

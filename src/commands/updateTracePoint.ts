@@ -26,8 +26,9 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
       }
       return tp;
     });
-    await service.updateTracePoints(updatedTracePoints);
+    await service.setTracePoints(updatedTracePoints);
     service.selectTracePoints(selectedIds);
+    
     vscode.window.visibleTextEditors.forEach(ed => {
       if (ed.document.uri.fsPath === editor.document.uri.fsPath) {
         service.highlightTracePointsInFile(ed.document);

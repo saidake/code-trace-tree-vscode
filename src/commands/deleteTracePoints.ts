@@ -24,7 +24,6 @@ export function registerDeleteTracePoints(context: vscode.ExtensionContext, serv
     if (confirm !== 'Delete') return;
 
     await service.deleteTracePointsWithChildren(selectedIds);
-    treeDataProvider.refresh();
     vscode.window.showInformationMessage(`Deleted ${selectedIds.length} trace point(s).`);
   }));
 }

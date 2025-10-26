@@ -16,6 +16,5 @@ export function registerCreateRootTracePoint(context: vscode.ExtensionContext, s
     });
     // Allow empty string or undefined
     await service.addTracePoint(name ?? '', editor.document.uri, lineNumber);
-    treeDataProvider.refresh();
   }));
 }

@@ -8,7 +8,9 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
         private _extensionUri: vscode.Uri,
         private service: TracePointService
     ) {
-        this.service.addListener(() => this.updateView());
+        this.service.addListener((tracePoints, changeType, affectedIds) => {
+            if(changeType==="select" || changeType === "description-update") this.updateView()
+        });
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -40,7 +42,7 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
             return;
         }
 
-        const tp = this.service.getTracePoints().find(tp => tp.id === selectedIds[0]);
+        const tp = this.service.getTracePointById(selectedIds[0]);
         this._view.webview.postMessage({
             command: 'updateDescription',
             description: tp?.description || '',

@@ -34,12 +34,10 @@ export function registerImportTracePoints(
         projectPath: currentProjectPath,
       }));
 
-      await service.updateTracePoints(updatedTracePoints);
       const expandedIdsArray = state.expandedTracePointIds.id || [];
       service.setExpandedTracePointIds(new Set(expandedIdsArray));
       service.setHighlightingEnabled(state.highlightingEnabled ?? true);
-
-      treeDataProvider.refresh();
+      await service.setTracePoints(updatedTracePoints);
       vscode.window.showInformationMessage('Trace points imported.');
     })
   );
