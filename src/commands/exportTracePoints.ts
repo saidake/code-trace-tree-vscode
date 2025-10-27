@@ -2,12 +2,12 @@ import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { serializeXml } from '../utils/xmlUtils';
 import { CODE_TRACE_TREE_STATE_KEY } from '../domain/constants';
-import { TracePointExportState } from '../domain/types';
+import { TracePointExportState, TracePointState } from '../domain/types';
 
 export function registerExportTracePoints(context: vscode.ExtensionContext, service: TracePointService) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {
     // Read state
-    const state = context.workspaceState.get<any>(CODE_TRACE_TREE_STATE_KEY) || {
+    const state = context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY) || {
       tracePoints: [],
       selectedTracePointIds: [],
       expandedTracePointIds: [],
@@ -30,7 +30,6 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
         expandedTracePointIds: {
           id: Array.from(service.getExpandedTracePointIds())
         },
-        highlightingEnabled: state.highlightingEnabled,
       },
     };
     const xml = serializeXml(exportState);

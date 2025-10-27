@@ -168,7 +168,6 @@ export class TracePointService {
             fileName,
             lineNumber,
             parentId,
-            childCount: 0,
             projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
             lineContent,
             isValid: true,
@@ -176,10 +175,6 @@ export class TracePointService {
             occurrenceIndex,
             description, // Defaults to empty string
         };
-        if (parentId) {
-            let pT = this.tracePointMap.get(parentId);
-            if (pT) pT.childCount += 1;
-        }
         this.tracePoints.push(tracePoint);
         this.tracePointMap.set(tracePoint.id, tracePoint);
         this.addTracePointToParentMap(tracePoint);
@@ -295,58 +290,117 @@ export class TracePointService {
         });
     }
 
-    async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
-        const filePath = vscode.workspace.asRelativePath(event.document.uri);
-        const affectedTracePoints: TracePoint[] = this.tracePoints.filter(tp => tp.filePath === filePath);
-        if (affectedTracePoints.length === 0) return;
+async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
+    const filePath = vscode.workspace.asRelativePath(event.document.uri);
+    const affectedTracePoints: TracePoint[] = this.tracePoints.filter(tp => tp.filePath === filePath);
+    if (affectedTracePoints.length === 0) return;
 
-        const updatedTracePoints : TracePoint[] = this.tracePoints.map(tp => {
-            if (tp.filePath !== filePath) return tp;
+    const newLines = event.document.getText().split(/\r?\n/);
 
-            let adjustedLine0 = tp.lineNumber - 1;
-            for (const change of event.contentChanges) {
-                const oldLines = change.range.end.line - change.range.start.line + 1;
-                const newLines = change.text.split(/\r?\n/).length;
-                const delta = newLines - oldLines;
-                if (adjustedLine0 > change.range.end.line) {
-                    adjustedLine0 += delta;
-                }
-            }
-            const adjustedLine = adjustedLine0 + 1;
+    // VSCode may include multiple content changes in a single event.
+    // For now, handle the first major change (extendable later).
+    const change = event.contentChanges[0];
+    if (!change) return;
 
-            if (adjustedLine < 1 || adjustedLine > event.document.lineCount) {
-                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
-            }
+    const oldLines = change.range.end.line - change.range.start.line;
+    const newLinesCount = change.text.split(/\r?\n/).length - 1;
+    const lineOffset = newLinesCount - oldLines;
+    const changedLine = change.range.start.line + 1;
 
-            const currentContent = event.document.lineAt(adjustedLine0).text;
-            if (currentContent !== tp.lineContent) {
-                return { ...tp, lineNumber: adjustedLine, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
-            }
+    console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
+    console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
 
-            const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, tp.lineContent);
-            const occurrenceIndex = matchingLines.indexOf(adjustedLine) + 1;
+    const updatedTracePoints: TracePoint[] = this.tracePoints.map(tp => {
+        if (tp.filePath !== filePath) return tp;
+
+        // CASE 1: The edited line is the same as the trace point line,
+        // and lines were added or removed (lineOffset > 0)
+        if (tp.lineNumber === changedLine && lineOffset > 0) {
+            const newLineNumber = tp.lineNumber + lineOffset;
+            const newContent = newLineNumber <= newLines.length ? newLines[newLineNumber - 1].trim() : null;
+
+            const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
+            const newOccurrenceIndex =
+                newContent === tp.lineContent
+                    ? tp.occurrenceIndex
+                    : matchingLines.indexOf(newLineNumber) + 1;
+
             return {
                 ...tp,
-                lineNumber: adjustedLine,
-                totalOccurrences: totalOccurrences,
-                occurrenceIndex: occurrenceIndex >= 0 ? occurrenceIndex : 0,
-                isValid: true
+                lineNumber: newLineNumber,
+                lineContent: newContent ?? '',
+                isValid: !!newContent,
+                totalOccurrences,
+                occurrenceIndex: newOccurrenceIndex,
             };
-        });
-
-        this.tracePoints = updatedTracePoints;
-        this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
-        this.rebuildChildrenMap(updatedTracePoints)
-        this.rebuildTreeItemMap(updatedTracePoints);
-        this.highlightTracePointsInFile(event.document);
-        const parentIdsToUpdate = affectedTracePoints.map(tp => tp.parentId ?? 'root');
-        if (parentIdsToUpdate.includes('root')) {
-            this.notifyListeners('update', ['root']);
-        } else {
-            this.notifyListeners('update', parentIdsToUpdate);
         }
-        this.saveState();
+
+        // CASE 2: The edited line is the same as the trace point line,
+        // but no lines were added or removed (only text content changed)
+        else if (tp.lineNumber === changedLine && lineOffset === 0) {
+            const newContent = newLines[changedLine - 1]?.trim() ?? null;
+            const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
+            const newOccurrenceIndex =
+                newContent === tp.lineContent
+                    ? tp.occurrenceIndex
+                    : matchingLines.indexOf(changedLine) + 1;
+
+            return {
+                ...tp,
+                lineContent: newContent ?? '',
+                isValid: !!newContent,
+                totalOccurrences,
+                occurrenceIndex: newOccurrenceIndex,
+            };
+        }
+
+        // CASE 3: The edited line is above the trace point line,
+        // and lines were added or removed (shift line numbers)
+        else if (tp.lineNumber > changedLine && lineOffset !== 0) {
+            const newLineNumber = Math.max(1, tp.lineNumber + lineOffset);
+            const newContent = newLineNumber <= newLines.length ? newLines[newLineNumber - 1].trim() : null;
+
+            const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
+            const newOccurrenceIndex =
+                newContent === tp.lineContent
+                    ? tp.occurrenceIndex
+                    : matchingLines.indexOf(newLineNumber) + 1;
+
+            return {
+                ...tp,
+                lineNumber: newLineNumber,
+                lineContent: newContent ?? '',
+                isValid: !!newContent,
+                totalOccurrences,
+                occurrenceIndex: newOccurrenceIndex,
+            };
+        }
+
+        // CASE 4: No change relevant to this trace point
+        return tp;
+    });
+
+    // Update internal states
+    this.tracePoints = updatedTracePoints;
+    this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
+    this.rebuildChildrenMap(updatedTracePoints);
+    this.rebuildTreeItemMap(updatedTracePoints);
+
+    // Re-highlight updated trace points in the file
+    this.highlightTracePointsInFile(event.document);
+
+    // Notify listeners to refresh affected UI parts
+    const parentIdsToUpdate = affectedTracePoints.map(tp => tp.parentId ?? 'root');
+    if (parentIdsToUpdate.includes('root')) {
+        this.notifyListeners('update', ['root']);
+    } else {
+        this.notifyListeners('update', parentIdsToUpdate);
     }
+
+    // Persist changes
+    this.saveState();
+}
+
 
     private async validateTracePointsOnLoad() {
         const updatedTracePoints = await Promise.all(this.tracePoints.map(async tp => {
@@ -462,8 +516,15 @@ export class TracePointService {
             title: 'Go to Trace Point',
             arguments: [item]
         };
-        // item.iconPath = new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
-        if (!tp.isValid) item.label = `~~${item.label}~~`; // Strikethrough for invalid
+
+        if (!tp.isValid) {
+            item.iconPath = new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
+            item.tooltip = 'This trace point is invalid or outdated.';
+        } else {
+            item.iconPath = undefined;
+            item.tooltip = undefined;
+        }
+
 
         this.treeItemMap.set(tp.id, item);
         if (tp.parentId) {

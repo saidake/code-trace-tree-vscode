@@ -6,7 +6,6 @@ export interface TracePoint {
     lineNumber: number;
 
     parentId?: string;
-    childCount : number;
 
     projectPath: string;
     
@@ -33,6 +32,5 @@ export interface TracePointExportState {
         expandedTracePointIds:  {
             id: string[]; 
         };
-        highlightingEnabled: boolean;
     };
 }
