@@ -23,7 +23,7 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
     if (!uri) return;
     // Convert state to xml data
     const exportState: TracePointExportState = {
-      TracePointState: {
+      tracePointState: {
         tracePoints: {
           tracePoint: state.tracePoints
         },

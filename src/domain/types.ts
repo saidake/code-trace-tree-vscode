@@ -25,7 +25,7 @@ export interface TracePointState {
 }
 
 export interface TracePointExportState {
-    TracePointState: {
+    tracePointState: {
         tracePoints: {
             tracePoint: TracePoint[]; 
         };

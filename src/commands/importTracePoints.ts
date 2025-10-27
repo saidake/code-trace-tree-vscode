@@ -23,7 +23,7 @@ export function registerImportTracePoints(
       const parsed: TracePointExportState = parseXml(xml);
       // console.log("[CraigTest] parsed: ",parsed);
 
-      const state = parsed.TracePointState;
+      const state = parsed.tracePointState;
 
       const tracePointsArray = state.tracePoints?.tracePoint ?? [];
 
@@ -36,7 +36,7 @@ export function registerImportTracePoints(
 
       const expandedIdsArray = state.expandedTracePointIds.id || [];
       service.setExpandedTracePointIds(new Set(expandedIdsArray));
-      service.setHighlightingEnabled(state.highlightingEnabled ?? true);
+      service.setHighlightingEnabled(true);
       await service.setTracePoints(updatedTracePoints);
       vscode.window.showInformationMessage('Trace points imported.');
     })
