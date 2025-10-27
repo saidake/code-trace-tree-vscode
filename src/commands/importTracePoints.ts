@@ -37,7 +37,9 @@ export function registerImportTracePoints(
       const expandedIdsArray = state.expandedTracePointIds.id || [];
       service.setExpandedTracePointIds(new Set(expandedIdsArray));
       service.setHighlightingEnabled(true);
-      await service.setTracePoints(updatedTracePoints);
+
+      await service.setTracePoints(updatedTracePoints, true);
+
       vscode.window.showInformationMessage('Trace points imported.');
     })
   );
