@@ -47,25 +47,21 @@ export class TracePointService {
     }
 
     async loadState() {
+        console.log("[TEST] loadState triggered")
         try {
             const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
             if (state) {
+                // state.tracePoints = [];
+                // state.selectedTracePointIds = [];
+                // state.expandedTracePointIds = [];
+
                 this.tracePoints = state.tracePoints || [];
                 this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
-                // this.tracePoints = [];
-                // this.selectedTracePointIds = new Set([]);
-                // this.expandedTracePointIds = new Set([]);
-
 
                 this.tracePointMap = new Map(state.tracePoints.map(tp => [tp.id, tp]));
                 this.rebuildChildrenMap(state.tracePoints);
                 this.rebuildTreeItemMap(state.tracePoints);
-
-
-                // this.tracePointMap = new Map();
-                // this.tracePointChildrenMap = new Map();
-
 
                 this._highlightingEnabled = state.highlightingEnabled;
                 await this.validateTracePointsOnLoad();
@@ -212,13 +208,13 @@ export class TracePointService {
         }
     }
 
-    async setTracePoints(newTracePoints: TracePoint[],validate: boolean=false) {
+    async setTracePoints(newTracePoints: TracePoint[], validate: boolean = false) {
         this.tracePoints = newTracePoints;
         this.tracePointMap = new Map(newTracePoints.map(tp => [tp.id, tp]));
         this.rebuildChildrenMap(newTracePoints);
         this.rebuildTreeItemMap(newTracePoints);
 
-        if(validate)this.validateTracePointsOnLoad();
+        if (validate) this.validateTracePointsOnLoad();
         this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
@@ -308,18 +304,22 @@ export class TracePointService {
         const lineOffset = newLinesCount - oldLines;
         const changedLine = change.range.start.line + 1;
 
-        console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
-        console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
+        // console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
+        // console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
 
         const updatedTracePoints: TracePoint[] = this.tracePoints.map(tp => {
             if (tp.filePath !== filePath) return tp;
-
+            // Revalidate invalid line
+            if (!tp.isValid) {
+                tp.isValid = newLines[tp.lineNumber-1] === tp.lineContent;
+                return tp;
+            }
             // CASE 1: The edited line is the same as the trace point line,
             // and lines were added or removed (lineOffset > 0)
             if (tp.lineNumber === changedLine && lineOffset > 0) {
                 const newLineNumber = tp.lineNumber + lineOffset;
                 const newContent = newLineNumber <= newLines.length ? newLines[newLineNumber - 1].trim() : null;
-
+                // Update occurrence.
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
                 const newOccurrenceIndex =
                     newContent === tp.lineContent
@@ -330,7 +330,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newContent ?? '',
-                    isValid: !!newContent,
+                    isValid: tp.isValid,
                     totalOccurrences,
                     occurrenceIndex: newOccurrenceIndex,
                 };
@@ -340,6 +340,7 @@ export class TracePointService {
             // but no lines were added or removed (only text content changed)
             else if (tp.lineNumber === changedLine && lineOffset === 0) {
                 const newContent = newLines[changedLine - 1]?.trim() ?? null;
+                // Update occurrence.
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
                 const newOccurrenceIndex =
                     newContent === tp.lineContent
@@ -349,7 +350,7 @@ export class TracePointService {
                 return {
                     ...tp,
                     lineContent: newContent ?? '',
-                    isValid: !!newContent,
+                    isValid: tp.isValid,
                     totalOccurrences,
                     occurrenceIndex: newOccurrenceIndex,
                 };
@@ -360,7 +361,7 @@ export class TracePointService {
             else if (tp.lineNumber > changedLine && lineOffset !== 0) {
                 const newLineNumber = Math.max(1, tp.lineNumber + lineOffset);
                 const newContent = newLineNumber <= newLines.length ? newLines[newLineNumber - 1].trim() : null;
-
+                // Update occurrence.
                 const [totalOccurrences, matchingLines] = this.getLineOccurrences(event.document, newContent ?? '');
                 const newOccurrenceIndex =
                     newContent === tp.lineContent
@@ -371,7 +372,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newContent ?? '',
-                    isValid: !!newContent,
+                    isValid: tp.isValid,
                     totalOccurrences,
                     occurrenceIndex: newOccurrenceIndex,
                 };
