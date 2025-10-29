@@ -59,12 +59,16 @@ export class TracePointService {
                 this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
 
-                this.tracePointMap = new Map(state.tracePoints.map(tp => [tp.id, tp]));
-                this.rebuildChildrenMap(state.tracePoints);
-                this.rebuildTreeItemMap(state.tracePoints);
+
 
                 this._highlightingEnabled = state.highlightingEnabled;
+
                 await this.validateTracePointsOnLoad();
+                this.updateTracePointMap();
+                this.rebuildChildrenMap();
+                this.rebuildTreeItemMap();
+
+                this.applyHighlightsToAllEditors();
                 this.notifyListeners();
             }
         } catch (e) {
@@ -208,13 +212,22 @@ export class TracePointService {
         }
     }
 
-    async setTracePoints(newTracePoints: TracePoint[], validate: boolean = false) {
-        this.tracePoints = newTracePoints;
-        this.tracePointMap = new Map(newTracePoints.map(tp => [tp.id, tp]));
-        this.rebuildChildrenMap(newTracePoints);
-        this.rebuildTreeItemMap(newTracePoints);
+    updateTracePointMap() {
+        this.tracePointMap = new Map(this.tracePoints.map(tp => [tp.id, tp]));
+    }
 
-        if (validate) this.validateTracePointsOnLoad();
+    async setTracePoints(newTracePoints: TracePoint[]) {
+        this.tracePoints = newTracePoints;
+        this.updateTracePointMap();
+    }
+
+    async saveTracePoints(newTracePoints: TracePoint[], validate: boolean = false) {
+        this.tracePoints = newTracePoints;
+        if (validate) await this.validateTracePointsOnLoad();
+        this.updateTracePointMap();
+        this.rebuildChildrenMap();
+        this.rebuildTreeItemMap();
+
         this.applyHighlightsToAllEditors();
         this.notifyListeners();
         this.saveState();
@@ -311,7 +324,7 @@ export class TracePointService {
             if (tp.filePath !== filePath) return tp;
             // Revalidate invalid line
             if (!tp.isValid) {
-                tp.isValid = newLines[tp.lineNumber-1] === tp.lineContent;
+                tp.isValid = newLines[tp.lineNumber - 1] === tp.lineContent;
                 return tp;
             }
             // CASE 1: The edited line is the same as the trace point line,
@@ -384,9 +397,9 @@ export class TracePointService {
 
         // Update internal states
         this.tracePoints = updatedTracePoints;
-        this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
-        this.rebuildChildrenMap(updatedTracePoints);
-        this.rebuildTreeItemMap(updatedTracePoints);
+        this.updateTracePointMap();
+        this.rebuildChildrenMap();
+        this.rebuildTreeItemMap();
 
         // Re-highlight updated trace points in the file
         this.highlightTracePointsInFile(event.document);
@@ -404,11 +417,14 @@ export class TracePointService {
     }
 
 
+    /**
+     * Update tracePoints and tracePointMap
+     */
     async validateTracePointsOnLoad() {
         console.log("validateTracePointsOnLoad triggered");
         const updatedTracePoints = await Promise.all(this.tracePoints.map(async (tracePoint) => {
             // Invalidate trace points with empty or missing required fields
-            if (!tracePoint.id || !tracePoint.filePath || !tracePoint.projectPath || !tracePoint.lineContent) {
+            if (!tracePoint.id || !tracePoint.filePath || !tracePoint.projectPath || tracePoint.lineContent == null) {
                 return { ...tracePoint, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 };
             }
 
@@ -436,7 +452,7 @@ export class TracePointService {
 
             // Content does not match at the original lineNumber, search the file for occurrences
             const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, tracePoint.lineContent);
-            console.log(`occurrence doesn't match: totalOccurrences: ${totalOccurrences}, matchingLines: ${matchingLines}, tracePoint.totalOccurrences: ${tracePoint.totalOccurrences}, tracePoint.occurrenceIndex: ${tracePoint.occurrenceIndex}`);
+            console.log(`occurrence doesn't match: tracePoint.lineContent: ${tracePoint.lineContent} totalOccurrences: ${totalOccurrences}, matchingLines: ${matchingLines}, tracePoint.totalOccurrences: ${tracePoint.totalOccurrences}, tracePoint.occurrenceIndex: ${tracePoint.occurrenceIndex}`);
 
             // If the total occurrences count is the same and occurrenceIndex is still valid, update the line number
             if (totalOccurrences === tracePoint.totalOccurrences && tracePoint.occurrenceIndex >= 1 && tracePoint.occurrenceIndex <= totalOccurrences) {
@@ -461,14 +477,8 @@ export class TracePointService {
 
         // Replace current trace points with updated ones
         this.tracePoints = updatedTracePoints;
-        this.tracePointMap = new Map(updatedTracePoints.map(tp => [tp.id, tp]));
-
-        // Reapply highlights for all open editors
-        this.applyHighlightsToAllEditors();
-
-        // Notify UI listeners that trace points have changed
-        this.notifyListeners();
     }
+
 
 
     async navigateToTracePoint(tp: TracePoint, treeView: vscode.TreeView<vscode.TreeItem>) {
@@ -583,9 +593,9 @@ export class TracePointService {
         }
     }
 
-    private rebuildChildrenMap(tracePoints: TracePoint[]) {
+    private rebuildChildrenMap() {
         this.tracePointChildrenMap = new Map();
-        for (const tp of tracePoints) {
+        for (const tp of this.tracePoints) {
             const parentId = tp.parentId || 'root';
             if (!this.tracePointChildrenMap.has(parentId)) {
                 this.tracePointChildrenMap.set(parentId, []);
@@ -594,9 +604,9 @@ export class TracePointService {
         }
     }
 
-    private rebuildTreeItemMap(tracePoints: TracePoint[]) {
+    private rebuildTreeItemMap() {
         this.treeItemMap = new Map();
-        for (const tp of tracePoints) {
+        for (const tp of this.tracePoints) {
             this.updateTreeItem(tp);
         }
     }

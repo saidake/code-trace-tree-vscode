@@ -26,7 +26,7 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
       }
       return tp;
     });
-    await service.setTracePoints(updatedTracePoints);
+    await service.saveTracePoints(updatedTracePoints);
     service.selectTracePoints(selectedIds);
     
     vscode.window.visibleTextEditors.forEach(ed => {

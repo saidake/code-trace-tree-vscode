@@ -65,6 +65,6 @@ export function registerMoveUp(context: vscode.ExtensionContext, service: TraceP
     }
 
     // Save updated order back to the service
-    service.setTracePoints(allTracePoints);
+    service.saveTracePoints(allTracePoints);
   }));
 }

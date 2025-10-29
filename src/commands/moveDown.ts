@@ -63,7 +63,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
     }
 
     // Save updated order back to the service
-    service.setTracePoints(allTracePoints);
+    service.saveTracePoints(allTracePoints);
 
   }));
 }

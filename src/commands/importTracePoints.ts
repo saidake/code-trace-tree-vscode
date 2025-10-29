@@ -38,7 +38,7 @@ export function registerImportTracePoints(
       service.setExpandedTracePointIds(new Set(expandedIdsArray));
       service.setHighlightingEnabled(true);
 
-      await service.setTracePoints(updatedTracePoints, true);
+      service.saveTracePoints(updatedTracePoints, true);
 
       vscode.window.showInformationMessage('Trace points imported.');
     })

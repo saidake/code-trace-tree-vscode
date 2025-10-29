@@ -19,7 +19,8 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
         const childrenMap = this.service.getTracePointChildrenMap();
         const treeItemMap = this.service.getTreeItemMap();
-        console.log("[Test] getChildren triggered, element: ", element, "tracePoints: ", this.service.getTracePoints());
+        const tracePoints=this.service.getTracePoints();
+        console.log("[Test] getChildren triggered, element: ", element, "tracePoints: ", this.service.getTracePoints(), "treeItemMap: ",treeItemMap);
         return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
     }
 
@@ -83,7 +84,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                 }
             }
 
-            await this.service.setTracePoints(updatedTracePoints);
+            await this.service.saveTracePoints(updatedTracePoints);
             return;
         }
 
@@ -109,7 +110,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             return tp;
         });
 
-        await this.service.setTracePoints(updated);
+        await this.service.saveTracePoints(updated);
     }
 
     private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
