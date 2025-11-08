@@ -55,7 +55,7 @@ export class TracePointService {
         try {
             const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
             if (state) {
-                // state.tracePoints = [];
+                // state.tracePointNodes = [];
                 // state.selectedTracePointIds = [];
                 // state.expandedTracePointIds = [];
 
@@ -99,6 +99,7 @@ export class TracePointService {
 
     selectTracePoints(ids: string[]) {
         this.selectedTracePointIds = new Set(ids);
+        this.notifyListeners('update-description', null);
         this.saveState();
     }
 
@@ -268,6 +269,8 @@ export class TracePointService {
             tp.tracePoint.description = newDescription;
             this.updateTreeItem(tp);
             this.notifyListeners('update-description', null);
+            const parentNode = this.getTracePointParentById(id)
+            this.notifyListeners('refresh', new Set<TracePointNode | null>([parentNode]))
             this.saveState();
         }
     }
@@ -619,6 +622,7 @@ export class TracePointService {
 
 
     updateTreeItem(tracePointNode: TracePointNode) {
+        console.log("updateTreeItem triggered, expandedTracePointIds: ",this.expandedTracePointIds, " tracePointNode.id: ",tracePointNode.id)
         // Determine collapsible state based on expandedIds
         let collapsibleState = vscode.TreeItemCollapsibleState.None;
         const hasChildren = tracePointNode.children.length > 0;
@@ -634,7 +638,11 @@ export class TracePointService {
         );
         item.id = tracePointNode.id;
         item.contextValue = 'traceable';
-        item.description = tracePoint.description ? tracePoint.description.substring(0, 50) + '...' : '';
+        item.description = tracePoint.description
+            ? tracePoint.description.length > 50
+                ? tracePoint.description.substring(0, 50) + '...'
+                : tracePoint.description
+            : '';
         item.tooltip = undefined; // Explicitly disable tooltip on hover
         item.command = {
             command: 'codeTraceTree.goToTracePoint',
@@ -656,6 +664,7 @@ export class TracePointService {
             const pTp = this.treeNodeMap.get(tracePointNode.parentId);
             if (pTp) {
                 pTp.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+                if(pTp.id)this.expandedTracePointIds.add(pTp.id)
             }
         }
     }

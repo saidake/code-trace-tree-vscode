@@ -63,8 +63,9 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
         if (!transferred) return;
         const draggedIds = transferred;
         let affectedParentNodes: Set<TracePointNode| null>  = new Set<TracePointNode>();
+        console.log("handleDrop - draggedIds: ",draggedIds)
 
-        for (const tracePointId in draggedIds) {
+        for (const tracePointId of draggedIds) {
             const draggedTreeNode = this.service.getTreeNodeById(tracePointId)
             if (!draggedTreeNode) continue
             const draggedTracePointNode = this.service.getTracePointNodeById(tracePointId)
@@ -114,7 +115,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             dropTracePointNode.children.push(draggedTracePointNode)
             draggedTracePointNode.parentId = dropTracePointNode.id
             affectedParentNodes.add(dropTracePointNode)
-            affectedParentNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.id))
+            affectedParentNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.parentId))
 
         }
         // if (validate) await this.validateTracePointsOnLoad();

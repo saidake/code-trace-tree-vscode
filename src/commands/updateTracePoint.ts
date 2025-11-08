@@ -22,7 +22,7 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
     const selectedIds = selected.map(item => item.id!);
 
-    for(const id in selectedIds){
+    for(const id of selectedIds){
       const tp = service.getTracePointNodeById(id)
       if(!tp)continue
       tp.tracePoint={ ...tp.tracePoint, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex }
