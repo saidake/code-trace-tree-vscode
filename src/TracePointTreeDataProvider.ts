@@ -28,7 +28,10 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                 });
             return children ?? []
         } else {
-            return tracePointNodes
+            return tracePointNodes.flatMap(rootNode => {
+                    const item = treeItemMap.get(rootNode.id);
+                    return item ? [item] : [];
+                });
         }
         // return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
     }
@@ -38,12 +41,11 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     private refresh(nodes: Set<TracePointNode | null> | null): void {
         const treeItemMap = this.service.getTreeItemMap();
         if (!nodes) {
-            // console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePointNodes(), "nodes: ", nodes)
+            console.log("[Test] refresh - fire triggered ", nodes, "nodes: ", nodes)
             this._onDidChangeTreeData.fire(undefined); // Full refresh
             return;
         }
-
-        // console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePointNodes(), "nodes: ", nodes)
+        console.log("[Test] refresh - fire triggered ", nodes, "nodes: ", nodes)
         nodes.forEach(node => {
             // console.log("[Test] refresh - treeItemMap.get(id): ", treeItemMap.get(node.id))
             this._onDidChangeTreeData.fire(node ? treeItemMap.get(node.id) : undefined);
