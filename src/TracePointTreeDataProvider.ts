@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { TracePointService } from './TracePointService';
-import { TracePoint } from './domain/types';
+import { TracePoint, TracePointNode } from './domain/types';
 
 export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.TreeDragAndDropController<vscode.TreeItem> {
     private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | undefined>();
@@ -9,7 +9,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     dragMimeTypes = ['application/vnd.code.tree.codetracetree'];
 
     constructor(private service: TracePointService) {
-        this.service.addListener((tracePoints, changeType, affectedIds) => this.refresh(changeType, affectedIds));
+        this.service.addNodeListener('refresh', (nodes) => this.refresh(nodes));
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -17,30 +17,37 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     }
 
     getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
-        const childrenMap = this.service.getTracePointChildrenMap();
         const treeItemMap = this.service.getTreeItemMap();
-        const tracePoints=this.service.getTracePoints();
-        console.log("[Test] getChildren triggered, element: ", element, "tracePoints: ", this.service.getTracePoints(), "treeItemMap: ",treeItemMap);
-        return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
+        const tracePointNodes = this.service.getTracePointNodes();
+        console.log("[Test] getChildren triggered, element: ", element, "tracePoints: ", this.service.getTracePointNodes(), "treeItemMap: ", treeItemMap);
+        if (element && element.id) {
+            const children = this.service.getTracePointNodeById(element.id)?.children
+                .flatMap(child => {
+                    const item = treeItemMap.get(child.id);
+                    return item ? [item] : [];
+                });
+            return children ?? []
+        } else {
+            return tracePointNodes
+        }
+        // return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
     }
 
 
     // Update the tree view when the command is executed.
-    private refresh(changeType?: 'add' | 'update' | 'delete' | 'select' | 'description-update' | 'all', affectedIds: string[] = []): void {
+    private refresh(nodes: Set<TracePointNode | null> | null): void {
         const treeItemMap = this.service.getTreeItemMap();
-        if (changeType === 'all' || !changeType) {
-            console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePoints(), "affectedIds: ", affectedIds)
+        if (!nodes) {
+            // console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePointNodes(), "nodes: ", nodes)
             this._onDidChangeTreeData.fire(undefined); // Full refresh
             return;
         }
 
-        if (changeType === 'add' || changeType === 'update' || changeType === 'description-update' || changeType === 'delete') {
-            console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePoints(), "affectedIds: ", affectedIds)
-            affectedIds.forEach(id => {
-                console.log("[Test] refresh - treeItemMap.get(id): ", treeItemMap.get(id))
-                this._onDidChangeTreeData.fire(treeItemMap.get(id));
-            });
-        }
+        // console.log("[Test] refresh - fire triggered, changeType: ", changeType, "tracePoints: ", this.service.getTracePointNodes(), "nodes: ", nodes)
+        nodes.forEach(node => {
+            // console.log("[Test] refresh - treeItemMap.get(id): ", treeItemMap.get(node.id))
+            this._onDidChangeTreeData.fire(node ? treeItemMap.get(node.id) : undefined);
+        });
     }
 
 
@@ -49,88 +56,73 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     }
 
     async handleDrop(target: vscode.TreeItem | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
+        console.log("handleDrop triggered")
         const transferred = dataTransfer.get('application/vnd.code.tree.codetracetree')?.value as string[] | undefined;
         if (!transferred) return;
-
         const draggedIds = transferred;
-        const tracePoints = this.service.getTracePoints();
+        let affectedNodes: Set<TracePointNode| null>  = new Set<TracePointNode>();
 
-        // If dropping into empty space (root level), position after original parent
-        if (!target) {
-            const updatedTracePoints = [];
-            const rootTracePoints = tracePoints.filter(tp => !tp.parentId);
-            const nonRootTracePoints = tracePoints.filter(tp => tp.parentId);
+        for (const tracePointId in draggedIds) {
+            const draggedTreeNode = this.service.getTreeNodeById(tracePointId)
+            if (!draggedTreeNode) continue
+            const draggedTracePointNode = this.service.getTracePointNodeById(tracePointId)
+            if (!draggedTracePointNode) continue
+            const oldParentTracePointNode = draggedTracePointNode.parentId ? this.service.getTracePointNodeById(draggedTracePointNode.parentId) : null
 
-            // Build new root list, placing dragged items after their original parents
-            const processedIds = new Set<string>();
-            for (const tp of rootTracePoints) {
-                updatedTracePoints.push(tp);
-                processedIds.add(tp.id);
-                if (draggedIds.includes(tp.id)) {
-                    // If the root item itself is dragged, it stays in place
-                    continue;
+            // If dropping into empty space (root level), position after original parent
+            if (!target) {
+                if (!draggedTracePointNode.parentId) continue
+                // Detach from old parent
+                if (oldParentTracePointNode?.children) {
+                    oldParentTracePointNode.children = oldParentTracePointNode.children.filter(
+                        child => child !== draggedTracePointNode
+                    );
                 }
-                // Add any dragged children of this parent
-                const draggedChildren = nonRootTracePoints.filter(child => child.parentId === tp.id && draggedIds.includes(child.id));
-                for (const child of draggedChildren) {
-                    updatedTracePoints.push({ ...child, parentId: undefined });
-                    processedIds.add(child.id);
+                // Attach under new parent
+                const rootParentId: string | null = this.service.findRootParentId(draggedTracePointNode)
+                draggedTracePointNode.parentId = undefined;
+                if (rootParentId != null) this.service.addRootTracePointNextTo(draggedTracePointNode, rootParentId)
+                affectedNodes.add(null)
+                continue
+            }
+            const dropTracePointId = target.id!;
+            const dropTracePointNode = this.service.getTracePointNodeById(dropTracePointId)!
+            // Prevent dropping on the current parent
+            if (draggedTracePointNode.parentId == dropTracePointNode?.id) continue;
+
+            // Skip if trying to drop inside itself or its descendant
+            let ancestorTracePoint: TracePointNode | null = dropTracePointNode;
+            let invalid = false;
+            while (ancestorTracePoint && ancestorTracePoint.parentId) {
+                if (ancestorTracePoint?.id === draggedTracePointNode.id) {
+                    invalid = true;
+                    break;
                 }
+                ancestorTracePoint = this.service.getTracePointNodeById(ancestorTracePoint.parentId)
             }
-            // Add remaining non-dragged root items and non-dragged non-root items
-            for (const tp of tracePoints) {
-                if (!processedIds.has(tp.id)) {
-                    updatedTracePoints.push(draggedIds.includes(tp.id) ? { ...tp, parentId: undefined } : tp);
-                }
+            if (invalid) continue;
+
+            // Detach from old parent
+            if (oldParentTracePointNode?.children) {
+                oldParentTracePointNode.children = oldParentTracePointNode.children.filter(
+                    child => child !== draggedTracePointNode
+                );
             }
+            // Attach under new parent
+            dropTracePointNode.children.push(draggedTracePointNode)
+            draggedTracePointNode.parentId = dropTracePointNode.id
+            affectedNodes.add(dropTracePointNode)
+            affectedNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.id))
 
-            await this.service.saveTracePoints(updatedTracePoints);
-            return;
         }
-
-        const targetId = target.id!;
-
-        // Prevent dropping an item onto itself
-        if (draggedIds.includes(targetId)) {
-            return; // Ignore the drop to avoid circular reference
-        }
-
-        // Check if any dragged item is an ancestor of the target
-        const isDescendantDrop = draggedIds.some(draggedId => this.isAncestor(draggedId, targetId, tracePoints));
-        if (isDescendantDrop) {
-            // Do nothing if dropping into a descendant
-            return;
-        }
-
-        // Update parentId for valid drops
-        const updated = tracePoints.map(tp => {
-            if (draggedIds.includes(tp.id)) {
-                return { ...tp, parentId: targetId };
-            }
-            return tp;
-        });
-
-        await this.service.saveTracePoints(updated);
-    }
-
-    private isAncestor(parentId: string, targetId: string, tracePoints: TracePoint[]): boolean {
-        // If targetId is not in tracePoints, it can't be a descendant
-        const target = tracePoints.find(tp => tp.id === targetId);
-        if (!target) return false;
-
-        // Traverse up the parent chain from targetId
-        let currentId = target.parentId;
-        while (currentId) {
-            if (currentId === parentId) return true;
-            const current = tracePoints.find(tp => tp.id === currentId);
-            currentId = current?.parentId;
-        }
-        return false;
+        // if (validate) await this.validateTracePointsOnLoad();
+        this.service.applyHighlightsToAllEditors();
+        this.service.notifyListeners('refresh', affectedNodes)
+        this.service.saveState();
     }
 
 
     // Add these methods to the TracePointTreeDataProvider class (at the end, before the closing brace)
-
     async expandItemRecursively(
         treeView: vscode.TreeView<vscode.TreeItem>,
         item: vscode.TreeItem
@@ -150,15 +142,13 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
      */
     getAllChildrenRecursively(itemId: string): vscode.TreeItem[] {
         const allChildren: vscode.TreeItem[] = [];
-        const childrenMap = this.service.getTracePointChildrenMap();
-        const treeItemMap = this.service.getTreeItemMap();
         const getChildrenRecursive = (id: string) => {
-            const childrenIds = childrenMap.get(id) || [];
-            childrenIds.forEach(childId => {
-                const childItem = treeItemMap.get(childId);
+            const children = this.service.getTracePointNodeById(id)?.children || [];
+            children.forEach(child => {
+                const childItem = this.service.getTreeNodeById(child.id);
                 if (childItem) {
                     allChildren.push(childItem);
-                    getChildrenRecursive(childId);
+                    getChildrenRecursive(child.id);
                 }
             });
         };
@@ -172,9 +162,8 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
      * Get all root items
      */
     getRootItems(): vscode.TreeItem[] {
-        const childrenMap = this.service.getTracePointChildrenMap();
-        const treeItemMap = this.service.getTreeItemMap();
-        return (childrenMap.get('root') || []).map(id => treeItemMap.get(id)!);
+        const tpNodes = this.service.getTracePointNodes();
+        return tpNodes.map(tp => this.service.getTreeNodeById(tp.id)!);
     }
 
     /**
@@ -195,10 +184,9 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
         if (!element.id) return undefined;
         const treeItemMap = this.service.getTreeItemMap();
-        const tracePointMap = this.service.getTracePointMap();
         // Find parent trace point
-        const currentTp = tracePointMap.get(element.id);
-        if (!currentTp || !currentTp.parentId || currentTp.parentId == "root") return undefined;
+        const currentTp = this.service.getTracePointNodeById(element.id);
+        if (!currentTp || !currentTp.parentId) return undefined;
         // Return parent TreeItem
         return treeItemMap.get(currentTp.parentId);
     }

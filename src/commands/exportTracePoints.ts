@@ -8,7 +8,7 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {
     // Read state
     const state = context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY) || {
-      tracePoints: [],
+      tracePointNodes: [],
       selectedTracePointIds: [],
       expandedTracePointIds: [],
       highlightingEnabled: true,
@@ -24,8 +24,8 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
     // Convert state to xml data
     const exportState: TracePointExportState = {
       tracePointState: {
-        tracePoints: {
-          tracePoint: state.tracePoints
+        tracePointNodes: {
+          tracePointNode: state.tracePointNodes
         },
         expandedTracePointIds: {
           id: Array.from(service.getExpandedTracePointIds())

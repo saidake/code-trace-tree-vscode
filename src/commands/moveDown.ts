@@ -1,69 +1,49 @@
 import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider';
+import { TracePointNode } from '../domain/types';
 
 export function registerMoveDown(context: vscode.ExtensionContext, service: TracePointService, treeView: vscode.TreeView<vscode.TreeItem>, treeDataProvider: TracePointTreeDataProvider) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.moveDown', async () => {
     const selected = await treeView.selection;
     if (selected.length === 0) return;
-    const tracePoints = service.getTracePoints();
     const selectedIds = new Set(selected.map(item => item.id!));
 
-    // Make a mutable copy of all trace points
-    const allTracePoints = [...tracePoints];
-    // Build a global index map (id -> index)
-    const globalIndexMap = new Map(allTracePoints.map((tp, i) => [tp.id, i]));
-    // Group selected trace points by their parentId
-    const nodesGroupedByParent = new Map<string | undefined, string[]>();
-    for (const tp of tracePoints) {
-      if (selectedIds.has(tp.id)) {
-        const parentId = tp.parentId;
-        if (!nodesGroupedByParent.has(parentId)) {
-          nodesGroupedByParent.set(parentId, []);
-        }
-        nodesGroupedByParent.get(parentId)!.push(tp.id);
-      }
+    let affectedNodes: Set<TracePointNode | null>= new Set<TracePointNode>();
+    const groupedByParent = new Map<string | undefined, TracePointNode[]>();
+    for (const id of selectedIds) {
+      const node = service.getTracePointNodeById(id);
+      if (!node) continue;
+      const parentId = node.parentId;
+      if (!groupedByParent.has(parentId)) groupedByParent.set(parentId, []);
+      groupedByParent.get(parentId)!.push(node);
     }
 
-    // Process each parent group
-    for (const [parentId, ids] of nodesGroupedByParent.entries()) {
-      // Find all siblings under the same parent
-      const siblingTracePoints = allTracePoints.filter(tp => tp.parentId === parentId);
+    for (const [parentId, nodes] of groupedByParent.entries()) {
+      const parentNode = service.getTracePointNodeById(parentId);
+      affectedNodes.add(parentNode)
+      const originalSiblings = service.getTracePointSiblingsByParentId(parentId);
 
-      // Sort in descending order of sibling index (because we are moving down)
-      const sortedIds = ids
-        .map(id => ({ id, index: siblingTracePoints.findIndex(tp => tp.id === id) }))
-        .sort((a, b) => b.index - a.index);
+      const orderedSelected = nodes.slice().sort(
+        (a, b) => originalSiblings.indexOf(a) - originalSiblings.indexOf(b)
+      );
 
-      for (const { id } of sortedIds) {
-        const currentIndex = siblingTracePoints.findIndex(tp => tp.id === id);
-        if (currentIndex < siblingTracePoints.length - 1) {
-          const nextSibling = siblingTracePoints[currentIndex + 1];
+      for (let i = orderedSelected.length - 1; i >= 0; i--) {
+        const node = orderedSelected[i];
+        const originalIndex = originalSiblings.indexOf(node);
 
-          // Skip if the next sibling is also selected (we move blocks as one group)
-          if (selectedIds.has(nextSibling.id)) continue;
-
-          // Get global indexes of current and next sibling
-          const currentGlobalIndex = globalIndexMap.get(id)!;
-          const nextGlobalIndex = globalIndexMap.get(nextSibling.id)!;
-
-          // Swap positions in the global array
-          [allTracePoints[currentGlobalIndex], allTracePoints[nextGlobalIndex]] =
-            [allTracePoints[nextGlobalIndex], allTracePoints[currentGlobalIndex]];
-
-          // Swap positions in sibling list as well
-          [siblingTracePoints[currentIndex], siblingTracePoints[currentIndex + 1]] =
-            [siblingTracePoints[currentIndex + 1], siblingTracePoints[currentIndex]];
-
-          // Update index map to reflect new order
-          globalIndexMap.set(id, nextGlobalIndex);
-          globalIndexMap.set(nextSibling.id, currentGlobalIndex);
+        if (
+          originalIndex < originalSiblings.length - 1 &&
+          !selectedIds.has(originalSiblings[originalIndex + 1].id)
+        ) {
+          [originalSiblings[originalIndex], originalSiblings[originalIndex + 1]] =
+            [originalSiblings[originalIndex + 1], originalSiblings[originalIndex]];
         }
       }
     }
 
     // Save updated order back to the service
-    service.saveTracePoints(allTracePoints);
-
+    service.notifyListeners('refresh', affectedNodes);
+    service.saveState();
   }));
 }

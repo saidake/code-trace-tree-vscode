@@ -9,9 +9,9 @@ export function registerRenameTracePoint(context: vscode.ExtensionContext, servi
       vscode.window.showWarningMessage('Select exactly one trace point to rename.');
       return;
     }
-    const tp = service.getTracePoints().find(tp => tp.id === selected[0].id);
+    const tp = service.getTracePointNodes().find(tp => tp.id === selected[0].id);
     if (!tp) return;
-    const newName = await vscode.window.showInputBox({ prompt: 'Enter new name (optional)', placeHolder: 'Leave empty for no name', value: tp.name });
+    const newName = await vscode.window.showInputBox({ prompt: 'Enter new name (optional)', placeHolder: 'Leave empty for no name', value: tp.tracePoint.name });
     // Allow empty string or undefined
     await service.renameTracePoint(tp.id, newName ?? '');
   }));

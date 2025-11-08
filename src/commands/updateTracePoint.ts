@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
+import { TracePointNode } from '../domain/types';
 
 export function registerUpdateTracePoint(context: vscode.ExtensionContext, service: TracePointService, treeView: vscode.TreeView<vscode.TreeItem>) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.updateTracePoint', async () => {
@@ -20,19 +21,22 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
     const [totalOccurrences, matchingLines] = service.getLineOccurrences(editor.document, lineContent);
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
     const selectedIds = selected.map(item => item.id!);
-    const updatedTracePoints = service.getTracePoints().map(tp => {
-      if (selectedIds.includes(tp.id)) {
-        return { ...tp, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex };
-      }
-      return tp;
-    });
-    await service.saveTracePoints(updatedTracePoints);
-    service.selectTracePoints(selectedIds);
-    
-    vscode.window.visibleTextEditors.forEach(ed => {
-      if (ed.document.uri.fsPath === editor.document.uri.fsPath) {
-        service.highlightTracePointsInFile(ed.document);
-      }
-    });
+
+    for(const id in selectedIds){
+      const tp = service.getTracePointNodeById(id)
+      if(!tp)continue
+      tp.tracePoint={ ...tp.tracePoint, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex }
+      service.updateTreeItem(tp)
+    }
+    service.applyHighlightsToAllEditors();
+
+    //service.selectTracePoints(selectedIds);
+    // vscode.window.visibleTextEditors.forEach(ed => {
+    //   if (ed.document.uri.fsPath === editor.document.uri.fsPath) {
+    //     service.highlightTracePointsInFile(ed.document);
+    //   }
+    // });
+    service.notifyListeners();
+    service.saveState();
   }));
 }

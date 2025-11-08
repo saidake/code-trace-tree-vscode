@@ -25,20 +25,26 @@ export function registerImportTracePoints(
 
       const state = parsed.tracePointState;
 
-      const tracePointsArray = state.tracePoints?.tracePoint ?? [];
+      const tracePointsArray = state.tracePointNodes?.tracePointNode ?? [];
 
       const currentProjectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
 
-      const updatedTracePoints = tracePointsArray.map((tp: any) => ({
-        ...tp,
-        projectPath: currentProjectPath,
-      }));
+      const updatedTracePoints = tracePointsArray.map((tp: any) => {
+        tp.tracePoint.projectPath = currentProjectPath;
+        return tp;
+      });
 
       const expandedIdsArray = state.expandedTracePointIds.id || [];
       service.setExpandedTracePointIds(new Set(expandedIdsArray));
       service.setHighlightingEnabled(true);
 
-      service.saveTracePoints(updatedTracePoints, true);
+      service.setTracePoints(updatedTracePoints);
+      service.updateTracePointMap();
+      service.rebuildTreeItemMap();
+      service.validateTracePointsOnLoad();
+      service.applyHighlightsToAllEditors();
+      service.notifyListeners();
+      service.saveState();
 
       vscode.window.showInformationMessage('Trace points imported.');
     })

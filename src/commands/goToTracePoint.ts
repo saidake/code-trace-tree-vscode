@@ -8,7 +8,7 @@ export function registerGoToTracePoint(context: vscode.ExtensionContext, service
       vscode.window.showWarningMessage('Select exactly one trace point.');
       return;
     }
-    const tp = selected[0].id?service.getTracePointById(selected[0].id):null;
+    const tp = selected[0].id?service.getTracePointNodeById(selected[0].id):null;
     if (tp) {
       await service.navigateToTracePoint(tp,treeView);
     }
