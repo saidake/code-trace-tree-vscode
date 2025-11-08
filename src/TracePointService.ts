@@ -594,18 +594,21 @@ export class TracePointService {
         };
         ids.forEach(id => collectChildren(id));
 
-        // Recursive function to remove nodes from a tree from bottom to top
-        const deleteNodeRecursively = (nodes: TracePointNode[]): TracePointNode[] => {
-            return nodes
-                .filter(node => !allIdsToDelete.has(node.id)) // Remove current node if in delete set
-                .map(node => ({
-                    ...node,
-                    children: deleteNodeRecursively(node.children), // Recursively process children
-                }));
+        // Recursive in-place delete function
+        const deleteNodeRecursively = (nodes: TracePointNode[]): void => {
+            // We must mutate `nodes` array in place (splice)
+            for (let i = nodes.length - 1; i >= 0; i--) {
+                const node = nodes[i];
+                // If node is in delete set, remove it from the array
+                if (allIdsToDelete.has(node.id)) {
+                    nodes.splice(i, 1);
+                    continue;
+                }
+                deleteNodeRecursively(node.children);
+            }
         };
-
-        // Update the top-level tree
-        this.tracePointNodes = deleteNodeRecursively(this.tracePointNodes);
+        // Apply directly to root
+        deleteNodeRecursively(this.tracePointNodes);
 
 
         allIdsToDelete.forEach(id => {
@@ -616,17 +619,34 @@ export class TracePointService {
         });
 
         this.applyHighlightsToAllEditors();
+        for (const affectedParentNode of affectedParentNodes) {
+            this.expandTreeItem(affectedParentNode)
+        }
         this.notifyListeners('refresh', affectedParentNodes);
         await this.saveState();
     }
 
 
+    expandTreeItem(tracePointNode: TracePointNode | null) {
+        if (!tracePointNode) return
+        const treeNode = this.getTreeNodeById(tracePointNode.id)
+        if (!treeNode) return
+        let collapsibleState = vscode.TreeItemCollapsibleState.None;
+        const hasChildren = tracePointNode.children.length > 0;
+        if (hasChildren) {
+            collapsibleState = this.expandedTracePointIds.has(tracePointNode.id)
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed;
+        }
+        treeNode.collapsibleState = collapsibleState
+    }
+
     updateTreeItem(tracePointNode: TracePointNode) {
-        console.log("updateTreeItem triggered, expandedTracePointIds: ",this.expandedTracePointIds, " tracePointNode.id: ",tracePointNode.id)
+        console.log("updateTreeItem triggered, expandedTracePointIds: ", this.expandedTracePointIds, " tracePointNode.id: ", tracePointNode.id)
         // Determine collapsible state based on expandedIds
         let collapsibleState = vscode.TreeItemCollapsibleState.None;
         const hasChildren = tracePointNode.children.length > 0;
-        if (tracePointNode.tracePoint.isValid && hasChildren) {
+        if (hasChildren) {
             collapsibleState = this.expandedTracePointIds.has(tracePointNode.id)
                 ? vscode.TreeItemCollapsibleState.Expanded
                 : vscode.TreeItemCollapsibleState.Collapsed;
@@ -664,7 +684,7 @@ export class TracePointService {
             const pTp = this.treeNodeMap.get(tracePointNode.parentId);
             if (pTp) {
                 pTp.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-                if(pTp.id)this.expandedTracePointIds.add(pTp.id)
+                if (pTp.id) this.expandedTracePointIds.add(pTp.id)
             }
         }
     }
@@ -678,5 +698,13 @@ export class TracePointService {
         }
     }
 
+    removeRootTracePoint(tpNode: TracePointNode): boolean {
+        const index = this.tracePointNodes.findIndex(node => node.id === tpNode.id);
+        if (index !== -1) {
+            this.tracePointNodes.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
 
 }

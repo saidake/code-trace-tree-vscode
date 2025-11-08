@@ -9,7 +9,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
     if (selected.length === 0) return;
     const selectedIds = new Set(selected.map(item => item.id!));
 
-    let affectedParentNodes: Set<TracePointNode | null>= new Set<TracePointNode>();
+    let affectedParentNodes: Set<TracePointNode | null>= new Set<TracePointNode | null>();
     const groupedByParent = new Map<string | undefined, TracePointNode[]>();
     for (const id of selectedIds) {
       const node = service.getTracePointNodeById(id);

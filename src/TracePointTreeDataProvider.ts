@@ -62,7 +62,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
         const transferred = dataTransfer.get('application/vnd.code.tree.codetracetree')?.value as string[] | undefined;
         if (!transferred) return;
         const draggedIds = transferred;
-        let affectedParentNodes: Set<TracePointNode| null>  = new Set<TracePointNode>();
+        let affectedParentNodes: Set<TracePointNode| null>  = new Set<TracePointNode | null>();
         console.log("handleDrop - draggedIds: ",draggedIds)
 
         for (const tracePointId of draggedIds) {
@@ -70,14 +70,14 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             if (!draggedTreeNode) continue
             const draggedTracePointNode = this.service.getTracePointNodeById(tracePointId)
             if (!draggedTracePointNode) continue
-            const oldParentTracePointNode = draggedTracePointNode.parentId ? this.service.getTracePointNodeById(draggedTracePointNode.parentId) : null
+            const oldDraggedParentTracePointNode = draggedTracePointNode.parentId ? this.service.getTracePointNodeById(draggedTracePointNode.parentId) : null
 
             // If dropping into empty space (root level), position after original parent
             if (!target) {
                 if (!draggedTracePointNode.parentId) continue
                 // Detach from old parent
-                if (oldParentTracePointNode?.children) {
-                    oldParentTracePointNode.children = oldParentTracePointNode.children.filter(
+                if (oldDraggedParentTracePointNode?.children) {
+                    oldDraggedParentTracePointNode.children = oldDraggedParentTracePointNode.children.filter(
                         child => child !== draggedTracePointNode
                     );
                 }
@@ -90,6 +90,11 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             }
             const dropTracePointId = target.id!;
             const dropTracePointNode = this.service.getTracePointNodeById(dropTracePointId)!
+            
+            
+            // Prevent dropping on the same node
+            if (dropTracePointNode.id == draggedTracePointNode.id) continue
+
             // Prevent dropping on the current parent
             if (draggedTracePointNode.parentId == dropTracePointNode?.id) continue;
 
@@ -106,17 +111,22 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             if (invalid) continue;
 
             // Detach from old parent
-            if (oldParentTracePointNode?.children) {
-                oldParentTracePointNode.children = oldParentTracePointNode.children.filter(
+            if (oldDraggedParentTracePointNode?.children) {
+                oldDraggedParentTracePointNode.children = oldDraggedParentTracePointNode.children.filter(
                     child => child !== draggedTracePointNode
                 );
+            }
+            if(!oldDraggedParentTracePointNode){
+                this.service.removeRootTracePoint(draggedTracePointNode)
             }
             // Attach under new parent
             dropTracePointNode.children.push(draggedTracePointNode)
             draggedTracePointNode.parentId = dropTracePointNode.id
+            //affectedParentNodes.add(this.service.getTracePointNodeById(dropTracePointNode.parentId))
+            affectedParentNodes.add(oldDraggedParentTracePointNode)
+            this.service.expandTreeItem(oldDraggedParentTracePointNode)
             affectedParentNodes.add(dropTracePointNode)
-            affectedParentNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.parentId))
-
+            this.service.expandTreeItem(dropTracePointNode)
         }
         // if (validate) await this.validateTracePointsOnLoad();
         this.service.applyHighlightsToAllEditors();
