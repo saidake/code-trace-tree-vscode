@@ -7,10 +7,8 @@ export function registerMoveUp(context: vscode.ExtensionContext, service: TraceP
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.moveUp', async () => {
     const selected = await treeView.selection;
     if (selected.length === 0) return;
-    const tracePoints = service.getTracePointNodes();
     const selectedIds = new Set(selected.map(item => item.id!));
-    const tracePointNodes = service.getTracePointNodes();
-    let affectedNodes: Set<TracePointNode | null> = new Set<TracePointNode>();
+    let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode>();
 
     const groupedByParent = new Map<string | undefined, TracePointNode[]>();
     for (const id of selectedIds) {
@@ -24,7 +22,7 @@ export function registerMoveUp(context: vscode.ExtensionContext, service: TraceP
 
     for (const [parentId, nodes] of groupedByParent.entries()) {
       const parentNode = service.getTracePointNodeById(parentId) 
-      affectedNodes.add(parentNode)
+      affectedParentNodes.add(parentNode)
       const originalSiblings = service.getTracePointSiblingsByParentId(parentId);
 
       const orderedSelected = nodes.slice().sort(
@@ -46,7 +44,7 @@ export function registerMoveUp(context: vscode.ExtensionContext, service: TraceP
     }
 
     // Save updated order back to the service
-    service.notifyListeners('refresh', affectedNodes);
+    service.notifyListeners('refresh', affectedParentNodes);
     service.saveState();
   }));
 }

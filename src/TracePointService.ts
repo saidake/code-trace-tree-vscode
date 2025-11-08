@@ -288,7 +288,7 @@ export class TracePointService {
         this.nodeMap = new Map(this.tracePointNodes.map(tp => [tp.id, tp]));
     }
 
-   async setTracePoints(newTracePoints: TracePointNode[]) {
+    async setTracePoints(newTracePoints: TracePointNode[]) {
         this.tracePointNodes = newTracePoints;
     }
 
@@ -311,8 +311,10 @@ export class TracePointService {
 
     async highlightTracePointsInFile(document: vscode.TextDocument) {
         if (!this.isHighlightingEnabled()) return;
+        console.log("highlightTracePointsInFile triggered")
         const filePath = vscode.workspace.asRelativePath(document.uri);
         const relevantTracePoints = this.fileNodesMap.get(filePath)?.filter(tp => tp.tracePoint.isValid) ?? [];
+        console.log("relevantTracePoints: ", relevantTracePoints)
 
         this.removeHighlights(document.uri.fsPath);
 
@@ -344,6 +346,7 @@ export class TracePointService {
     }
 
     applyHighlightsToAllEditors() {
+        console.log("applyHighlightsToAllEditors triggered")
         vscode.window.visibleTextEditors.forEach(editor => {
             if (this.isHighlightingEnabled()) {
                 this.highlightTracePointsInFile(editor.document);
@@ -370,7 +373,7 @@ export class TracePointService {
         const lineOffset = newLinesCount - oldLines;
         const changedLine = change.range.start.line + 1;
         const updatedNodes: TracePointNode[] = [];
-        let affectedNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>();
+        let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>();
 
         // console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
         // console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
@@ -381,7 +384,7 @@ export class TracePointService {
                 if (valid) {
                     node.tracePoint = { ...tp, isValid: true };
                     updatedNodes.push(node);
-                    affectedNodes.add(this.getTracePointParentById(node.parentId))
+                    affectedParentNodes.add(this.getTracePointParentById(node.parentId))
                 }
                 continue;
             }
@@ -402,7 +405,7 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
 
             }
             // CASE 2: Edit on the trace point line (lineOffset = 0)
@@ -418,7 +421,7 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
 
             }
 
@@ -438,7 +441,7 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
 
             }
         }
@@ -447,7 +450,7 @@ export class TracePointService {
         // Re-highlight updated trace points in the file
         this.highlightTracePointsInFile(event.document);
         // Notify listeners to refresh affected UI parts
-        this.notifyListeners('refresh', affectedNodes);
+        this.notifyListeners('refresh', affectedParentNodes);
         // Persist changes
         this.saveState();
     }
@@ -571,6 +574,15 @@ export class TracePointService {
             const node = this.getTracePointNodeById(id)
             affectedParentNodes.add(this.getTracePointNodeById(node?.parentId))
             if (node) {
+                if (node.tracePoint.filePath) {
+                    const arr = this.fileNodesMap.get(node.tracePoint.filePath);
+                    if (arr) {
+                        this.fileNodesMap.set(
+                            node.tracePoint.filePath,
+                            arr.filter(n => n.id !== node.id)
+                        );
+                    }
+                }
                 for (const child of node.children) {
                     allIdsToDelete.add(child.id);
                     collectChildren(child.id);

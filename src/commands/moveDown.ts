@@ -9,7 +9,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
     if (selected.length === 0) return;
     const selectedIds = new Set(selected.map(item => item.id!));
 
-    let affectedNodes: Set<TracePointNode | null>= new Set<TracePointNode>();
+    let affectedParentNodes: Set<TracePointNode | null>= new Set<TracePointNode>();
     const groupedByParent = new Map<string | undefined, TracePointNode[]>();
     for (const id of selectedIds) {
       const node = service.getTracePointNodeById(id);
@@ -21,7 +21,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
 
     for (const [parentId, nodes] of groupedByParent.entries()) {
       const parentNode = service.getTracePointNodeById(parentId);
-      affectedNodes.add(parentNode)
+      affectedParentNodes.add(parentNode)
       const originalSiblings = service.getTracePointSiblingsByParentId(parentId);
 
       const orderedSelected = nodes.slice().sort(
@@ -43,7 +43,7 @@ export function registerMoveDown(context: vscode.ExtensionContext, service: Trac
     }
 
     // Save updated order back to the service
-    service.notifyListeners('refresh', affectedNodes);
+    service.notifyListeners('refresh', affectedParentNodes);
     service.saveState();
   }));
 }

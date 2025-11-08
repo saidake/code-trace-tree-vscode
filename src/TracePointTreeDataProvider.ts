@@ -62,7 +62,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
         const transferred = dataTransfer.get('application/vnd.code.tree.codetracetree')?.value as string[] | undefined;
         if (!transferred) return;
         const draggedIds = transferred;
-        let affectedNodes: Set<TracePointNode| null>  = new Set<TracePointNode>();
+        let affectedParentNodes: Set<TracePointNode| null>  = new Set<TracePointNode>();
 
         for (const tracePointId in draggedIds) {
             const draggedTreeNode = this.service.getTreeNodeById(tracePointId)
@@ -84,7 +84,7 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                 const rootParentId: string | null = this.service.findRootParentId(draggedTracePointNode)
                 draggedTracePointNode.parentId = undefined;
                 if (rootParentId != null) this.service.addRootTracePointNextTo(draggedTracePointNode, rootParentId)
-                affectedNodes.add(null)
+                affectedParentNodes.add(null)
                 continue
             }
             const dropTracePointId = target.id!;
@@ -113,13 +113,13 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
             // Attach under new parent
             dropTracePointNode.children.push(draggedTracePointNode)
             draggedTracePointNode.parentId = dropTracePointNode.id
-            affectedNodes.add(dropTracePointNode)
-            affectedNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.id))
+            affectedParentNodes.add(dropTracePointNode)
+            affectedParentNodes.add(this.service.getTracePointNodeById(draggedTracePointNode.id))
 
         }
         // if (validate) await this.validateTracePointsOnLoad();
         this.service.applyHighlightsToAllEditors();
-        this.service.notifyListeners('refresh', affectedNodes)
+        this.service.notifyListeners('refresh', affectedParentNodes)
         this.service.saveState();
     }
 
