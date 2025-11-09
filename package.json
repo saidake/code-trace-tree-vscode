@@ -48,7 +48,7 @@
                 "title": "Create a Root Code Trace Point"
             },
             {
-                "command": "codeTraceTree.createSelectedTracePoint",
+                "command": "codeTraceTree.createTracePointUnderSelected",
                 "title": "Create Code Trace Point (Under selected)"
             },
             {
@@ -160,7 +160,7 @@
                     "group": "navigation"
                 },
                 {
-                    "command": "codeTraceTree.createSelectedTracePoint",
+                    "command": "codeTraceTree.createTracePointUnderSelected",
                     "group": "navigation@50"
                 },
                 {

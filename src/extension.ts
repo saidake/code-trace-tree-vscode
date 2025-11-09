@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { TracePointService } from './TracePointService';
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider';
 import { registerCreateRootTracePoint } from './commands/createRootTracePoint';
-import { registerCreateSelectedTracePoint } from './commands/createSelectedTracePoint';
+import { registerCreateTracePointUnderSelected } from './commands/createTracePointUnderSelected';
 // import { registerUpdateTracePoint } from './commands/updateTracePoint';
 import { registerMoveUp } from './commands/moveUp';
 import { registerMoveDown } from './commands/moveDown';
@@ -47,12 +47,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Listen to tree view expand/collapse events
     context.subscriptions.push(
         treeView.onDidExpandElement(e => {
+            console.log("onDidExpandElement triggered")
             const id = e.element.id!;
             const expanded = service.getExpandedTracePointIds();
             expanded.add(id);
             service.setExpandedTracePointIds(expanded);
         }),
         treeView.onDidCollapseElement(e => {
+            console.log("onDidCollapseElement triggered")
             const id = e.element.id!;
             const expanded = service.getExpandedTracePointIds();
             expanded.delete(id);
@@ -61,7 +63,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
     // Register all commands
     registerCreateRootTracePoint(context, service, treeDataProvider);
-    registerCreateSelectedTracePoint(context, service, treeDataProvider, treeView);
+    registerCreateTracePointUnderSelected(context, service, treeDataProvider, treeView);
     // registerUpdateTracePoint(context, service, treeView);
     registerMoveUp(context, service, treeView, treeDataProvider);
     registerMoveDown(context, service, treeView, treeDataProvider);

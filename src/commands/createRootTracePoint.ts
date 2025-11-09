@@ -10,11 +10,14 @@ export function registerCreateRootTracePoint(context: vscode.ExtensionContext, s
       return;
     }
     const lineNumber = editor.selection.active.line + 1;
-    const name = await vscode.window.showInputBox({ 
-      prompt: 'Enter name for the root trace point (optional)', 
-      placeHolder: 'Leave empty for no name' 
+    const name = await vscode.window.showInputBox({
+      prompt: 'Enter name for the root trace point (optional)',
+      placeHolder: 'Leave empty for no name'
     });
     // Allow empty string or undefined
     await service.addTracePoint(name ?? '', editor.document.uri, lineNumber);
+    service.highlightTracePointsInFile(editor.document);
+    service.notifyListeners()
+    service.saveState();
   }));
 }

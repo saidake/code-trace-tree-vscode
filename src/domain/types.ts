@@ -30,7 +30,6 @@ export interface TracePointNode {
 
 export interface TracePointState {
     tracePointNodes: TracePointNode[];
-    selectedTracePointIds: string[];
     expandedTracePointIds: string[];
     highlightingEnabled: boolean;
 }

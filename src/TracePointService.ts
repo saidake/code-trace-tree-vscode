@@ -42,7 +42,6 @@ export class TracePointService {
         if (!state) {
             const initialState: TracePointState = {
                 tracePointNodes: [],
-                selectedTracePointIds: [],
                 expandedTracePointIds: [],
                 highlightingEnabled: true,
             };
@@ -60,7 +59,7 @@ export class TracePointService {
                 // state.expandedTracePointIds = [];
 
                 this.tracePointNodes = state.tracePointNodes || [];
-                this.selectedTracePointIds = new Set(state.selectedTracePointIds || []);
+                this.selectedTracePointIds = new Set();
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
 
 
@@ -82,7 +81,6 @@ export class TracePointService {
     async saveState() {
         const state: TracePointState = {
             tracePointNodes: this.tracePointNodes,
-            selectedTracePointIds: Array.from(this.selectedTracePointIds),
             expandedTracePointIds: Array.from(this.expandedTracePointIds),
             highlightingEnabled: this._highlightingEnabled ?? true,
         };
@@ -240,18 +238,6 @@ export class TracePointService {
             this.fileNodesMap.set(newNode.tracePoint.filePath, []);
         }
         this.fileNodesMap.get(newNode.tracePoint.filePath)!.push(newNode);
-        this.highlightTracePointsInFile(document);
-
-
-        if (!parentId) {
-            this.notifyListeners()
-        } else {
-            const parentNode = this.nodeMap.get(parentId);
-            if (parentNode) {
-                this.notifyListeners('refresh', new Set<TracePointNode | null>([parentNode]))
-            }
-        }
-        this.saveState();
     }
 
 
