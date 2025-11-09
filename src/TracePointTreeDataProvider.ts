@@ -33,7 +33,6 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                     return item ? [item] : [];
                 });
         }
-        // return (childrenMap.get(element ? element.id! : "root") || []).map(childId => treeItemMap.get(childId)!);
     }
 
 
@@ -85,13 +84,17 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                 const rootParentId: string | null = this.service.findRootParentId(draggedTracePointNode)
                 draggedTracePointNode.parentId = undefined;
                 if (rootParentId != null) this.service.addRootTracePointNextTo(draggedTracePointNode, rootParentId)
+
+                // Refresh parent nodes
+                affectedParentNodes.add(oldDraggedParentTracePointNode)
+                this.service.expandTreeItem(oldDraggedParentTracePointNode)
                 affectedParentNodes.add(null)
                 continue
             }
             const dropTracePointId = target.id!;
             const dropTracePointNode = this.service.getTracePointNodeById(dropTracePointId)!
-            
-            
+
+
             // Prevent dropping on the same node
             if (dropTracePointNode.id == draggedTracePointNode.id) continue
 
@@ -116,13 +119,14 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
                     child => child !== draggedTracePointNode
                 );
             }
-            if(!oldDraggedParentTracePointNode){
+            if (!oldDraggedParentTracePointNode) {
                 this.service.removeRootTracePoint(draggedTracePointNode)
             }
             // Attach under new parent
             dropTracePointNode.children.push(draggedTracePointNode)
             draggedTracePointNode.parentId = dropTracePointNode.id
-            //affectedParentNodes.add(this.service.getTracePointNodeById(dropTracePointNode.parentId))
+
+            // Refresh parent nodes
             affectedParentNodes.add(oldDraggedParentTracePointNode)
             this.service.expandTreeItem(oldDraggedParentTracePointNode)
             affectedParentNodes.add(dropTracePointNode)

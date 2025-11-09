@@ -29,7 +29,7 @@ export function registerMoveUp(context: vscode.ExtensionContext, service: TraceP
         (a, b) => originalSiblings.indexOf(a) - originalSiblings.indexOf(b)
       );
 
-      for (let i = orderedSelected.length - 1; i >= 0; i--) {
+      for (let i = 0; i < orderedSelected.length; i++) {
         const node = orderedSelected[i];
         const originalIndex = originalSiblings.indexOf(node);
 

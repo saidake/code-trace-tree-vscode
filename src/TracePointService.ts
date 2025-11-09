@@ -254,9 +254,7 @@ export class TracePointService {
         this.saveState();
     }
 
-    getTracePointParentIdById(id: string) {
-        return this.nodeMap.get(id)?.parentId ?? "root";
-    }
+
     getTracePointParentById(id?: string): TracePointNode | null {
         if (!id) return null
         const parentId = this.nodeMap.get(id)?.parentId
@@ -381,19 +379,22 @@ export class TracePointService {
         // console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
         // console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
         for (const node of affectedTracePoints) {
-            const tp = node.tracePoint
+            const tp = node.
+            tracePoint
             if (!tp.isValid) {
                 const valid = newLines[tp.lineNumber - 1]?.trim() === tp.lineContent?.trim();
                 if (valid) {
                     node.tracePoint = { ...tp, isValid: true };
                     updatedNodes.push(node);
-                    affectedParentNodes.add(this.getTracePointParentById(node.parentId))
+                    affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
                 }
                 continue;
             }
             const newContent = newLines[tp.lineNumber - 1]?.trim() ?? null;
+            const isLineStart = change.range.start.character === 0;
+            const isEnter = /\r?\n/.test(change.text);
             // CASE 1: Press Enter at the beginning of the line (lineOffset !== 0)
-            if (tp.lineNumber === changedLine && change.text.startsWith('\n') && lineOffset > 0) {
+            if (tp.lineNumber === changedLine && isEnter && lineOffset > 0 && isLineStart) {
                 const newLineNumber = tp.lineNumber + lineOffset;
                 const newLineContent = newLines[newLineNumber - 1]?.trim() ?? null;
                 const [total, matches] = this.getLineOccurrences(event.document, newLineContent ?? '');
@@ -408,7 +409,7 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
 
             }
             // CASE 2: Edit on the trace point line (lineOffset = 0)
@@ -424,7 +425,7 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
 
             }
 
@@ -444,12 +445,15 @@ export class TracePointService {
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
                 updatedNodes.push(node);
-                affectedParentNodes.add(this.getTracePointParentById(node.parentId))
+                affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
 
             }
         }
         // Update internal states
-        this.rebuildTreeItemMap(updatedNodes);
+        // this.rebuildTreeItemMap(updatedNodes);
+        updatedNodes.forEach(item => {
+            this.updateTreeItem(item)
+        })
         // Re-highlight updated trace points in the file
         this.highlightTracePointsInFile(event.document);
         // Notify listeners to refresh affected UI parts
@@ -634,9 +638,8 @@ export class TracePointService {
         let collapsibleState = vscode.TreeItemCollapsibleState.None;
         const hasChildren = tracePointNode.children.length > 0;
         if (hasChildren) {
-            collapsibleState = this.expandedTracePointIds.has(tracePointNode.id)
-                ? vscode.TreeItemCollapsibleState.Expanded
-                : vscode.TreeItemCollapsibleState.Collapsed;
+            collapsibleState = vscode.TreeItemCollapsibleState.Expanded
+            this.expandedTracePointIds.add(tracePointNode.id)
         }
         treeNode.collapsibleState = collapsibleState
     }
@@ -652,7 +655,12 @@ export class TracePointService {
                 : vscode.TreeItemCollapsibleState.Collapsed;
         }
         const tracePoint = tracePointNode.tracePoint
-        const item = new vscode.TreeItem(
+        const prevItem = this.treeNodeMap.get(tracePointNode.id);
+        if (prevItem) {
+            prevItem.collapsibleState = collapsibleState
+            prevItem.label = `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`
+        }
+        const item = prevItem ? prevItem : new vscode.TreeItem(
             `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`,
             collapsibleState
         );
