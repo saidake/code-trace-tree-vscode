@@ -404,7 +404,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newLineContent ?? '',
-                    isValid: !!newLineContent,
+                    isValid: newLineContent!==null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
@@ -420,7 +420,7 @@ export class TracePointService {
                 node.tracePoint = {
                     ...tp,
                     lineContent: newContent ?? '',
-                    isValid: !!newContent,
+                    isValid: newContent!==null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
@@ -440,7 +440,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newLineContent ?? '',
-                    isValid: !!newLineContent,
+                    isValid: newLineContent!==null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
