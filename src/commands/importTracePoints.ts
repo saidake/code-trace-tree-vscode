@@ -52,7 +52,7 @@ export function registerImportTracePoints(
        */
       const convertNode = (nodeExport: TracePointNodeExport): any => {
         // Normalize children to array
-        const childrenRaw = nodeExport.children.tracePointNode;
+        const childrenRaw = nodeExport.children?.tracePointNode;
         const childrenArray = childrenRaw
           ? Array.isArray(childrenRaw)
             ? childrenRaw
