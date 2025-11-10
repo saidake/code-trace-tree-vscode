@@ -55,20 +55,16 @@ export class TracePointService {
             const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY);
             if (state) {
                 // state.tracePointNodes = [];
-                // state.selectedTracePointIds = [];
                 // state.expandedTracePointIds = [];
 
                 this.tracePointNodes = state.tracePointNodes || [];
-                this.selectedTracePointIds = new Set();
                 this.expandedTracePointIds = new Set(state.expandedTracePointIds || []);
-
-
 
                 this._highlightingEnabled = state.highlightingEnabled;
 
                 await this.validateTracePointsOnLoad();
-                this.updateTracePointMap();
-                this.rebuildTreeItemMap();
+                this.rebuildNodeMapAndFileNodesMap();
+                this.rebuildTreeNodeMap();
 
                 this.applyHighlightsToAllEditors();
                 this.notifyListeners();
@@ -271,9 +267,28 @@ export class TracePointService {
         }
     }
 
-    updateTracePointMap() {
-        this.nodeMap = new Map(this.tracePointNodes.map(tp => [tp.id, tp]));
+    rebuildNodeMapAndFileNodesMap() {
+        this.nodeMap = new Map<string, TracePointNode>();
+        this.fileNodesMap = new Map<string, TracePointNode[]>();
+
+        const traverse = (node: TracePointNode) => {
+            this.nodeMap.set(node.id, node);
+            const filePath = node.tracePoint.filePath;
+            if (!this.fileNodesMap.has(filePath)) {
+                this.fileNodesMap.set(filePath, []);
+            }
+            this.fileNodesMap.get(filePath)!.push(node);
+            for (const child of node.children) {
+                traverse(child);
+            }
+        };
+
+        // Process all root-level nodes
+        for (const rootNode of this.tracePointNodes) {
+            traverse(rootNode);
+        }
     }
+
 
     async setTracePoints(newTracePoints: TracePointNode[]) {
         this.tracePointNodes = newTracePoints;
@@ -366,7 +381,7 @@ export class TracePointService {
         // console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
         for (const node of affectedTracePoints) {
             const tp = node.
-            tracePoint
+                tracePoint
             if (!tp.isValid) {
                 const valid = newLines[tp.lineNumber - 1]?.trim() === tp.lineContent?.trim();
                 if (valid) {
@@ -390,7 +405,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newLineContent ?? '',
-                    isValid: newLineContent!==null,
+                    isValid: newLineContent !== null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
@@ -406,7 +421,7 @@ export class TracePointService {
                 node.tracePoint = {
                     ...tp,
                     lineContent: newContent ?? '',
-                    isValid: newContent!==null,
+                    isValid: newContent !== null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
@@ -426,7 +441,7 @@ export class TracePointService {
                     ...tp,
                     lineNumber: newLineNumber,
                     lineContent: newLineContent ?? '',
-                    isValid: newLineContent!==null,
+                    isValid: newLineContent !== null,
                     totalOccurrences: total,
                     occurrenceIndex: occIdx >= 0 ? occIdx : 0
                 };
@@ -684,13 +699,22 @@ export class TracePointService {
     }
 
 
-    rebuildTreeItemMap(tracePointNodes?: TracePointNode[]) {
-        if (!tracePointNodes) tracePointNodes = this.tracePointNodes
+    rebuildTreeNodeMap(tracePointNodes?: TracePointNode[]) {
+        if (!tracePointNodes) tracePointNodes = this.tracePointNodes;
         this.treeNodeMap = new Map();
-        for (const tp of tracePointNodes) {
-            this.updateTreeItem(tp);
+
+        const traverse = (node: TracePointNode) => {
+            this.updateTreeItem(node);
+            for (const child of node.children) {
+                traverse(child);
+            }
+        };
+
+        for (const rootNode of tracePointNodes) {
+            traverse(rootNode);
         }
     }
+
 
     removeRootTracePoint(tpNode: TracePointNode): boolean {
         const index = this.tracePointNodes.findIndex(node => node.id === tpNode.id);

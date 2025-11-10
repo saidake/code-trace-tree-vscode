@@ -39,8 +39,8 @@ export function registerImportTracePoints(
       service.setHighlightingEnabled(true);
 
       service.setTracePoints(updatedTracePoints);
-      service.updateTracePointMap();
-      service.rebuildTreeItemMap();
+      service.rebuildNodeMapAndFileNodesMap();
+      service.rebuildTreeNodeMap();
       service.validateTracePointsOnLoad();
       service.applyHighlightsToAllEditors();
       service.notifyListeners();
