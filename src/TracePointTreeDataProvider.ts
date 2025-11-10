@@ -186,16 +186,15 @@ export class TracePointTreeDataProvider implements vscode.TreeDataProvider<vscod
     /**
      * Expand selected items and all their children recursively
      */
-    async expandSelectedAndChildren(treeView: vscode.TreeView<vscode.TreeItem>): Promise<number> {
+    async expandSelectedAndChildren(treeView: vscode.TreeView<vscode.TreeItem>) {
         const selected = await treeView.selection;
-        if (selected.length === 0) return 0;
+        if (selected.length === 0) return;
 
         let expandedCount = 0;
         for (const item of selected) {
             await this.expandItemRecursively(treeView, item);
             expandedCount++;
         }
-        return expandedCount;
     }
 
     getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {

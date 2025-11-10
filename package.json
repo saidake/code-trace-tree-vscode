@@ -73,11 +73,6 @@
                 "icon": "$(expand-all)"
             },
             {
-                "command": "codeTraceTree.collapseAll",
-                "title": "Collapse All",
-                "icon": "$(collapse-all)"
-            },
-            {
                 "command": "codeTraceTree.toggleHighlights",
                 "title": "Toggle Highlights",
                 "icon": "$(eye)"
@@ -111,28 +106,23 @@
                     "when": "view == codeTraceTree.view"
                 },
                 {
-                    "command": "codeTraceTree.expandSelected",
+                    "command": "codeTraceTree.toggleHighlights",
                     "group": "navigation@300",
                     "when": "view == codeTraceTree.view"
                 },
                 {
-                    "command": "codeTraceTree.collapseAll",
+                    "command": "codeTraceTree.exportTracePoints",
                     "group": "navigation@400",
                     "when": "view == codeTraceTree.view"
                 },
                 {
-                    "command": "codeTraceTree.toggleHighlights",
+                    "command": "codeTraceTree.importTracePoints",
                     "group": "navigation@500",
                     "when": "view == codeTraceTree.view"
                 },
                 {
-                    "command": "codeTraceTree.exportTracePoints",
-                    "group": "navigation@700",
-                    "when": "view == codeTraceTree.view"
-                },
-                {
-                    "command": "codeTraceTree.importTracePoints",
-                    "group": "navigation@800",
+                    "command": "codeTraceTree.expandSelected",
+                    "group": "navigation@600",
                     "when": "view == codeTraceTree.view"
                 }
             ],
