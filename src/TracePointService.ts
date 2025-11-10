@@ -94,7 +94,6 @@ export class TracePointService {
     selectTracePoints(ids: string[]) {
         this.selectedTracePointIds = new Set(ids);
         this.notifyListeners('update-description', null);
-        this.saveState();
     }
 
 

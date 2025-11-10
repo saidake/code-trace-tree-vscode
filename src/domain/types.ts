@@ -1,8 +1,8 @@
 export type NodeListenerEventType =
-  | 'refresh'
-  | 'update-description'
+    | 'refresh'
+    | 'update-description'
 
-  
+
 export type NodeListener = (nodes: Set<TracePointNode | null> | null) => void;
 
 export interface TracePoint {
@@ -12,7 +12,7 @@ export interface TracePoint {
     lineNumber: number;
 
     projectPath: string;
-    
+
     lineContent?: string;
     isValid: boolean;
     totalOccurrences: number;
@@ -34,13 +34,20 @@ export interface TracePointState {
     highlightingEnabled: boolean;
 }
 
+export interface TracePointNodeExport {
+    tracePointNode: {
+        id: string;
+        tracePoint: TracePoint;
+        parentId?: string;
+        children: TracePointNodeExport[] | undefined;
+    }
+}
+
 export interface TracePointExportState {
     tracePointState: {
-        tracePointNodes: {
-            tracePointNode: TracePointNode[]; 
-        };
-        expandedTracePointIds:  {
-            id: string[]; 
+        tracePointNodes: TracePointNodeExport[];
+        expandedTracePointIds: {
+            id: string[];
         };
     };
 }

@@ -2,7 +2,21 @@ import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { serializeXml } from '../utils/xmlUtils';
 import { CODE_TRACE_TREE_STATE_KEY } from '../domain/constants';
-import { TracePointExportState, TracePointState } from '../domain/types';
+import { TracePointExportState, TracePointNode, TracePointNodeExport, TracePointState } from '../domain/types';
+
+// Helper: recursively convert TracePointNode to XML-friendly object
+function buildTracePointNodeXml(node: TracePointNode): TracePointNodeExport {
+    return {
+        tracePointNode: {
+            id: node.id,
+            tracePoint: node.tracePoint,
+            parentId: node.parentId,
+            children: node.children.length > 0
+                ? node.children.map(child => buildTracePointNodeXml(child))
+                : undefined
+        }
+    };
+}
 
 export function registerExportTracePoints(context: vscode.ExtensionContext, service: TracePointService) {
   context.subscriptions.push(vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {
@@ -24,9 +38,7 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
     // Convert state to xml data
     const exportState: TracePointExportState = {
       tracePointState: {
-        tracePointNodes: {
-          tracePointNode: state.tracePointNodes
-        },
+        tracePointNodes: state.tracePointNodes.map(tp => buildTracePointNodeXml(tp)),
         expandedTracePointIds: {
           id: Array.from(service.getExpandedTracePointIds())
         },
