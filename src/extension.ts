@@ -3,7 +3,7 @@ import { TracePointService } from './TracePointService';
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider';
 import { registerCreateRootTracePoint } from './commands/createRootTracePoint';
 import { registerCreateTracePointUnderSelected } from './commands/createTracePointUnderSelected';
-// import { registerUpdateTracePoint } from './commands/updateTracePoint';
+import { registerUpdateTracePoint } from './commands/updateTracePoint';
 import { registerMoveUp } from './commands/moveUp';
 import { registerMoveDown } from './commands/moveDown';
 import { registerExpandSelected } from './commands/expandSelected';
@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register all commands
     registerCreateRootTracePoint(context, service, treeDataProvider);
     registerCreateTracePointUnderSelected(context, service, treeDataProvider, treeView);
-    // registerUpdateTracePoint(context, service, treeView);
+    registerUpdateTracePoint(context, service, treeView);
     registerMoveUp(context, service, treeView, treeDataProvider);
     registerMoveDown(context, service, treeView, treeDataProvider);
     registerExpandSelected(context, treeView, treeDataProvider);

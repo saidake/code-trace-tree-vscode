@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { TracePointNode } from '../domain/types';
@@ -16,27 +17,24 @@ export function registerUpdateTracePoint(context: vscode.ExtensionContext, servi
     }
     const lineNumber = editor.selection.active.line + 1;
     const lineContent = editor.document.lineAt(lineNumber - 1).text.trim();
-    const fileName = vscode.workspace.asRelativePath(editor.document.uri);
+    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+    const fileName = path.basename(filePath);
     const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
     const [totalOccurrences, matchingLines] = service.getLineOccurrences(editor.document, lineContent);
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1;
-    const selectedIds = selected.map(item => item.id!);
 
-    for(const id of selectedIds){
-      const tp = service.getTracePointNodeById(id)
-      if(!tp)continue
-      tp.tracePoint={ ...tp.tracePoint, fileName, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex }
+    let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>();
+    for (const treeItem of selected) {
+      const tp = service.getTracePointNodeById(treeItem.id)
+      if (!tp) continue
+      affectedParentNodes.add(service.getTracePointNodeById(tp.parentId))
+      const prevFilePath = tp.tracePoint.filePath
+      tp.tracePoint = { ...tp.tracePoint, fileName, filePath, projectPath, lineNumber, lineContent, isValid: true, totalOccurrences: totalOccurrences, occurrenceIndex, description: undefined }
       service.updateTreeItem(tp)
+      service.updateInFileNodesMap(prevFilePath, tp)
     }
-    service.applyHighlightsToAllEditors();
-
-    //service.selectTracePoints(selectedIds);
-    // vscode.window.visibleTextEditors.forEach(ed => {
-    //   if (ed.document.uri.fsPath === editor.document.uri.fsPath) {
-    //     service.highlightTracePointsInFile(ed.document);
-    //   }
-    // });
-    service.notifyListeners();
+    service.applyHighlightsToAllEditors(editor);
+    service.notifyListeners('refresh', affectedParentNodes);
     service.saveState();
   }));
 }

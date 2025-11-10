@@ -13,7 +13,10 @@ export function registerCreateTracePointUnderSelected(context: vscode.ExtensionC
       vscode.window.showWarningMessage('No active editor.');
       return;
     }
-
+    if (selected.length === 0) {
+      vscode.window.showWarningMessage('No trace points selected.');
+      return;
+    }
     const lineNumber = editor.selection.active.line + 1;
     const name = await vscode.window.showInputBox({
       prompt: 'Enter name for the child trace point (optional)',
@@ -28,7 +31,7 @@ export function registerCreateTracePointUnderSelected(context: vscode.ExtensionC
       affectedParentNodes.add(parentNode)
     }
     service.highlightTracePointsInFile(editor.document);
-    service.notifyListeners('refresh',affectedParentNodes)
+    service.notifyListeners('refresh', affectedParentNodes)
     service.saveState();
   }));
 }

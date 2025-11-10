@@ -10,8 +10,7 @@
         "Other"
     ],
     "activationEvents": [
-        "onStartupFinished",
-        "onCommand:codeTraceTree.createTracePoint"
+        "onStartupFinished"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -39,21 +38,16 @@
         },
         "commands": [
             {
-                "command": "codeTraceTree.createTracePoint",
-                "title": "Create Code Trace Point",
-                "icon": "$(add)"
-            },
-            {
                 "command": "codeTraceTree.createRootTracePoint",
                 "title": "Create a Root Code Trace Point"
             },
             {
                 "command": "codeTraceTree.createTracePointUnderSelected",
-                "title": "Create Code Trace Point (Under selected)"
+                "title": "Create Code Trace Points (Under selected)"
             },
             {
                 "command": "codeTraceTree.updateTracePoint",
-                "title": "Update Selected Trace Point"
+                "title": "Update Selected Trace Points"
             },
             {
                 "command": "codeTraceTree.renameTracePoint",

@@ -18,7 +18,7 @@ export interface TracePoint {
     totalOccurrences: number;
     occurrenceIndex: number;
 
-    description: string;
+    description?: string;
 }
 
 export interface TracePointNode {

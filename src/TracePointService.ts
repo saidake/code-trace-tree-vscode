@@ -345,8 +345,16 @@ export class TracePointService {
         }
     }
 
-    applyHighlightsToAllEditors() {
+    applyHighlightsToAllEditors(editor: vscode.TextEditor | null = null) {
         console.log("applyHighlightsToAllEditors triggered")
+        if (editor) {
+            if (this.isHighlightingEnabled()) {
+                this.highlightTracePointsInFile(editor.document);
+            } else {
+                this.removeHighlights(editor.document.uri.fsPath);
+            }
+            return
+        }
         vscode.window.visibleTextEditors.forEach(editor => {
             if (this.isHighlightingEnabled()) {
                 this.highlightTracePointsInFile(editor.document);
@@ -643,6 +651,22 @@ export class TracePointService {
         treeNode.collapsibleState = collapsibleState
     }
 
+    updateInFileNodesMap(prevFilePath: string, node: TracePointNode) {
+        if (prevFilePath == node.tracePoint.filePath) return;
+        // Remove the node from the previous node list
+        const prevList = this.fileNodesMap.get(prevFilePath);
+        if (prevList) {
+            const index = prevList.indexOf(node);
+            if (index !== -1) {
+                prevList.splice(index, 1);
+            }
+        }
+        // Add the node to the new file path
+        if (!this.fileNodesMap.has(node.tracePoint.filePath)) {
+            this.fileNodesMap.set(node.tracePoint.filePath, []);
+        }
+        this.fileNodesMap.get(node.tracePoint.filePath)!.push(node);
+    }
     updateTreeItem(tracePointNode: TracePointNode) {
         console.log("updateTreeItem triggered, expandedTracePointIds: ", this.expandedTracePointIds, " tracePointNode.id: ", tracePointNode.id)
         // Determine collapsible state based on expandedIds
