@@ -3,7 +3,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { parseXml, serializeXml } from './utils/xmlUtils';
 import { CODE_TRACE_TREE_STATE_KEY } from './domain/constants';
 import { NodeListener, NodeListenerEventType, TracePoint, TracePointNode, TracePointState } from './domain/types';
 

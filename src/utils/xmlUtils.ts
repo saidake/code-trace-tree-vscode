@@ -2,7 +2,7 @@ import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
-  parseTagValue: true,   
+  parseTagValue: false,   
   trimValues: true,      
 });
 

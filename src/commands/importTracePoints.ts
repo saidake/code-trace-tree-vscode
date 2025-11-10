@@ -3,8 +3,23 @@ import * as vscode from 'vscode';
 import { TracePointService } from '../TracePointService';
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider';
 import { parseXml } from '../utils/xmlUtils';
-import { TracePointExportState, TracePointNodeExport } from '../domain/types';
-
+import { TracePoint, TracePointExportState, TracePointNodeExport } from '../domain/types';
+/**
+ * Recursively convert imported TracePointNodeExport to TracePointNode,
+ * updating project path and preserving children structure.
+ */
+const convertTracePoint = (tp: any, currentProjectPath: string): TracePoint => ({
+  name: tp.name,
+  fileName: tp.fileName,
+  filePath: tp.filePath,
+  lineNumber: Number(tp.lineNumber),
+  projectPath: currentProjectPath,
+  lineContent: tp.lineContent,
+  isValid: tp.isValid === 'true' || tp.isValid === true,
+  totalOccurrences: Number(tp.totalOccurrences),
+  occurrenceIndex: Number(tp.occurrenceIndex),
+  description: tp.description,
+});
 /**
  * Registers the command to import trace points from an XML file.
  * The imported nodes are integrated into the current workspace project.
@@ -28,7 +43,7 @@ export function registerImportTracePoints(
       const xml = new TextDecoder().decode(data);
       const parsed: TracePointExportState = parseXml(xml);
       const state = parsed.tracePointState;
-      const tracePointsArray: TracePointNodeExport[] = state.tracePointNodes ?? [];
+      const tracePointsArray: TracePointNodeExport[] = state.tracePointNodes.tracePointNode ?? [];
       const currentProjectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
 
       /**
@@ -37,7 +52,7 @@ export function registerImportTracePoints(
        */
       const convertNode = (nodeExport: TracePointNodeExport): any => {
         // Normalize children to array
-        const childrenRaw = nodeExport.tracePointNode.children;
+        const childrenRaw = nodeExport.children.tracePointNode;
         const childrenArray = childrenRaw
           ? Array.isArray(childrenRaw)
             ? childrenRaw
@@ -45,12 +60,9 @@ export function registerImportTracePoints(
           : [];
 
         return {
-          id: nodeExport.tracePointNode.id,
-          tracePoint: {
-            ...nodeExport.tracePointNode.tracePoint,
-            projectPath: currentProjectPath,
-          },
-          parentId: nodeExport.tracePointNode.parentId,
+          id: nodeExport.id,
+          tracePoint: convertTracePoint(nodeExport.tracePoint, currentProjectPath),
+          parentId: nodeExport.parentId,
           children: childrenArray.map(convertNode),
         };
       };

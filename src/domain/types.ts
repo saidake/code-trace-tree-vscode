@@ -35,17 +35,19 @@ export interface TracePointState {
 }
 
 export interface TracePointNodeExport {
-    tracePointNode: {
-        id: string;
-        tracePoint: TracePoint;
-        parentId?: string;
-        children: TracePointNodeExport[] | undefined;
-    }
+    id: string;
+    tracePoint: TracePoint;
+    parentId?: string;
+    children: {
+        tracePointNode: TracePointNodeExport[];
+    };
 }
 
 export interface TracePointExportState {
     tracePointState: {
-        tracePointNodes: TracePointNodeExport[];
+        tracePointNodes: {
+            tracePointNode: TracePointNodeExport[];
+        };
         expandedTracePointIds: {
             id: string[];
         };

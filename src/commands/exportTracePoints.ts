@@ -7,14 +7,14 @@ import { TracePointExportState, TracePointNode, TracePointNodeExport, TracePoint
 // Helper: recursively convert TracePointNode to XML-friendly object
 function buildTracePointNodeXml(node: TracePointNode): TracePointNodeExport {
     return {
-        tracePointNode: {
             id: node.id,
             tracePoint: node.tracePoint,
             parentId: node.parentId,
-            children: node.children.length > 0
+            children: {
+              tracePointNode: node.children.length > 0
                 ? node.children.map(child => buildTracePointNodeXml(child))
-                : undefined
-        }
+                : []
+            }
     };
 }
 
@@ -38,7 +38,9 @@ export function registerExportTracePoints(context: vscode.ExtensionContext, serv
     // Convert state to xml data
     const exportState: TracePointExportState = {
       tracePointState: {
-        tracePointNodes: state.tracePointNodes.map(tp => buildTracePointNodeXml(tp)),
+        tracePointNodes: {
+          tracePointNode: state.tracePointNodes.map(tp => buildTracePointNodeXml(tp)),
+        },
         expandedTracePointIds: {
           id: Array.from(service.getExpandedTracePointIds())
         },
