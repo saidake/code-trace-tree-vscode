@@ -8,6 +8,6 @@ Code Trace Tree is a plugin for VSCode and JetBrains IDEs that lets you trace co
 Double-click any trace point to navigate to its source, with full support for hierarchical parent-child structure.
 <!-- Plugin description end -->
 
-<img src="docs/assets/logo.png" width="100">
+<img src="AAA/docs/assets/logo.png" width="100">
 
 ----
