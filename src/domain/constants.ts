@@ -1,1 +1,0 @@
-export const CODE_TRACE_TREE_STATE_KEY="CodeTraceTreeState"

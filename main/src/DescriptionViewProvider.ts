@@ -1,56 +1,58 @@
-import * as vscode from 'vscode';
-import { TracePointService } from './TracePointService';
+import * as vscode from 'vscode'
+import { TracePointService } from './TracePointService'
 
 export class DescriptionViewProvider implements vscode.WebviewViewProvider {
-    private _view?: vscode.WebviewView;
+  private _view?: vscode.WebviewView
 
-    constructor(
-        private _extensionUri: vscode.Uri,
-        private service: TracePointService
-    ) {
-        this.service.addNodeListener('update-description',() => {this.updateView()});
+  constructor(
+    private _extensionUri: vscode.Uri,
+    private service: TracePointService
+  ) {
+    this.service.addNodeListener('update-description', () => {
+      this.updateView()
+    })
+  }
+
+  resolveWebviewView(webviewView: vscode.WebviewView) {
+    this._view = webviewView
+    webviewView.webview.options = { enableScripts: true }
+
+    webviewView.webview.html = this._getHtml()
+
+    webviewView.webview.onDidReceiveMessage(async (msg) => {
+      if (msg.command === 'descriptionChanged') {
+        await this.service.updateTracePointDescription(msg.itemId, msg.description)
+      }
+    })
+
+    this.updateView()
+  }
+
+  public updateView() {
+    if (!this._view) return
+
+    const selectedIds = this.service.getSelectedTracePointIds()
+    if (selectedIds.length !== 1) {
+      this._view.webview.postMessage({
+        command: 'updateDescription',
+        description: '',
+        disabled: true,
+        itemId: ''
+      })
+      return
     }
 
-    resolveWebviewView(webviewView: vscode.WebviewView) {
-        this._view = webviewView;
-        webviewView.webview.options = { enableScripts: true };
+    const tp = this.service.getTracePointNodeById(selectedIds[0])
+    this._view.webview.postMessage({
+      command: 'updateDescription',
+      description: tp?.tracePoint.description || '',
+      disabled: false,
+      itemId: tp?.id || ''
+    })
+  }
 
-        webviewView.webview.html = this._getHtml();
-
-        webviewView.webview.onDidReceiveMessage(async msg => {
-            if (msg.command === 'descriptionChanged') {
-                await this.service.updateTracePointDescription(msg.itemId, msg.description);
-            }
-        });
-
-        this.updateView();
-    }
-
-    public updateView() {
-        if (!this._view) return;
-
-        const selectedIds = this.service.getSelectedTracePointIds();
-        if (selectedIds.length !== 1) {
-            this._view.webview.postMessage({
-                command: 'updateDescription',
-                description: '',
-                disabled: true,
-                itemId: '',
-            });
-            return;
-        }
-
-        const tp = this.service.getTracePointNodeById(selectedIds[0]);
-        this._view.webview.postMessage({
-            command: 'updateDescription',
-            description: tp?.tracePoint.description || '',
-            disabled: false,
-            itemId: tp?.id || '',
-        });
-    }
-
-    private _getHtml(): string {
-        return `
+  private _getHtml(): string {
+    return `
         <html>
         <body style="padding: 10px; height: 100vh;">
             <textarea 
@@ -100,6 +102,6 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
                 });
             </script>
         </body>
-        </html>`;
-    }
+        </html>`
+  }
 }

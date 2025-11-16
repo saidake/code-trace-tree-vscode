@@ -1,0 +1,34 @@
+# Custom files
+/docx-input/
+/main/src/generated-pages/
+
+# Node modules
+**/node_modules
+
+
+# Build / output directories
+**/dist
+**/build
+**/.next
+**/out
+
+# Generated files
+**/*.min.js
+**/*.bundle.js
+**/*.d.ts
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+.DS_Store
+
+# Yarn / package manager
+yarn.lock
+package-lock.json
+
+# Ignore config files that shouldn't be formatted (optional)
+tsconfig*.json
