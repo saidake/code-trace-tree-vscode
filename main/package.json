@@ -19,7 +19,7 @@
         {
           "id": "code-trace-tree-container",
           "title": "Code Trace Tree",
-          "icon": "AAA/assets/icons/code_trace_tree_icon.svg"
+          "icon": "assets/icons/code_trace_tree_icon.svg"
         }
       ]
     },
