@@ -96,6 +96,10 @@
         "command": "codeTraceTree.goToTracePoint",
         "title": "Go to Trace Point",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "codeTraceTree.goToTracePointInTree",
+        "title": "Go to the Trace Point in the tree panel"
       }
     ],
     "menus": {
@@ -146,15 +150,20 @@
       "editor/context": [
         {
           "command": "codeTraceTree.createRootTracePoint",
-          "group": "navigation"
+          "group": "codeTraceTree@1"
         },
         {
           "command": "codeTraceTree.createTracePointUnderSelected",
-          "group": "navigation@50"
+          "group": "codeTraceTree@2"
         },
         {
           "command": "codeTraceTree.updateTracePoint",
-          "group": "navigation@100"
+          "group": "codeTraceTree@3"
+        },
+        {
+          "command": "codeTraceTree.goToTracePointInTree",
+          "group": "codeTraceTree@4",
+          "when": "codeTraceTree.hasTracePointAtCaret"
         }
       ]
     }

@@ -11,6 +11,10 @@ import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints } from './commands/importTracePoints'
 import { registerGoToTracePoint } from './commands/goToTracePoint'
+import {
+  registerGoToTracePointInTree,
+  updateTracePointAtCaretContext
+} from './commands/goToTracePointInTree'
 import { registerRenameTracePoint } from './commands/renameTracePoint'
 import { registerDeleteTracePoints } from './commands/deleteTracePoints'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
@@ -75,11 +79,19 @@ export function activate(context: vscode.ExtensionContext) {
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
   registerGoToTracePoint(context, service, treeView)
+  registerGoToTracePointInTree(context, service, treeView)
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
   registerDeleteTracePoints(context, service, treeView, treeDataProvider)
 
   // Load hybrid storage + active profile
-  service.loadState()
+  service.loadState().then(() => updateTracePointAtCaretContext(service))
+
+  // Keep editor context-menu visibility in sync with caret line / tree changes
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => updateTracePointAtCaretContext(service)),
+    vscode.window.onDidChangeTextEditorSelection(() => updateTracePointAtCaretContext(service))
+  )
+  service.addNodeListener('refresh', () => updateTracePointAtCaretContext(service))
 
   // Listen for document changes/openings
   vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e))

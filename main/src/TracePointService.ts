@@ -154,6 +154,15 @@ export class TracePointService {
     return this.fileNodesMap.get(filePath)
   }
 
+  /** Valid trace points on a given relative file path + 1-based line. */
+  findValidTracePointsAt(filePath: string, lineNumber: number): TracePointNode[] {
+    return (
+      this.fileNodesMap
+        .get(filePath)
+        ?.filter((n) => n.tracePoint.isValid && n.tracePoint.lineNumber === lineNumber) ?? []
+    )
+  }
+
   addRootTracePointNextTo(tracePoint: TracePointNode, id: string) {
     if (tracePoint.parentId !== null && tracePoint.parentId !== undefined) return
 
