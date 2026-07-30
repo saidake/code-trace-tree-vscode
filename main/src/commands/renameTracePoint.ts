@@ -12,12 +12,13 @@ export function registerRenameTracePoint(
     vscode.commands.registerCommand(
       'codeTraceTree.renameTracePoint',
       async (item: vscode.TreeItem) => {
-        const selected = item ? [item] : await treeView.selection
+        const selected = item ? [item] : treeView.selection
         if (selected.length !== 1) {
           vscode.window.showWarningMessage('Select exactly one trace point to rename.')
           return
         }
-        const tp = service.getTracePointNodes().find((tp) => tp.id === selected[0].id)
+        // Look up by id in the full tree map (not just roots)
+        const tp = selected[0].id ? service.getTracePointNodeById(selected[0].id) : null
         if (!tp) return
         const newName = await vscode.window.showInputBox({
           prompt: 'Enter new name (optional)',
