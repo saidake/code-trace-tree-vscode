@@ -1,26 +1,6 @@
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { serializeXml } from '../utils/xmlUtils'
-import { CODE_TRACE_TREE_STATE_KEY } from '../domain/constants'
-import {
-  TracePointExportState,
-  TracePointNode,
-  TracePointNodeExport,
-  TracePointState
-} from '../domain/types'
-
-// Helper: recursively convert TracePointNode to XML-friendly object
-function buildTracePointNodeXml(node: TracePointNode): TracePointNodeExport {
-  return {
-    id: node.id,
-    tracePoint: node.tracePoint,
-    parentId: node.parentId,
-    children: {
-      tracePointNode:
-        node.children.length > 0 ? node.children.map((child) => buildTracePointNodeXml(child)) : []
-    }
-  }
-}
+import { exportAllProfilesXml, exportSingleProfileXml } from '../utils/traceProfileXml'
 
 export function registerExportTracePoints(
   context: vscode.ExtensionContext,
@@ -28,36 +8,48 @@ export function registerExportTracePoints(
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.exportTracePoints', async () => {
-      // Read state
-      const state = context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY) || {
-        tracePointNodes: [],
-        selectedTracePointIds: [],
-        expandedTracePointIds: [],
-        highlightingEnabled: true,
-        descriptionAreaOpened: false
-      }
+      // Choose current profile vs all profiles
+      const choice = await vscode.window.showQuickPick(
+        [
+          {
+            label: 'Current Profile',
+            description: `Export "${service.getActiveProfileName()}" as a single-profile file`,
+            value: 'current' as const
+          },
+          {
+            label: 'All Profiles',
+            description: 'Export every profile in a multi-profile file',
+            value: 'all' as const
+          }
+        ],
+        { title: 'Export Trace Points', placeHolder: 'Choose what to export' }
+      )
+      if (!choice) return
 
-      // Prompt
+      const exportAll = choice.value === 'all'
+      const defaultName = exportAll
+        ? 'code-trace-tree-profiles.xml'
+        : `code-trace-tree-${service.getActiveProfileName()}.xml`
+
       const uri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file('code-trace-tree-config.xml'),
+        defaultUri: vscode.Uri.file(defaultName),
         filters: { XML: ['xml'] }
       })
       if (!uri) return
-      // Convert state to xml data
-      const exportState: TracePointExportState = {
-        tracePointState: {
-          tracePointNodes: {
-            tracePointNode: state.tracePointNodes.map((tp) => buildTracePointNodeXml(tp))
-          },
-          expandedTracePointIds: {
-            id: Array.from(service.getExpandedTracePointIds())
-          }
-        }
-      }
-      const xml = serializeXml(exportState)
+
+      const xml = exportAll
+        ? exportAllProfilesXml(service.getProfilesSnapshot(), service.getActiveProfileName())
+        : exportSingleProfileXml(
+            service.getActiveProfileName(),
+            service.getTracePointNodes(),
+            service.getExpandedTracePointIds()
+          )
 
       await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(xml))
-      vscode.window.showInformationMessage('Trace points exported.')
+      const scope = exportAll
+        ? 'all profiles'
+        : `profile "${service.getActiveProfileName()}"`
+      vscode.window.showInformationMessage(`Exported ${scope}.`)
     })
   )
 }

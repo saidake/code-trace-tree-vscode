@@ -26,6 +26,11 @@
     "views": {
       "code-trace-tree-container": [
         {
+          "id": "codeTraceTree.profile",
+          "name": "Profile",
+          "type": "webview"
+        },
+        {
           "id": "codeTraceTree.view",
           "name": "Trace Points"
         },

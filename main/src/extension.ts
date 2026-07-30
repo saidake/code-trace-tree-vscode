@@ -14,6 +14,7 @@ import { registerGoToTracePoint } from './commands/goToTracePoint'
 import { registerRenameTracePoint } from './commands/renameTracePoint'
 import { registerDeleteTracePoints } from './commands/deleteTracePoints'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
+import { ProfileViewProvider } from './ProfileViewProvider'
 
 let service: TracePointService
 let treeDataProvider: TracePointTreeDataProvider
@@ -29,7 +30,13 @@ export function activate(context: vscode.ExtensionContext) {
     dragAndDropController: treeDataProvider
   })
 
-  // description Webview
+  // Profile selector webview (above Trace Points)
+  const profileProvider = new ProfileViewProvider(context.extensionUri, service)
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('codeTraceTree.profile', profileProvider)
+  )
+
+  // Description webview
   const descProvider = new DescriptionViewProvider(context.extensionUri, service)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
@@ -39,21 +46,18 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     treeView.onDidChangeSelection((e) => {
       const selectedIds = e.selection.map((item) => item.id!).filter((id) => id !== undefined)
-      // console.log(`[CodeTraceTree] Selection changed. Selected IDs: ${selectedIds.join(', ')}`);
       service.selectTracePoints(selectedIds)
     })
   )
   // Listen to tree view expand/collapse events
   context.subscriptions.push(
     treeView.onDidExpandElement((e) => {
-      console.log('onDidExpandElement triggered')
       const id = e.element.id!
       const expanded = service.getExpandedTracePointIds()
       expanded.add(id)
       service.setExpandedTracePointIds(expanded)
     }),
     treeView.onDidCollapseElement((e) => {
-      console.log('onDidCollapseElement triggered')
       const id = e.element.id!
       const expanded = service.getExpandedTracePointIds()
       expanded.delete(id)
@@ -69,12 +73,12 @@ export function activate(context: vscode.ExtensionContext) {
   registerExpandSelected(context, treeView, treeDataProvider)
   registerToggleHighlights(context, service)
   registerExportTracePoints(context, service)
-  registerImportTracePoints(context, service, treeDataProvider)
+  registerImportTracePoints(context, service)
   registerGoToTracePoint(context, service, treeView)
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
   registerDeleteTracePoints(context, service, treeView, treeDataProvider)
 
-  // Load initial state
+  // Load hybrid storage + active profile
   service.loadState()
 
   // Listen for document changes/openings
@@ -83,5 +87,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  service.saveState()
+  // Flush pending profile/tree writes before unload
+  service?.persistNow()
 }

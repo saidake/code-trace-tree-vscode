@@ -3,14 +3,16 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { CODE_TRACE_TREE_STATE_KEY } from './domain/constants'
+import { DEFAULT_PROFILE_NAME } from './domain/constants'
 import {
   NodeListener,
   NodeListenerEventType,
+  ProfileListener,
   TracePoint,
   TracePointNode,
-  TracePointState
+  TraceProfile
 } from './domain/types'
+import { ProjectStorage } from './storage/projectStorage'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -28,9 +30,15 @@ export class TracePointService {
   private _highlightingEnabled: boolean = true
   private _descriptionAreaOpened: boolean = false
 
-  private constructor(private context: vscode.ExtensionContext) {
-    this.initConfig()
-  }
+  private profiles: TraceProfile[] = [
+    { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
+  ]
+  private activeProfileName: string = DEFAULT_PROFILE_NAME
+  private profileListeners: ProfileListener[] = []
+  private storage: ProjectStorage | undefined
+  private persistTimer: ReturnType<typeof setTimeout> | undefined
+
+  private constructor(private context: vscode.ExtensionContext) {}
 
   static getInstance(context: vscode.ExtensionContext): TracePointService {
     if (!TracePointService.instance) {
@@ -39,50 +47,67 @@ export class TracePointService {
     return TracePointService.instance
   }
 
-  private async initConfig() {
-    const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY)
-    if (!state) {
-      const initialState: TracePointState = {
-        tracePointNodes: [],
-        expandedTracePointIds: [],
-        highlightingEnabled: true
-      }
-      await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, initialState)
-    }
-  }
-
+  /** Resolve hybrid storage and load the active profile into working memory. */
   async loadState() {
-    console.log('[TEST] loadState triggered')
     try {
-      const state = this.context.workspaceState.get<TracePointState>(CODE_TRACE_TREE_STATE_KEY)
-      if (state) {
-        // state.tracePointNodes = [];
-        // state.expandedTracePointIds = [];
-
-        this.tracePointNodes = state.tracePointNodes || []
-        this.expandedTracePointIds = new Set(state.expandedTracePointIds || [])
-
-        this._highlightingEnabled = state.highlightingEnabled
-
-        await this.validateTracePointsOnLoad()
-        this.rebuildNodeMapAndFileNodesMap()
-        this.rebuildTreeNodeMap()
-
-        this.applyHighlightsToAllEditors()
-        this.notifyListeners()
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+      if (!workspaceRoot) {
+        vscode.window.showWarningMessage('Code Trace Tree: open a workspace folder to persist data.')
+        return
       }
+
+      this.storage = new ProjectStorage(workspaceRoot)
+      const doc = this.storage.resolveAndLoad()
+
+      this.profiles = doc.profiles.map((p) => ({
+        name: p.name || DEFAULT_PROFILE_NAME,
+        tracePointNodes: p.tracePointNodes,
+        expandedTracePointIds: [...p.expandedTracePointIds]
+      }))
+      if (this.profiles.length === 0) {
+        this.profiles = [
+          { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
+        ]
+      }
+      this.activeProfileName =
+        doc.activeProfileName && this.profiles.some((p) => p.name === doc.activeProfileName)
+          ? doc.activeProfileName
+          : this.profiles[0].name
+      this._highlightingEnabled = doc.highlightingEnabled
+      this._descriptionAreaOpened = doc.descriptionAreaOpened
+
+      // Load active profile tree into working memory
+      await this.loadActiveProfileFromStore()
+      this.notifyProfileListeners()
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to load trace points: ${e}`)
     }
   }
 
-  async saveState() {
-    const state: TracePointState = {
-      tracePointNodes: this.tracePointNodes,
-      expandedTracePointIds: Array.from(this.expandedTracePointIds),
-      highlightingEnabled: this._highlightingEnabled ?? true
+  /** Debounce disk writes after mutations. */
+  schedulePersist() {
+    if (this.persistTimer) clearTimeout(this.persistTimer)
+    this.persistTimer = setTimeout(() => this.persistNow(), 300)
+  }
+
+  /** Flush active profile into the profile store and write global XML. */
+  persistNow() {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+      this.persistTimer = undefined
     }
-    await this.context.workspaceState.update(CODE_TRACE_TREE_STATE_KEY, state)
+    this.syncActiveProfileToStore()
+    this.storage?.save(
+      this.profiles,
+      this.activeProfileName,
+      this._descriptionAreaOpened,
+      this._highlightingEnabled
+    )
+  }
+
+  /** @deprecated Prefer schedulePersist — kept for call-site compatibility during refactor. */
+  saveState() {
+    this.schedulePersist()
   }
 
   getTracePointNodes(): TracePointNode[] {
@@ -157,7 +182,7 @@ export class TracePointService {
 
   setExpandedTracePointIds(expandedTracePointIds: Set<string>) {
     this.expandedTracePointIds = expandedTracePointIds
-    this.saveState()
+    this.schedulePersist()
   }
 
   isHighlightingEnabled(): boolean {
@@ -167,11 +192,243 @@ export class TracePointService {
   setHighlightingEnabled(enabled: boolean) {
     this._highlightingEnabled = enabled
     this.applyHighlightsToAllEditors()
-    this.saveState()
+    this.schedulePersist()
   }
 
   isDescriptionAreaOpened(): boolean {
     return this._descriptionAreaOpened
+  }
+
+  setDescriptionAreaOpened(opened: boolean) {
+    this._descriptionAreaOpened = opened
+    this.schedulePersist()
+  }
+
+  getActiveProfileName(): string {
+    return this.activeProfileName
+  }
+
+  getProfileNames(): string[] {
+    return this.profiles.map((p) => p.name)
+  }
+
+  addProfileListener(listener: ProfileListener) {
+    this.profileListeners.push(listener)
+  }
+
+  private notifyProfileListeners() {
+    this.profileListeners.forEach((listener) => listener())
+  }
+
+  /** Copy working tree + expand ids back into the active TraceProfile. */
+  private syncActiveProfileToStore() {
+    const profile = this.profiles.find((p) => p.name === this.activeProfileName)
+    if (!profile) return
+    profile.tracePointNodes = this.tracePointNodes
+    profile.expandedTracePointIds = Array.from(this.expandedTracePointIds)
+  }
+
+  /** Fill runtime projectPath on every node from the current workspace. */
+  private applyProjectPathToNodes(nodes: TracePointNode[]) {
+    const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ''
+    const walk = (node: TracePointNode) => {
+      node.tracePoint.projectPath = projectPath
+      node.children.forEach(walk)
+    }
+    nodes.forEach(walk)
+  }
+
+  private clearAllHighlights() {
+    for (const filePath of [...this.highlighters.keys()]) {
+      this.removeHighlights(filePath)
+    }
+  }
+
+  /** Swap working memory to the active profile and refresh UI/highlights. */
+  private async loadActiveProfileFromStore() {
+    let profile = this.profiles.find((p) => p.name === this.activeProfileName)
+    if (!profile) {
+      profile = this.profiles[0]
+      if (!profile) {
+        profile = { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
+        this.profiles = [profile]
+      }
+      this.activeProfileName = profile.name
+    }
+
+    this.clearAllHighlights()
+    this.selectedTracePointIds.clear()
+    this.tracePointNodes = profile.tracePointNodes
+    this.expandedTracePointIds = new Set(profile.expandedTracePointIds)
+    this.applyProjectPathToNodes(this.tracePointNodes)
+
+    this.rebuildNodeMapAndFileNodesMap()
+    await this.validateTracePointsOnLoad()
+    this.rebuildTreeNodeMap()
+    this.applyHighlightsToAllEditors()
+    this.notifyListeners()
+  }
+
+  async switchProfile(name: string) {
+    if (name === this.activeProfileName || !this.profiles.some((p) => p.name === name)) return
+    this.syncActiveProfileToStore()
+    this.activeProfileName = name
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
+  }
+
+  async addProfile(name: string): Promise<boolean> {
+    const trimmed = name.trim()
+    if (
+      !trimmed ||
+      this.profiles.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+    ) {
+      return false
+    }
+    this.syncActiveProfileToStore()
+    this.profiles.push({ name: trimmed, tracePointNodes: [], expandedTracePointIds: [] })
+    this.activeProfileName = trimmed
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
+    return true
+  }
+
+  async deleteProfile(name: string): Promise<boolean> {
+    if (this.profiles.length <= 1) return false
+    const index = this.profiles.findIndex((p) => p.name === name)
+    if (index < 0) return false
+    this.profiles.splice(index, 1)
+    if (this.activeProfileName === name) {
+      this.activeProfileName = this.profiles[0].name
+      await this.loadActiveProfileFromStore()
+    }
+    this.notifyProfileListeners()
+    this.schedulePersist()
+    return true
+  }
+
+  async replaceActiveProfileTree(nodes: TracePointNode[], expandedIds: string[]) {
+    this.clearAllHighlights()
+    this.selectedTracePointIds.clear()
+    this.tracePointNodes = nodes
+    this.expandedTracePointIds = new Set(expandedIds)
+    this.applyProjectPathToNodes(this.tracePointNodes)
+    this.rebuildNodeMapAndFileNodesMap()
+    await this.validateTracePointsOnLoad()
+    this.rebuildTreeNodeMap()
+    this.applyHighlightsToAllEditors()
+    this.syncActiveProfileToStore()
+    this.notifyListeners()
+    this.schedulePersist()
+  }
+
+  /** Snapshot every profile (active tree is synced first). */
+  getProfilesSnapshot(): TraceProfile[] {
+    this.syncActiveProfileToStore()
+    return this.profiles.map((p) => ({
+      name: p.name,
+      tracePointNodes: p.tracePointNodes,
+      expandedTracePointIds: [...p.expandedTracePointIds]
+    }))
+  }
+
+  allocateUniqueProfileName(desired: string): string {
+    const base = desired.trim() || 'imported'
+    if (!this.profiles.some((p) => p.name.toLowerCase() === base.toLowerCase())) return base
+    let i = 2
+    while (this.profiles.some((p) => p.name.toLowerCase() === `${base} (${i})`.toLowerCase())) {
+      i++
+    }
+    return `${base} (${i})`
+  }
+
+  async importAsNewProfile(
+    desiredName: string,
+    nodes: TracePointNode[],
+    expandedIds: string[]
+  ): Promise<string> {
+    this.syncActiveProfileToStore()
+    const name = this.allocateUniqueProfileName(desiredName)
+    this.profiles.push({
+      name,
+      tracePointNodes: nodes,
+      expandedTracePointIds: [...expandedIds]
+    })
+    this.activeProfileName = name
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
+    return name
+  }
+
+  async importAsNewProfiles(imported: TraceProfile[]): Promise<string[]> {
+    if (imported.length === 0) return []
+    this.syncActiveProfileToStore()
+    const created: string[] = []
+    for (const profile of imported) {
+      const name = this.allocateUniqueProfileName(profile.name)
+      this.profiles.push({
+        name,
+        tracePointNodes: profile.tracePointNodes,
+        expandedTracePointIds: [...profile.expandedTracePointIds]
+      })
+      created.push(name)
+    }
+    this.activeProfileName = created[0]
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
+    return created
+  }
+
+  async mergeProfiles(imported: TraceProfile[], preferredActiveName?: string) {
+    if (imported.length === 0) return
+    this.syncActiveProfileToStore()
+    for (const incoming of imported) {
+      const existing = this.profiles.find(
+        (p) => p.name.toLowerCase() === incoming.name.toLowerCase()
+      )
+      if (existing) {
+        existing.tracePointNodes = incoming.tracePointNodes
+        existing.expandedTracePointIds = [...incoming.expandedTracePointIds]
+      } else {
+        this.profiles.push({
+          name: incoming.name,
+          tracePointNodes: incoming.tracePointNodes,
+          expandedTracePointIds: [...incoming.expandedTracePointIds]
+        })
+      }
+    }
+    const preferred =
+      preferredActiveName && this.profiles.some((p) => p.name === preferredActiveName)
+        ? preferredActiveName
+        : undefined
+    if (preferred) {
+      this.activeProfileName = preferred
+    } else if (!this.profiles.some((p) => p.name === this.activeProfileName)) {
+      this.activeProfileName = this.profiles[0].name
+    }
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
+  }
+
+  async replaceAllProfiles(imported: TraceProfile[], preferredActiveName?: string) {
+    if (imported.length === 0) return
+    this.profiles = imported.map((p) => ({
+      name: p.name.trim() || DEFAULT_PROFILE_NAME,
+      tracePointNodes: p.tracePointNodes,
+      expandedTracePointIds: [...p.expandedTracePointIds]
+    }))
+    this.activeProfileName =
+      preferredActiveName && this.profiles.some((p) => p.name === preferredActiveName)
+        ? preferredActiveName
+        : this.profiles[0].name
+    await this.loadActiveProfileFromStore()
+    this.notifyProfileListeners()
+    this.schedulePersist()
   }
 
   addNodeListener(eventType: NodeListenerEventType, listener: NodeListener) {
