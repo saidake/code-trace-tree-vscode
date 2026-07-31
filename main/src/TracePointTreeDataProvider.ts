@@ -32,7 +32,8 @@ export class TracePointTreeDataProvider
       treeItemMap
     )
     if (element && element.id) {
-      const children = this.service.getTracePointNodeById(element.id)?.children.flatMap((child) => {
+      const nodeId = this.service.resolveNodeId(element.id)
+      const children = this.service.getTracePointNodeById(nodeId)?.children.flatMap((child) => {
         const item = treeItemMap.get(child.id)
         return item ? [item] : []
       })
@@ -61,9 +62,12 @@ export class TracePointTreeDataProvider
   }
 
   handleDrag(source: readonly vscode.TreeItem[], dataTransfer: vscode.DataTransfer): void {
+    // Transfer domain node UUIDs (not profile-scoped TreeItem ids)
     dataTransfer.set(
       'application/vnd.code.tree.codetracetree',
-      new vscode.DataTransferItem(source.map((item) => item.id))
+      new vscode.DataTransferItem(
+        source.map((item) => this.service.resolveNodeId(item.id)).filter((id): id is string => !!id)
+      )
     )
   }
 
@@ -110,7 +114,8 @@ export class TracePointTreeDataProvider
         affectedParentNodes.add(null)
         continue
       }
-      const dropTracePointId = target.id!
+      const dropTracePointId = this.service.resolveNodeId(target.id)
+      if (!dropTracePointId) continue
       const dropTracePointNode = this.service.getTracePointNodeById(dropTracePointId)!
 
       // Prevent dropping on the same node
@@ -165,7 +170,9 @@ export class TracePointTreeDataProvider
     await treeView.reveal(item, { expand: true, focus: false, select: false })
 
     // Get all children recursively and expand them
-    const allChildren = this.getAllChildrenRecursively(item.id!)
+    const nodeId = this.service.resolveNodeId(item.id)
+    if (!nodeId) return
+    const allChildren = this.getAllChildrenRecursively(nodeId)
     for (const child of allChildren) {
       await treeView.reveal(child, { expand: true, focus: false, select: false })
     }
@@ -214,10 +221,11 @@ export class TracePointTreeDataProvider
   }
 
   getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
-    if (!element.id) return undefined
+    const nodeId = this.service.resolveNodeId(element.id)
+    if (!nodeId) return undefined
     const treeItemMap = this.service.getTreeItemMap()
     // Find parent trace point
-    const currentTp = this.service.getTracePointNodeById(element.id)
+    const currentTp = this.service.getTracePointNodeById(nodeId)
     if (!currentTp || !currentTp.parentId) return undefined
     // Return parent TreeItem
     return treeItemMap.get(currentTp.parentId)

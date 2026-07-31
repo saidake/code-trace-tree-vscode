@@ -31,7 +31,8 @@ export function registerCreateTracePointUnderSelected(
       let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
       // Allow empty string or undefined
       for (const item of selected) {
-        const parentId = item.id!
+        const parentId = service.resolveNodeId(item.id)
+        if (!parentId) continue
         await service.addTracePoint(name ?? '', editor.document.uri, lineNumber, parentId)
         const parentNode = service.getTracePointNodeById(parentId)
         affectedParentNodes.add(parentNode)

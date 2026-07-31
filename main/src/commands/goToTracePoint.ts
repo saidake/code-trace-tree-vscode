@@ -15,7 +15,8 @@ export function registerGoToTracePoint(
           vscode.window.showWarningMessage('Select exactly one trace point.')
           return
         }
-        const tp = selected[0].id ? service.getTracePointNodeById(selected[0].id) : null
+        const nodeId = service.resolveNodeId(selected[0].id)
+        const tp = nodeId ? service.getTracePointNodeById(nodeId) : null
         if (tp) {
           await service.navigateToTracePoint(tp, treeView)
         }

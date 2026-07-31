@@ -49,20 +49,26 @@ export function activate(context: vscode.ExtensionContext) {
   // Listen to tree view selection changes
   context.subscriptions.push(
     treeView.onDidChangeSelection((e) => {
-      const selectedIds = e.selection.map((item) => item.id!).filter((id) => id !== undefined)
+      const selectedIds = e.selection
+        .map((item) => service.resolveNodeId(item.id))
+        .filter((id): id is string => !!id)
       service.selectTracePoints(selectedIds)
     })
   )
-  // Listen to tree view expand/collapse events
+  // Listen to tree view expand/collapse events (skipped during profile switch rebuild)
   context.subscriptions.push(
     treeView.onDidExpandElement((e) => {
-      const id = e.element.id!
+      if (!service.shouldPersistExpandEvents()) return
+      const id = service.resolveNodeId(e.element.id)
+      if (!id) return
       const expanded = service.getExpandedTracePointIds()
       expanded.add(id)
       service.setExpandedTracePointIds(expanded)
     }),
     treeView.onDidCollapseElement((e) => {
-      const id = e.element.id!
+      if (!service.shouldPersistExpandEvents()) return
+      const id = service.resolveNodeId(e.element.id)
+      if (!id) return
       const expanded = service.getExpandedTracePointIds()
       expanded.delete(id)
       service.setExpandedTracePointIds(expanded)

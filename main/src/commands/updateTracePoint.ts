@@ -33,7 +33,7 @@ export function registerUpdateTracePoint(
 
       let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
       for (const treeItem of selected) {
-        const tp = service.getTracePointNodeById(treeItem.id)
+        const tp = service.getTracePointNodeById(service.resolveNodeId(treeItem.id))
         if (!tp) continue
         affectedParentNodes.add(service.getTracePointNodeById(tp.parentId))
         const prevFilePath = tp.tracePoint.filePath

@@ -18,7 +18,8 @@ export function registerRenameTracePoint(
           return
         }
         // Look up by id in the full tree map (not just roots)
-        const tp = selected[0].id ? service.getTracePointNodeById(selected[0].id) : null
+        const nodeId = service.resolveNodeId(selected[0].id)
+        const tp = nodeId ? service.getTracePointNodeById(nodeId) : null
         if (!tp) return
         const newName = await vscode.window.showInputBox({
           prompt: 'Enter new name (optional)',

@@ -13,7 +13,9 @@ export function registerMoveDown(
     vscode.commands.registerCommand('codeTraceTree.moveDown', async () => {
       const selected = await treeView.selection
       if (selected.length === 0) return
-      const selectedIds = new Set(selected.map((item) => item.id!))
+      const selectedIds = new Set(
+        selected.map((item) => service.resolveNodeId(item.id)).filter((id): id is string => !!id)
+      )
 
       let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
       const groupedByParent = new Map<string | undefined, TracePointNode[]>()

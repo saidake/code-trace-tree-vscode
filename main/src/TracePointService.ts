@@ -37,6 +37,9 @@ export class TracePointService {
   private profileListeners: ProfileListener[] = []
   private storage: ProjectStorage | undefined
   private persistTimer: ReturnType<typeof setTimeout> | undefined
+  /** Ignore TreeView expand/collapse while rebuilding after a profile switch. */
+  private ignoreExpandEvents = false
+  private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
 
   private constructor(private context: vscode.ExtensionContext) {}
 
@@ -253,6 +256,40 @@ export class TracePointService {
     }
   }
 
+  /**
+   * TreeItem.id scoped by profile so VS Code does not restore expand/selection
+   * across profiles that share the same node UUIDs.
+   */
+  toTreeItemId(nodeId: string): string {
+    // Encode profile so names containing "::" cannot break parsing
+    return `${encodeURIComponent(this.activeProfileName)}::${nodeId}`
+  }
+
+  /** Extract the domain node UUID from a profile-scoped TreeItem.id. */
+  resolveNodeId(treeItemId: string | undefined | null): string | undefined {
+    if (!treeItemId) return undefined
+    const idx = treeItemId.indexOf('::')
+    return idx >= 0 ? treeItemId.slice(idx + 2) : treeItemId
+  }
+
+  shouldPersistExpandEvents(): boolean {
+    return !this.ignoreExpandEvents
+  }
+
+  private beginIgnoreExpandEvents() {
+    this.ignoreExpandEvents = true
+    if (this.ignoreExpandTimer) clearTimeout(this.ignoreExpandTimer)
+  }
+
+  private endIgnoreExpandEventsSoon() {
+    if (this.ignoreExpandTimer) clearTimeout(this.ignoreExpandTimer)
+    // TreeView may emit expand events asynchronously after refresh
+    this.ignoreExpandTimer = setTimeout(() => {
+      this.ignoreExpandEvents = false
+      this.ignoreExpandTimer = undefined
+    }, 150)
+  }
+
   /** Swap working memory to the active profile and refresh UI/highlights. */
   private async loadActiveProfileFromStore() {
     let profile = this.profiles.find((p) => p.name === this.activeProfileName)
@@ -265,17 +302,23 @@ export class TracePointService {
       this.activeProfileName = profile.name
     }
 
-    this.clearAllHighlights()
-    this.selectedTracePointIds.clear()
-    this.tracePointNodes = profile.tracePointNodes
-    this.expandedTracePointIds = new Set(profile.expandedTracePointIds)
-    this.applyProjectPathToNodes(this.tracePointNodes)
+    // Block expand/collapse persistence while the tree is rebuilt for this profile
+    this.beginIgnoreExpandEvents()
+    try {
+      this.clearAllHighlights()
+      this.selectedTracePointIds.clear()
+      this.tracePointNodes = profile.tracePointNodes
+      this.expandedTracePointIds = new Set(profile.expandedTracePointIds)
+      this.applyProjectPathToNodes(this.tracePointNodes)
 
-    this.rebuildNodeMapAndFileNodesMap()
-    await this.validateTracePointsOnLoad()
-    this.rebuildTreeNodeMap()
-    this.applyHighlightsToAllEditors()
-    this.notifyListeners()
+      this.rebuildNodeMapAndFileNodesMap()
+      await this.validateTracePointsOnLoad()
+      this.rebuildTreeNodeMap()
+      this.applyHighlightsToAllEditors()
+      this.notifyListeners()
+    } finally {
+      this.endIgnoreExpandEventsSoon()
+    }
   }
 
   async switchProfile(name: string) {
@@ -499,6 +542,10 @@ export class TracePointService {
     this.nodeMap.set(newNode.id, newNode)
 
     this.updateTreeItem(newNode)
+    // Keep the parent expanded when adding a child (do not do this on every rebuild)
+    if (parentId) {
+      this.expandTreeItem(this.getTracePointNodeById(parentId))
+    }
     if (!this.fileNodesMap.has(newNode.tracePoint.filePath)) {
       this.fileNodesMap.set(newNode.tracePoint.filePath, [])
     }
@@ -959,13 +1006,7 @@ export class TracePointService {
     this.fileNodesMap.get(node.tracePoint.filePath)!.push(node)
   }
   updateTreeItem(tracePointNode: TracePointNode) {
-    console.log(
-      'updateTreeItem triggered, expandedTracePointIds: ',
-      this.expandedTracePointIds,
-      ' tracePointNode.id: ',
-      tracePointNode.id
-    )
-    // Determine collapsible state based on expandedIds
+    // Determine collapsible state only from this profile's expanded ids
     let collapsibleState = vscode.TreeItemCollapsibleState.None
     const hasChildren = tracePointNode.children.length > 0
     if (hasChildren) {
@@ -974,18 +1015,15 @@ export class TracePointService {
         : vscode.TreeItemCollapsibleState.Collapsed
     }
     const tracePoint = tracePointNode.tracePoint
+    const label = `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`
     const prevItem = this.treeNodeMap.get(tracePointNode.id)
     if (prevItem) {
       prevItem.collapsibleState = collapsibleState
-      prevItem.label = `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`
+      prevItem.label = label
     }
-    const item = prevItem
-      ? prevItem
-      : new vscode.TreeItem(
-          `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`,
-          collapsibleState
-        )
-    item.id = tracePointNode.id
+    const item = prevItem ? prevItem : new vscode.TreeItem(label, collapsibleState)
+    // Profile-scoped id prevents cross-profile expand/selection restore
+    item.id = this.toTreeItemId(tracePointNode.id)
     item.contextValue = 'traceable'
     item.description = tracePoint.description
       ? tracePoint.description.length > 50
@@ -1011,13 +1049,6 @@ export class TracePointService {
     }
 
     this.treeNodeMap.set(tracePointNode.id, item)
-    if (tracePointNode.parentId) {
-      const pTp = this.treeNodeMap.get(tracePointNode.parentId)
-      if (pTp) {
-        pTp.collapsibleState = vscode.TreeItemCollapsibleState.Expanded
-        if (pTp.id) this.expandedTracePointIds.add(pTp.id)
-      }
-    }
   }
 
   rebuildTreeNodeMap(tracePointNodes?: TracePointNode[]) {
