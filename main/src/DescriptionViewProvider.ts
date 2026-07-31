@@ -54,12 +54,13 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
   private _getHtml(): string {
     return `
         <html>
-        <body style="padding: 10px; height: 100vh;">
+        <body style="padding: 10px; height: 100vh; box-sizing: border-box; margin: 0;">
             <textarea 
                 id="desc"
                 style="
                     width: 100%;
                     height: 100%;
+                    box-sizing: border-box;
                     resize: none;
                     font-family: inherit;
                     border: 1px solid var(--vscode-editorWidget-border);
