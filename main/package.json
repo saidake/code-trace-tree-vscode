@@ -3,6 +3,13 @@
   "displayName": "Code Trace Tree",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
   "version": "0.0.1",
+  "publisher": "pidifa",
+  "license": "GPL-3.0-or-later",
+  "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saidake/code-trace-tree-vscode.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },

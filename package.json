@@ -1,4 +1,12 @@
 {
+  "name": "code-trace-tree-vscode",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saidake/code-trace-tree-vscode.git"
+  },
   "scripts": {
     "format": "prettier --write './main/**/*.{ts,tsx,css,scss,json}' --ignore-path .prettierignore",
     "check-format": "prettier --check './main/**/*.{ts,tsx,css,scss,json}' --ignore-path .prettierignore"
