@@ -17,16 +17,15 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
-import {
-  REFRESH_REQUEST_FILE,
-  SELECT_REQUEST_FILE
-} from '../domain/constants'
+import * as AgentSignalFiles from './agentSignalFiles'
 
 const DEBOUNCE_MS = 400
 
 /**
- * Watches the bound global project XML and IDE-local refresh/select request files
- * so external agents can edit storage and ask VS Code to reload / select nodes.
+ * Watches the bound global project XML and this project's signal files under
+ * `<appDir>/signals/` so external agents can edit storage, ask VS Code to reload,
+ * or select/navigate trace points. Each watcher only reacts to
+ * `<projectId>.request_refresh` / `<projectId>.select_trace_points`.
  */
 export class ExternalStorageWatcher implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = []
@@ -35,7 +34,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
   private pendingReason: string | undefined
 
   constructor(
-    private readonly projectBase: string,
+    private readonly projectId: string,
     private readonly storageFileProvider: () => string | undefined,
     private readonly shouldIgnore: () => boolean,
     private readonly onExternalChange: (reason: string) => void,
@@ -43,18 +42,13 @@ export class ExternalStorageWatcher implements vscode.Disposable {
   ) {}
 
   start() {
-    const vscodeDir = path.join(this.projectBase, '.vscode')
-    const ideaDir = path.join(this.projectBase, '.idea')
+    const signals = AgentSignalFiles.signalsDir()
     try {
-      fs.mkdirSync(vscodeDir, { recursive: true })
+      fs.mkdirSync(signals, { recursive: true })
     } catch {
       // ignore
     }
-
-    this.watchDir(vscodeDir)
-    if (fs.existsSync(ideaDir)) {
-      this.watchDir(ideaDir)
-    }
+    this.watchSignalsDir(signals)
 
     const storageFile = this.storageFileProvider()
     if (storageFile) {
@@ -66,6 +60,14 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       const onStorage = () => this.scheduleReload('storage-xml')
       this.disposables.push(watcher, watcher.onDidChange(onStorage), watcher.onDidCreate(onStorage))
     }
+
+    // Replay fresh signals written while the IDE was closed; drop stale ones.
+    if (AgentSignalFiles.isFresh(AgentSignalFiles.refreshPath(this.projectId))) {
+      this.scheduleReload('refresh-request')
+    }
+    if (AgentSignalFiles.isFresh(AgentSignalFiles.selectPath(this.projectId))) {
+      this.scheduleSelect()
+    }
   }
 
   dispose() {
@@ -75,32 +77,36 @@ export class ExternalStorageWatcher implements vscode.Disposable {
     this.disposables.length = 0
   }
 
-  private watchDir(dir: string) {
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(dir, 'code-trace-tree.*')
-    )
-    const handle = (uri: vscode.Uri) => this.handleEvent(uri.fsPath)
-    this.disposables.push(
-      watcher,
-      watcher.onDidCreate(handle),
-      watcher.onDidChange(handle)
-    )
+  private watchSignalsDir(dir: string) {
+    const refreshName = AgentSignalFiles.refreshFileName(this.projectId)
+    const selectName = AgentSignalFiles.selectFileName(this.projectId)
+    // Watch both signal files for this projectId (glob doesn't allow OR; use two watchers).
+    for (const name of [refreshName, selectName]) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(dir, name)
+      )
+      const handle = (uri: vscode.Uri) => this.handleEvent(uri.fsPath)
+      this.disposables.push(
+        watcher,
+        watcher.onDidCreate(handle),
+        watcher.onDidChange(handle)
+      )
+    }
   }
 
   private handleEvent(filePath: string) {
     const name = path.basename(filePath)
-    if (name === SELECT_REQUEST_FILE) {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    if (name === AgentSignalFiles.selectFileName(this.projectId)) {
+      if (AgentSignalFiles.isFresh(AgentSignalFiles.selectPath(this.projectId))) {
         this.scheduleSelect()
       }
       return
     }
     if (this.shouldIgnore()) return
-    if (name === REFRESH_REQUEST_FILE) {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    if (name === AgentSignalFiles.refreshFileName(this.projectId)) {
+      if (AgentSignalFiles.isFresh(AgentSignalFiles.refreshPath(this.projectId))) {
         this.scheduleReload('refresh-request')
       }
-      return
     }
   }
 

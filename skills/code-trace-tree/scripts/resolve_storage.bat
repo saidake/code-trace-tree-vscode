@@ -85,6 +85,13 @@ if not defined STORAGE_XML (
 echo project_root=%PROJECT_ROOT%
 echo global_dir=%APP_DIR%
 echo project_id=%PROJECT_ID%
+if defined PROJECT_ID (
+  echo refresh_signal=%APP_DIR%\signals\%PROJECT_ID%.request_refresh
+  echo select_signal=%APP_DIR%\signals\%PROJECT_ID%.select_trace_points
+) else (
+  echo refresh_signal=
+  echo select_signal=
+)
 echo storage_xml=%STORAGE_XML%
 
 if not defined STORAGE_XML (

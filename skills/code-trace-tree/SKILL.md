@@ -4,7 +4,7 @@ description: >
   Read, edit, and refresh Code Trace Tree plugin data (JetBrains / VS Code shared storage).
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
   modify Code Trace Tree profiles, sync agent-written traces into the IDE, notify IntelliJ IDEA
-  or VS Code to reload plugin data, or select/navigate to trace points in the IDE tree.
+  to reload plugin data, or select/navigate to trace points in the IDE tree.
   Prefer scripts/trace_tree.py for search/add/move/delete/rebind (flexible LINE tips; no occurrence args; idempotent add).
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.
   When `<claudeAssistEnabled>` is true, auto-sync topic-related traces each turn that touched code.
@@ -14,27 +14,33 @@ description: >
 
 Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
 
-## Session startup: check Claude Assist
+## Session startup: check Agent Notes
 
 When this skill is loaded in the current session, resolve the project storage XML and read `<claudeAssistEnabled>` (and `<claudeAssistTarget>`). Keep those values for the rest of the session:
 
 | `claudeAssistEnabled` | Behavior |
 |-----------------------|----------|
-| `true` | Follow [Claude Assist action](#claude-assist-action): auto-sync topic-related traces on turns that touch code |
+| `true` | Follow [Agent Notes action](#agent-notes-action): auto-sync topic-related traces on turns that touch code |
 | `false` or missing | Do **not** auto-sync; only edit traces when the user explicitly asks |
 
-Re-check the flags if the user toggles Claude Assist in the IDE during the session (after a refresh / resolve).
+Re-check the flags if the user toggles **Agent Notes** in the IDE during the session (after a refresh / resolve).
 
 ## Skill scripts location
 
-All helper scripts live in **this skill’s** `scripts/` directory (not the user’s project root):
+All helper scripts live in **this skill’s** `scripts/` directory (not the user’s project root).
+The same skill package is used by multiple agents; only the install path differs:
 
-| Install | Scripts directory |
-|---------|-------------------|
-| Global | `~/.claude/skills/code-trace-tree/scripts/` (Windows: `%USERPROFILE%\.claude\skills\code-trace-tree\scripts\`) |
-| Project-local | `<repo>/.claude/skills/code-trace-tree/scripts/` |
+| Agent | Global install | Project-local install |
+|-------|----------------|------------------------|
+| Claude Code | `~/.claude/skills/code-trace-tree/` | `<repo>/.claude/skills/code-trace-tree/` |
+| Cursor | `~/.cursor/skills/code-trace-tree/` | `<repo>/.cursor/skills/code-trace-tree/` |
+| GitHub Copilot | `~/.copilot/skills/code-trace-tree/` | `<repo>/.github/skills/code-trace-tree/` |
+| Codex | `~/.agents/skills/code-trace-tree/` | `<repo>/.agents/skills/code-trace-tree/` |
+| Gemini CLI | `~/.gemini/skills/code-trace-tree/` | `<repo>/.gemini/skills/code-trace-tree/` |
 
-In examples below, `scripts/...` means that skill path. From a project checkout that vendors the skill, `bash .claude/skills/code-trace-tree/scripts/resolve_storage.sh` also works. Prefer an absolute path or `cd` into the skill folder when unsure.
+On Windows, `~` is `%USERPROFILE%`. In examples below, `scripts/...` means that skill path.
+From a repo that vendors the skill (or after `python skills/package_skills.py --sync`), use the matching project-local path.
+Prefer an absolute path or `cd` into the skill folder when unsure.
 
 ## Storage layout
 
@@ -42,8 +48,8 @@ In examples below, `scripts/...` means that skill path. From a project checkout 
 |-------|----------|
 | Project id | `.idea/code-trace-tree.project.id` (prefer) or `.vscode/code-trace-tree.project.id` |
 | Global XML | OS config dir + `/code-trace-tree/<FolderName>.xml` |
-| Refresh signal | `.idea/` and `.vscode/code-trace-tree.refresh-request` (scripts write both) |
-| Select signal | `.idea/` and `.vscode/code-trace-tree.select-request` (one node UUID per line) |
+| Refresh signal | `<global>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
+| Select signal | `<global>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
 Global base directory:
 
@@ -54,15 +60,15 @@ Global base directory:
 Resolve the bound XML with (optional project path discovers the IDE project root; default is CWD):
 
 ```bash
-# macOS / Linux — run from skill scripts dir, or use the full skill path
-bash ~/.claude/skills/code-trace-tree/scripts/resolve_storage.sh
-# optional: bash ~/.claude/skills/code-trace-tree/scripts/resolve_storage.sh /path/to/project
+# macOS / Linux — from this skill's scripts/ directory (any agent install path)
+bash scripts/resolve_storage.sh
+# optional: bash scripts/resolve_storage.sh /path/to/project
 ```
 
 ```bat
-REM Windows
-%USERPROFILE%\.claude\skills\code-trace-tree\scripts\resolve_storage.bat
-REM optional: ...\resolve_storage.bat C:\path\to\project
+REM Windows — from this skill's scripts\ directory
+scripts\resolve_storage.bat
+REM optional: scripts\resolve_storage.bat C:\path\to\project
 ```
 
 ## Preferred code workflow format
@@ -141,9 +147,8 @@ python3 …/scripts/trace_tree.py --project /path/to/project search
 Omit `--project` when the process CWD is already inside the IDE project (scripts walk upward to find `.idea` / `.git`).
 
 ```bash
-# macOS / Linux — set SKILL_SCRIPTS to whichever install you use:
-#   global:        ~/.claude/skills/code-trace-tree/scripts
-#   project-local: .claude/skills/code-trace-tree/scripts   (from repo root)
+# macOS / Linux — set SKILL_SCRIPTS to your agent install (see table above).
+# Example project-local Claude path from repo root:
 SKILL_SCRIPTS="${SKILL_SCRIPTS:-.claude/skills/code-trace-tree/scripts}"
 bash "$SKILL_SCRIPTS/trace_tree.sh" search
 # line optional when content uniquely resolves; substring OK for distinctive tips:
@@ -161,7 +166,7 @@ bash "$SKILL_SCRIPTS/trace_tree.sh" rebind --file src/A.java --file src/B.java
 ```
 
 ```bat
-REM Windows — project-local (from repo root) or set to %%USERPROFILE%%\.claude\skills\code-trace-tree\scripts
+REM Windows — set SKILL_SCRIPTS to your agent install (see table above).
 if not defined SKILL_SCRIPTS set "SKILL_SCRIPTS=.claude\skills\code-trace-tree\scripts"
 %SKILL_SCRIPTS%\trace_tree.bat search
 %SKILL_SCRIPTS%\trace_tree.bat add --file src\A.java --content ".handleEmailTriggerRequest(" --name handleEmail
@@ -172,7 +177,7 @@ REM After editing source on disk:
 %SKILL_SCRIPTS%\trace_tree.bat rebind --file src\A.java
 ```
 
-Default profile: Claude Assist target when enabled (`CLAUDE` / active); otherwise `<activeProfileName>`.
+Default profile: Agent Notes target when enabled (`AGENT` / active); otherwise `<activeProfileName>`.
 
 **Rebind after disk edits:** Claude does not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `trace_tree rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences.
 
@@ -184,12 +189,12 @@ Default profile: Claude Assist target when enabled (`CLAUDE` / active); otherwis
 | Add root / child | `trace_tree add` with `--parent` (ids preferred; idempotent if already present) |
 | Reparent node | `trace_tree move` |
 | Remove node + subtree | `trace_tree delete` |
-| Repair lines after source edits | `trace_tree rebind` (required after Claude disk edits) |
+| Repair lines after source edits | `trace_tree rebind` (required after agent disk edits) |
 | Switch profile | Set `<activeProfileName>` or pass `--profile` to scripts |
 
 ## After refresh
 
-IntelliJ or VS Code (with the plugin loaded) reloads the bound XML, refreshes the Code Trace Tree tool window, and re-applies highlights. The plugin deletes its IDE-local `code-trace-tree.refresh-request` after a successful reload.
+IntelliJ (with the plugin loaded) reloads the bound XML, refreshes the Code Trace Tree tool window, and re-applies highlights. All open windows for that projectId watch the shared signals folder. Signal files older than 60s are ignored and removed.
 
 ## Additional resources
 
@@ -206,19 +211,19 @@ All under the skill’s `scripts/` directory (see Skill scripts location):
 1. **Resolve** the project id + global XML (skill `scripts/resolve_storage.sh` / `.bat`; see Skill scripts location).
 2. **Read** the XML. Schema: [references/data-format.md](references/data-format.md).
 3. **Edit** carefully (see rules below). Prefer atomic write: write `*.xml.tmp` then replace.
-4. **Refresh IDE** so IntelliJ / VS Code reloads in-memory state:
+4. **Refresh IDE** so IntelliJ reloads in-memory state:
 
 ```bash
-# macOS / Linux
-bash ~/.claude/skills/code-trace-tree/scripts/request_refresh.sh
+# macOS / Linux — from this skill's scripts/ directory
+bash scripts/request_refresh.sh
 ```
 
 ```bat
 REM Windows
-%USERPROFILE%\.claude\skills\code-trace-tree\scripts\request_refresh.bat
+scripts\request_refresh.bat
 ```
 
-Editing the global XML alone is usually enough (the plugin watches it). Always write the refresh request after agent edits so reload is explicit.
+Editing the global XML alone is usually enough (the plugin watches it). Always write the refresh signal after agent edits so reload is explicit.
 
 ## Edit rules
 
@@ -234,18 +239,20 @@ Editing the global XML alone is usually enough (the plugin watches it). Always w
 - Do not delete unrelated profiles. Default profile name is `main`.
 - If the IDE has the project open, finish XML edits **before** writing the refresh request.
 
-## Claude Assist action
+## Agent Notes action
+
+The IDE toolbar toggle **Agent Notes** (storage flags `claudeAssistEnabled` / `claudeAssistTarget` below) applies to any agent using this skill. This plugin does not include an AI agent.
 
 Check project XML flags after resolving storage:
 
 | Flag | Meaning |
 |------|---------|
-| `claudeAssistEnabled` | `true` → Claude may mutate traces; `false`/missing → do **not** auto-sync |
-| `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `CLAUDE` → edit/create profile named `CLAUDE` |
+| `claudeAssistEnabled` | `true` → the agent may auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
+| `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `AGENT` → edit/create profile named `AGENT` (legacy `CLAUDE` is migrated) |
 
 When **enabled** and the current turn **touched code** (read, edited, or discussed concrete source for the topic):
 
-1. Resolve the target profile (`CURRENT` or `CLAUDE`; `trace_tree` honors assist flags by default).
+1. Resolve the target profile (`CURRENT` or `AGENT`; `trace_tree` honors assist flags by default).
 2. Use `trace_tree add` / `move` / `delete` for the **discussed topic** only (follow Preferred code workflow format). Prefer scripts over hand-editing occurrence fields.
 3. After modifying source files, run `trace_tree rebind` (with `--file` for touched paths when possible) so LINE locations track the new text.
 4. Add short `--description` notes when extra context helps; keep `--name` concise.
@@ -256,13 +263,13 @@ When **disabled**, only edit traces if the user explicitly asks.
 
 ## Select / navigate in the IDE action
 
-Write node UUIDs (one per line) to `.idea/` and/or `.vscode/code-trace-tree.select-request`, or use the helper scripts (they write both). The plugin shows the Code Trace Tree tool window, selects and reveals those nodes, then deletes the file.
+Write node UUIDs (one per line) to `signals/<projectId>.select_trace_points`, or use the helper scripts. Every open IDE window for that project watches the signal and selects / reveals those nodes. Stale signals (age > 60s) are ignored.
 
 | Request | Tree | Editor |
 |---------|------|--------|
 | 1 valid id | Select + reveal | Navigate to source |
 | 2+ valid ids | Select + reveal all | No navigation |
-| Unknown ids only | No-op (file still deleted) | No navigation |
+| Unknown ids only | No-op | No navigation |
 
 Use after creating or locating traces when the user should see them in the IDE. Prefer a single id when you want the editor to jump to the source.
 

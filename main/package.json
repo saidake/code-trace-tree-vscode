@@ -109,7 +109,7 @@
       },
       {
         "command": "codeTraceTree.toggleClaudeAssist",
-        "title": "Claude Assist",
+        "title": "Agent Notes",
         "icon": "$(lightbulb)",
         "enablement": "view == codeTraceTree.view"
       },

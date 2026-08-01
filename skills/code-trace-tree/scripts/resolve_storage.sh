@@ -101,6 +101,13 @@ fi
 printf 'project_root=%s\n' "$project_root"
 printf 'global_dir=%s\n' "$app_dir"
 printf 'project_id=%s\n' "$project_id"
+if [[ -n "${project_id:-}" ]]; then
+  printf 'refresh_signal=%s\n' "$app_dir/signals/$project_id.request_refresh"
+  printf 'select_signal=%s\n' "$app_dir/signals/$project_id.select_trace_points"
+else
+  printf 'refresh_signal=\n'
+  printf 'select_signal=\n'
+fi
 printf 'storage_xml=%s\n' "$storage_xml"
 
 if [[ -z "$storage_xml" ]]; then

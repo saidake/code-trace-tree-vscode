@@ -22,7 +22,8 @@ export type ProfileListener = () => void
 
 export type TraceType = 'LINE' | 'FILE' | 'DIRECTORY'
 
-export type ClaudeAssistTarget = 'CURRENT' | 'CLAUDE'
+/** Where Agent Notes writes traces when enabled. Storage value CLAUDE migrates to AGENT. */
+export type ClaudeAssistTarget = 'CURRENT' | 'AGENT'
 
 export interface TracePoint {
   traceName: string

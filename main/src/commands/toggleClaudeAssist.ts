@@ -36,15 +36,15 @@ export function registerToggleClaudeAssist(
             target: 'CURRENT' as const
           },
           {
-            label: 'CLAUDE Profile',
-            description: 'Create/switch to the CLAUDE profile',
-            target: 'CLAUDE' as const
+            label: 'AGENT Profile',
+            description: 'Create/switch to the AGENT profile',
+            target: 'AGENT' as const
           }
         ],
         {
-          title: 'Enable Claude Assist',
+          title: 'Enable Agent Notes',
           placeHolder:
-            'Claude will add/update/remove topic-related traces each turn that touched code'
+            'External AI agent may sync topic-related traces each turn that touched code. This plugin does not include an AI agent—install one separately and add the Code Trace Tree skill.'
         }
       )
       if (!choice) return

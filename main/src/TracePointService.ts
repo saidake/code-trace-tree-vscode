@@ -20,7 +20,7 @@ import * as fs from 'fs'
 import * as vscode from 'vscode'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { CLAUDE_PROFILE_NAME, DEFAULT_PROFILE_NAME } from './domain/constants'
+import { AGENT_PROFILE_NAME, DEFAULT_PROFILE_NAME } from './domain/constants'
 import {
   ClaudeAssistTarget,
   NodeListener,
@@ -31,8 +31,9 @@ import {
   TraceProfile
 } from './domain/types'
 import { formatDisplayText, formatLocationSuffix } from './utils/displayText'
+import * as AgentSignalFiles from './storage/agentSignalFiles'
+import { migrateClaudeProfileToAgent } from './storage/projectDataXml'
 import { ProjectStorage } from './storage/projectStorage'
-import * as ProjectIdFiles from './storage/projectIdFiles'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -71,6 +72,10 @@ export class TracePointService {
 
   getBoundStorageFile(): string | undefined {
     return this.storage?.getBoundStorageFile()
+  }
+
+  getBoundProjectId(): string | undefined {
+    return this.storage?.getBoundProjectId()
   }
 
   getWorkspaceRoot(): string | undefined {
@@ -130,6 +135,14 @@ export class TracePointService {
       doc.activeProfileName && this.profiles.some((p) => p.name === doc.activeProfileName)
         ? doc.activeProfileName
         : this.profiles[0].name
+    const { active: migratedActive, changed: profileMigrated } = migrateClaudeProfileToAgent(
+      this.profiles,
+      this.activeProfileName
+    )
+    this.activeProfileName =
+      migratedActive && this.profiles.some((p) => p.name === migratedActive)
+        ? migratedActive
+        : this.profiles[0].name
     this._highlightingEnabled = doc.highlightingEnabled
     this._descriptionAreaOpened = doc.descriptionAreaOpened
     this._namePromptEnabled = doc.namePromptEnabled
@@ -137,6 +150,9 @@ export class TracePointService {
     this._claudeAssistTarget = doc.claudeAssistTarget
     await this.syncToggleContextKeys()
     await this.loadActiveProfileFromStore()
+    if (profileMigrated && !this.suppressPersist) {
+      this.schedulePersist()
+    }
   }
 
   /** Debounce disk writes after mutations. */
@@ -306,27 +322,36 @@ export class TracePointService {
   async enableClaudeAssist(target: ClaudeAssistTarget) {
     this._claudeAssistTarget = target
     this._claudeAssistEnabled = true
-    if (target === 'CLAUDE') {
-      await this.ensureClaudeProfileActive()
+    if (target === 'AGENT') {
+      await this.ensureAgentProfileActive()
     }
     await this.syncToggleContextKeys()
     this.schedulePersist()
   }
 
-  private async ensureClaudeProfileActive() {
+  private async ensureAgentProfileActive() {
+    const { active: migratedActive } = migrateClaudeProfileToAgent(
+      this.profiles,
+      this.activeProfileName
+    )
+    this.activeProfileName =
+      migratedActive && this.profiles.some((p) => p.name === migratedActive)
+        ? migratedActive
+        : this.activeProfileName
     const existing = this.profiles.find(
-      (p) => p.name.toLowerCase() === CLAUDE_PROFILE_NAME.toLowerCase()
+      (p) => p.name.toLowerCase() === AGENT_PROFILE_NAME.toLowerCase()
     )
     if (!existing) {
-      await this.addProfile(CLAUDE_PROFILE_NAME)
+      await this.addProfile(AGENT_PROFILE_NAME)
       return
     }
-    existing.name = CLAUDE_PROFILE_NAME
-    if (this.activeProfileName.toLowerCase() === CLAUDE_PROFILE_NAME.toLowerCase()) {
-      this.activeProfileName = CLAUDE_PROFILE_NAME
+    const wasActive = this.activeProfileName.toLowerCase() === existing.name.toLowerCase()
+    existing.name = AGENT_PROFILE_NAME
+    if (wasActive) {
+      this.activeProfileName = AGENT_PROFILE_NAME
       this.notifyProfileListeners()
     } else {
-      await this.switchProfile(CLAUDE_PROFILE_NAME)
+      await this.switchProfile(AGENT_PROFILE_NAME)
     }
   }
 
@@ -1078,38 +1103,43 @@ export class TracePointService {
     try {
       await this.applyDocument(doc)
       this.notifyProfileListeners()
-      this.clearRefreshRequestFiles()
+      // Leave the refresh signal for other IDE windows; TTL cleans it up.
     } finally {
       this.suppressPersist = false
     }
     return true
   }
 
-  async consumeSelectRequest(treeView: vscode.TreeView<vscode.TreeItem>): Promise<void> {
-    const root = this.workspaceRoot
-    if (!root) return
-    const candidates = [
-      ProjectIdFiles.vscodeSelectRequestPath(root),
-      ProjectIdFiles.ideaSelectRequestPath(root)
-    ]
-    let requestPath: string | undefined
+  /**
+   * Selects / reveals trace points listed in the global select signal
+   * (`signals/<projectId>.select_trace_points`, one UUID per line).
+   * TTL-stale files are ignored; fresh signals are left for other windows.
+   * When exactly one id resolves in the current profile, also navigates to its source.
+   */
+  async handleExternalSelectRequest(
+    treeView: vscode.TreeView<vscode.TreeItem>
+  ): Promise<void> {
+    const projectId = this.getBoundProjectId()
+    if (!projectId) return
+    const requestPath = AgentSignalFiles.selectPath(projectId)
+    if (!AgentSignalFiles.isFresh(requestPath)) return
+
     let requestedIds: string[] = []
-    for (const candidate of candidates) {
-      if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue
-      try {
-        requestedIds = fs
-          .readFileSync(candidate, 'utf8')
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean)
-        requestPath = candidate
-        break
-      } catch {
-        // try next
-      }
+    try {
+      requestedIds = [
+        ...new Set(
+          fs
+            .readFileSync(requestPath, 'utf8')
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+        )
+      ]
+    } catch {
+      return
     }
-    this.clearSelectRequestFiles()
-    if (!requestPath || requestedIds.length === 0) return
+    // Leave the signal file for other IDE windows; TTL cleans it up.
+    if (requestedIds.length === 0) return
 
     const resolved = requestedIds
       .map((id) => this.getTracePointNodeById(id))
@@ -1129,36 +1159,6 @@ export class TracePointService {
     this.selectTracePoints(ids)
     if (resolved.length === 1) {
       await this.navigateToTracePoint(resolved[0], treeView)
-    }
-  }
-
-  private clearRefreshRequestFiles() {
-    const root = this.workspaceRoot
-    if (!root) return
-    for (const p of [
-      ProjectIdFiles.vscodeRefreshRequestPath(root),
-      ProjectIdFiles.ideaRefreshRequestPath(root)
-    ]) {
-      try {
-        if (fs.existsSync(p)) fs.unlinkSync(p)
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  private clearSelectRequestFiles() {
-    const root = this.workspaceRoot
-    if (!root) return
-    for (const p of [
-      ProjectIdFiles.vscodeSelectRequestPath(root),
-      ProjectIdFiles.ideaSelectRequestPath(root)
-    ]) {
-      try {
-        if (fs.existsSync(p)) fs.unlinkSync(p)
-      } catch {
-        // ignore
-      }
     }
   }
 

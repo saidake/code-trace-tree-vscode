@@ -48,6 +48,10 @@ export class ProjectStorage {
     return this.boundFile
   }
 
+  getBoundProjectId(): string | undefined {
+    return this.boundProjectId
+  }
+
   /** Re-read the bound XML without rebinding project id. */
   reloadBoundDocument(): ProjectDocument | undefined {
     const file = this.boundFile

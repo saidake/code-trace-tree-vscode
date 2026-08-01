@@ -1,8 +1,8 @@
 # Build and Release
 #
-# Builds the VSIX and Claude skill ZIP, attaches both to the GitHub Release.
+# Builds the VSIX and per-agent skill ZIPs, attaches them to the GitHub Release.
 # Triggered on push of a git tag matching v* (e.g. v1.0.0).
-# Attachments: plugin .vsix + code-trace-tree-skill-X.Y.Z.zip
+# Attachments: plugin .vsix + code-trace-tree-skill-<agent>-X.Y.Z.zip
 
 name: Build and Release
 
@@ -28,6 +28,10 @@ jobs:
           cache: yarn
           cache-dependency-path: main/yarn.lock
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
@@ -39,19 +43,16 @@ jobs:
       - name: Package extension
         run: npx --yes @vscode/vsce package
 
-      - name: Package Claude skill ZIP
+      - name: Package agent skill ZIPs
         working-directory: .
         run: |
           set -euo pipefail
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          SKILL_ZIP="code-trace-tree-skill-${VERSION}.zip"
-          STAGE="$(mktemp -d)"
-          cp -a .claude/skills/code-trace-tree "$STAGE/"
-          (cd "$STAGE" && zip -r "$GITHUB_WORKSPACE/$SKILL_ZIP" code-trace-tree)
-          echo "SKILL_ZIP=$SKILL_ZIP" >> "$GITHUB_ENV"
-          ls -la "$SKILL_ZIP"
-          unzip -l "$SKILL_ZIP"
+          python skills/package_skills.py --zip --version "$VERSION"
+          ls -la dist/skills/
+          unzip -l "dist/skills/code-trace-tree-skill-claude-${VERSION}.zip"
+          echo "SKILL_DIR=dist/skills" >> "$GITHUB_ENV"
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
@@ -59,11 +60,11 @@ jobs:
           name: code-trace-tree
           path: main/*.vsix
 
-      - name: Upload Claude skill artifact
+      - name: Upload skill artifacts
         uses: actions/upload-artifact@v4
         with:
           name: code-trace-tree-skill
-          path: code-trace-tree-skill-*.zip
+          path: dist/skills/code-trace-tree-skill-*.zip
 
       - name: Attach artifacts to GitHub Release
         working-directory: .
@@ -74,14 +75,16 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
           VSIX="$(ls main/*.vsix | head -n1)"
-          SKILL_ZIP="${SKILL_ZIP:-code-trace-tree-skill-${VERSION}.zip}"
+          TITLE="Code Trace Tree ${TAG}"
+          mapfile -t SKILL_ZIPS < <(ls dist/skills/code-trace-tree-skill-*.zip)
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$VSIX" "$SKILL_ZIP" --clobber
+            gh release upload "$TAG" "$VSIX" "${SKILL_ZIPS[@]}" --clobber
+            gh release edit "$TAG" --title "$TITLE"
           else
             gh release create "$TAG" \
-              --title "Code Trace Tree ${TAG#v}" \
-              --generate-notes \
+              --title "$TITLE" \
+              --notes "" \
               "$VSIX" \
-              "$SKILL_ZIP"
+              "${SKILL_ZIPS[@]}"
           fi

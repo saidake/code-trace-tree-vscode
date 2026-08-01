@@ -116,13 +116,14 @@ For agent-written `LINE` nodes:
 3. After Claude edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).
 4. If editing XML by hand: count matching trimmed lines → `totalOccurrences`; set `occurrenceIndex` (1-based) for the intended `lineNumber`.
 
-## Claude Assist flags
+## Agent Notes flags (storage: Claude Assist)
 
 | Element | Values | Meaning |
 |---------|--------|---------|
-| `claudeAssistEnabled` | `true` / `false` (default `false`) | When true, Claude may auto-sync topic-related traces |
-| `claudeAssistTarget` | `CURRENT` (default) or `CLAUDE` | Write into the active profile, or the dedicated `CLAUDE` profile |
+| `claudeAssistEnabled` | `true` / `false` (default `false`) | When true, an external agent may auto-sync topic-related traces |
+| `claudeAssistTarget` | `CURRENT` (default) or `AGENT` | Write into the active profile, or the dedicated `AGENT` profile |
 
+Legacy value `CLAUDE` (and a profile named `CLAUDE`) is accepted on read and migrated to `AGENT`.
 Missing elements mean assist is off and target is `CURRENT`.
 
 ## Import/export

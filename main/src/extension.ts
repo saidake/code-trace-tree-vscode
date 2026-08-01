@@ -136,18 +136,18 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function startExternalWatcher(context: vscode.ExtensionContext) {
-  const root = service.getWorkspaceRoot()
-  if (!root) return
+  const projectId = service.getBoundProjectId()
+  if (!projectId) return
   externalWatcher?.dispose()
   externalWatcher = new ExternalStorageWatcher(
-    root,
+    projectId,
     () => service.getBoundStorageFile(),
     () => service.shouldIgnoreExternalChanges(),
     (reason) => {
       void service.reloadFromExternalStorage(reason)
     },
     () => {
-      void service.consumeSelectRequest(treeView)
+      void service.handleExternalSelectRequest(treeView)
     }
   )
   externalWatcher.start()
