@@ -1,0 +1,5 @@
+{
+  "typescript.tsdk": "main/node_modules/typescript/lib",
+  "typescript.tsc.autoDetect": "off",
+  "npm.packageManager": "yarn"
+}

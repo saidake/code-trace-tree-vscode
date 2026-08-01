@@ -2,13 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "watch",
       "type": "npm",
       "script": "watch",
       "path": "main/",
       "problemMatcher": "$tsc-watch",
       "isBackground": true,
       "presentation": {
-        "reveal": "never"
+        "reveal": "never",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false
       },
       "group": {
         "kind": "build",
@@ -16,6 +20,7 @@
       }
     },
     {
+      "label": "compile",
       "type": "npm",
       "script": "compile",
       "path": "main/",

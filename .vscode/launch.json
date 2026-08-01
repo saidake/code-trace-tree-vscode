@@ -6,9 +6,14 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/main"],
-      "outFiles": ["${workspaceFolder}/main/out/**/*.js"],
-      "preLaunchTask": "${defaultBuildTask}"
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/main"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/main/out/**/*.js"
+      ],
+      "sourceMaps": true,
+      "preLaunchTask": "watch"
     }
   ]
 }
