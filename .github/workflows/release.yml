@@ -1,0 +1,61 @@
+# Build and Release
+#
+# Builds the VSIX and attaches it to the GitHub Release.
+# Triggered on push of a git tag matching v* (e.g. v1.0.0).
+
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: main
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: main/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Sync version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          yarn version --new-version "$VERSION" --no-git-tag-version
+
+      - name: Package extension
+        run: npx --yes @vscode/vsce package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-trace-tree
+          path: main/*.vsix
+
+      - name: Attach VSIX to GitHub Release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          VSIX="$(ls main/*.vsix | head -n1)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$VSIX" --clobber
+          else
+            gh release create "$TAG" \
+              --title "Code Trace Tree ${TAG#v}" \
+              --generate-notes \
+              "$VSIX"
+          fi
