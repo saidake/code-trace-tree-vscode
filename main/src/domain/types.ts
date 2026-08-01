@@ -20,16 +20,24 @@ export type NodeListener = (nodes: Set<TracePointNode | null> | null) => void
 
 export type ProfileListener = () => void
 
+export type TraceType = 'LINE' | 'FILE' | 'DIRECTORY'
+
+export type ClaudeAssistTarget = 'CURRENT' | 'CLAUDE'
+
 export interface TracePoint {
-  name: string
-  fileName: string
-  filePath: string
+  traceName: string
+  traceType: TraceType
+  baseName: string
+  /** Relative to project root. */
+  tracePath: string
+  /** LINE only; 0 for FILE/DIRECTORY. */
   lineNumber: number
 
   /** Runtime-only: workspace root; not persisted to XML. */
   projectPath: string
 
-  lineContent?: string
+  /** LINE only. */
+  lineContent?: string | null
   /** Runtime-only: recomputed on load; not persisted to XML. */
   isValid: boolean
   totalOccurrences: number
@@ -60,6 +68,9 @@ export interface ProjectDocument {
   activeProfileName: string
   descriptionAreaOpened: boolean
   highlightingEnabled: boolean
+  namePromptEnabled: boolean
+  claudeAssistEnabled: boolean
+  claudeAssistTarget: ClaudeAssistTarget
   /** Absolute path of the XML file this document is bound to. */
   storageFile?: string
 }
@@ -69,13 +80,20 @@ export interface TracePointNodeXml {
   id: string
   parentId: string
   tracePoint: {
-    name: string
-    fileName: string
-    filePath: string
-    lineNumber: number | string
+    traceName?: string
+    traceType?: string
+    baseName?: string
+    tracePath?: string
+    /** @deprecated legacy field */
+    name?: string
+    /** @deprecated legacy field */
+    fileName?: string
+    /** @deprecated legacy field */
+    filePath?: string
+    lineNumber?: number | string
     lineContent?: string
-    totalOccurrences: number | string
-    occurrenceIndex: number | string
+    totalOccurrences?: number | string
+    occurrenceIndex?: number | string
     description?: string
   }
   children?: {

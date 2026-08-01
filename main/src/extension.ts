@@ -19,11 +19,15 @@ import { TracePointService } from './TracePointService'
 import { TracePointTreeDataProvider } from './TracePointTreeDataProvider'
 import { registerCreateRootTracePoint } from './commands/createRootTracePoint'
 import { registerCreateTracePointUnderSelected } from './commands/createTracePointUnderSelected'
+import { registerCreateRootPathTracePoint } from './commands/createRootPathTracePoint'
+import { registerCreatePathTracePointUnderSelected } from './commands/createPathTracePointUnderSelected'
 import { registerUpdateTracePoint } from './commands/updateTracePoint'
 import { registerMoveUp } from './commands/moveUp'
 import { registerMoveDown } from './commands/moveDown'
 import { registerExpandSelected } from './commands/expandSelected'
 import { registerToggleHighlights } from './commands/toggleHighlights'
+import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
+import { registerToggleClaudeAssist } from './commands/toggleClaudeAssist'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints } from './commands/importTracePoints'
 import { registerGoToTracePoint } from './commands/goToTracePoint'
@@ -33,12 +37,15 @@ import {
 } from './commands/goToTracePointInTree'
 import { registerRenameTracePoint } from './commands/renameTracePoint'
 import { registerDeleteTracePoints } from './commands/deleteTracePoints'
+import { registerCopyTracePointText } from './commands/copyTracePointText'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
 import { ProfileViewProvider } from './ProfileViewProvider'
+import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
 
 let service: TracePointService
 let treeDataProvider: TracePointTreeDataProvider
 let treeView: vscode.TreeView<vscode.TreeItem>
+let externalWatcher: ExternalStorageWatcher | undefined
 
 export function activate(context: vscode.ExtensionContext) {
   service = TracePointService.getInstance(context)
@@ -50,19 +57,16 @@ export function activate(context: vscode.ExtensionContext) {
     dragAndDropController: treeDataProvider
   })
 
-  // Profile selector webview (above Trace Points)
   const profileProvider = new ProfileViewProvider(context.extensionUri, service)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeTraceTree.profile', profileProvider)
   )
 
-  // Description webview
   const descProvider = new DescriptionViewProvider(context.extensionUri, service)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
   )
 
-  // Listen to tree view selection changes
   context.subscriptions.push(
     treeView.onDidChangeSelection((e) => {
       const selectedIds = e.selection
@@ -71,7 +75,6 @@ export function activate(context: vscode.ExtensionContext) {
       service.selectTracePoints(selectedIds)
     })
   )
-  // Listen to tree view expand/collapse events (skipped during profile switch rebuild)
   context.subscriptions.push(
     treeView.onDidExpandElement((e) => {
       if (!service.shouldPersistExpandEvents()) return
@@ -90,37 +93,69 @@ export function activate(context: vscode.ExtensionContext) {
       service.setExpandedTracePointIds(expanded)
     })
   )
-  // Register all commands
+
   registerCreateRootTracePoint(context, service, treeDataProvider)
   registerCreateTracePointUnderSelected(context, service, treeDataProvider, treeView)
+  registerCreateRootPathTracePoint(context, service)
+  registerCreatePathTracePointUnderSelected(context, service, treeView)
   registerUpdateTracePoint(context, service, treeView)
   registerMoveUp(context, service, treeView, treeDataProvider)
   registerMoveDown(context, service, treeView, treeDataProvider)
   registerExpandSelected(context, treeView, treeDataProvider)
   registerToggleHighlights(context, service)
+  registerToggleNamePrompt(context, service)
+  registerToggleClaudeAssist(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
   registerGoToTracePoint(context, service, treeView)
   registerGoToTracePointInTree(context, service, treeView)
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
   registerDeleteTracePoints(context, service, treeView, treeDataProvider)
+  registerCopyTracePointText(context, service, treeView)
 
-  // Load hybrid storage + active profile
-  service.loadState().then(() => updateTracePointAtCaretContext(service))
+  service.loadState().then(() => {
+    updateTracePointAtCaretContext(service)
+    startExternalWatcher(context)
+  })
 
-  // Keep editor context-menu visibility in sync with caret line / tree changes
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => updateTracePointAtCaretContext(service)),
     vscode.window.onDidChangeTextEditorSelection(() => updateTracePointAtCaretContext(service))
   )
   service.addNodeListener('refresh', () => updateTracePointAtCaretContext(service))
 
-  // Listen for document changes/openings
-  vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e))
-  vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc))
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e)),
+    vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc)),
+    // Rebind LINE anchors after disk saves (covers tools that write files outside the editor)
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      const rel = vscode.workspace.asRelativePath(doc.uri)
+      void service.rebindLineNodesForPaths([rel])
+    })
+  )
+}
+
+function startExternalWatcher(context: vscode.ExtensionContext) {
+  const root = service.getWorkspaceRoot()
+  if (!root) return
+  externalWatcher?.dispose()
+  externalWatcher = new ExternalStorageWatcher(
+    root,
+    () => service.getBoundStorageFile(),
+    () => service.shouldIgnoreExternalChanges(),
+    (reason) => {
+      void service.reloadFromExternalStorage(reason)
+    },
+    () => {
+      void service.consumeSelectRequest(treeView)
+    }
+  )
+  externalWatcher.start()
+  context.subscriptions.push(externalWatcher)
 }
 
 export function deactivate() {
-  // Flush pending profile/tree writes before unload
   service?.persistNow()
+  externalWatcher?.dispose()
+  externalWatcher = undefined
 }

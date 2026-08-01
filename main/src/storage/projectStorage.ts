@@ -18,7 +18,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/constants'
-import { ProjectDocument, TraceProfile } from '../domain/types'
+import { ClaudeAssistTarget, ProjectDocument, TraceProfile } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import {
   cloneProfiles,
@@ -42,6 +42,24 @@ export class ProjectStorage {
 
   constructor(projectBasePath: string) {
     this.projectBase = path.resolve(projectBasePath)
+  }
+
+  getBoundStorageFile(): string | undefined {
+    return this.boundFile
+  }
+
+  /** Re-read the bound XML without rebinding project id. */
+  reloadBoundDocument(): ProjectDocument | undefined {
+    const file = this.boundFile
+    if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return undefined
+    try {
+      const doc = parseProjectFile(file)
+      const rebound: ProjectDocument = { ...doc, storageFile: file }
+      this.bind(rebound)
+      return rebound
+    } catch {
+      return undefined
+    }
   }
 
   resolveAndLoad(): ProjectDocument {
@@ -84,6 +102,9 @@ export class ProjectStorage {
         activeProfileName: byPath.activeProfileName || DEFAULT_PROFILE_NAME,
         descriptionAreaOpened: byPath.descriptionAreaOpened,
         highlightingEnabled: byPath.highlightingEnabled,
+        namePromptEnabled: byPath.namePromptEnabled,
+        claudeAssistEnabled: byPath.claudeAssistEnabled,
+        claudeAssistTarget: byPath.claudeAssistTarget,
         storageFile: newFile
       }
       ProjectIdFiles.writeProjectId(this.projectBase, newId)
@@ -104,6 +125,9 @@ export class ProjectStorage {
       activeProfileName: DEFAULT_PROFILE_NAME,
       descriptionAreaOpened: false,
       highlightingEnabled: true,
+      namePromptEnabled: true,
+      claudeAssistEnabled: false,
+      claudeAssistTarget: 'CURRENT',
       storageFile: newFile
     }
     ProjectIdFiles.writeProjectId(this.projectBase, newId)
@@ -116,7 +140,10 @@ export class ProjectStorage {
     profiles: TraceProfile[],
     activeProfileName: string,
     descriptionAreaOpened: boolean,
-    highlightingEnabled: boolean
+    highlightingEnabled: boolean,
+    namePromptEnabled: boolean,
+    claudeAssistEnabled: boolean,
+    claudeAssistTarget: ClaudeAssistTarget
   ): void {
     const file = this.boundFile
     const projectId = this.boundProjectId
@@ -135,6 +162,9 @@ export class ProjectStorage {
       activeProfileName,
       descriptionAreaOpened,
       highlightingEnabled,
+      namePromptEnabled,
+      claudeAssistEnabled,
+      claudeAssistTarget,
       storageFile: file
     }
     this.saveDocument(doc)

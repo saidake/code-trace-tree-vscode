@@ -40,7 +40,7 @@ export function registerRenameTracePoint(
         const newName = await vscode.window.showInputBox({
           prompt: 'Enter new name (optional)',
           placeHolder: 'Leave empty for no name',
-          value: tp.tracePoint.name
+          value: tp.tracePoint.traceName
         })
         // Allow empty string or undefined
         await service.renameTracePoint(tp.id, newName ?? '')

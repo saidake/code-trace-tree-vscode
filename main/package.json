@@ -58,6 +58,14 @@
         "title": "Create Code Trace Points (Under selected)"
       },
       {
+        "command": "codeTraceTree.createRootPathTracePoint",
+        "title": "Create a Root File/Directory Trace Point"
+      },
+      {
+        "command": "codeTraceTree.createPathTracePointUnderSelected",
+        "title": "Create File/Directory Trace Point (Under selected)"
+      },
+      {
         "command": "codeTraceTree.updateTracePoint",
         "title": "Update Selected Trace Points"
       },
@@ -68,6 +76,10 @@
       {
         "command": "codeTraceTree.deleteTracePoints",
         "title": "Delete Trace Points"
+      },
+      {
+        "command": "codeTraceTree.copyTracePointText",
+        "title": "Copy Trace Point Text"
       },
       {
         "command": "codeTraceTree.moveUp",
@@ -88,6 +100,18 @@
         "command": "codeTraceTree.toggleHighlights",
         "title": "Toggle Highlights",
         "icon": "$(eye)"
+      },
+      {
+        "command": "codeTraceTree.toggleNamePrompt",
+        "title": "Prompt for Name",
+        "icon": "$(edit)",
+        "enablement": "view == codeTraceTree.view"
+      },
+      {
+        "command": "codeTraceTree.toggleClaudeAssist",
+        "title": "Claude Assist",
+        "icon": "$(lightbulb)",
+        "enablement": "view == codeTraceTree.view"
       },
       {
         "command": "codeTraceTree.exportTracePoints",
@@ -127,6 +151,18 @@
           "when": "view == codeTraceTree.view"
         },
         {
+          "command": "codeTraceTree.toggleNamePrompt",
+          "group": "navigation@350",
+          "when": "view == codeTraceTree.view",
+          "toggle": "codeTraceTree.namePromptEnabled"
+        },
+        {
+          "command": "codeTraceTree.toggleClaudeAssist",
+          "group": "navigation@360",
+          "when": "view == codeTraceTree.view",
+          "toggle": "codeTraceTree.claudeAssistEnabled"
+        },
+        {
           "command": "codeTraceTree.exportTracePoints",
           "group": "navigation@400",
           "when": "view == codeTraceTree.view"
@@ -144,6 +180,11 @@
       ],
       "view/item/context": [
         {
+          "command": "codeTraceTree.copyTracePointText",
+          "group": "navigation@50",
+          "when": "view == codeTraceTree.view && viewItem == traceable"
+        },
+        {
           "command": "codeTraceTree.renameTracePoint",
           "group": "navigation@100",
           "when": "view == codeTraceTree.view && viewItem == traceable"
@@ -152,6 +193,16 @@
           "command": "codeTraceTree.deleteTracePoints",
           "group": "navigation@200",
           "when": "view == codeTraceTree.view && viewItem == traceable"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codeTraceTree.createRootPathTracePoint",
+          "group": "codeTraceTree@1"
+        },
+        {
+          "command": "codeTraceTree.createPathTracePointUnderSelected",
+          "group": "codeTraceTree@2"
         }
       ],
       "editor/context": [
@@ -173,7 +224,15 @@
           "when": "codeTraceTree.hasTracePointAtCaret"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "codeTraceTree.copyTracePointText",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "view == codeTraceTree.view && focusedView == codeTraceTree.view"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",

@@ -14,33 +14,38 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+import * as path from 'path'
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
-export function registerCreateRootTracePoint(
+export function registerCreateRootPathTracePoint(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  _treeDataProvider: TracePointTreeDataProvider
+  service: TracePointService
 ) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('codeTraceTree.createRootTracePoint', async () => {
-      const editor = vscode.window.activeTextEditor
-      if (!editor) {
-        vscode.window.showWarningMessage('No active editor.')
-        return
+    vscode.commands.registerCommand(
+      'codeTraceTree.createRootPathTracePoint',
+      async (uri?: vscode.Uri) => {
+        const target = uri ?? vscode.window.activeTextEditor?.document.uri
+        if (!target) {
+          vscode.window.showWarningMessage('Select a file or folder in the Explorer.')
+          return
+        }
+        const kindLabel =
+          (await vscode.workspace.fs.stat(target)).type & vscode.FileType.Directory
+            ? 'directory'
+            : 'file'
+        const name = await resolveNewTracePointName(
+          service,
+          `Enter name for the ${kindLabel} trace point:`,
+          path.basename(target.fsPath)
+        )
+        if (name === undefined) return
+        await service.addPathTracePoint(name, target)
+        service.notifyListeners()
+        service.saveState()
       }
-      const lineNumber = editor.selection.active.line + 1
-      const name = await resolveNewTracePointName(
-        service,
-        'Enter name for the root trace point (optional)'
-      )
-      if (name === undefined) return
-      await service.addTracePoint(name, editor.document.uri, lineNumber)
-      service.highlightTracePointsInFile(editor.document)
-      service.notifyListeners()
-      service.saveState()
-    })
+    )
   )
 }

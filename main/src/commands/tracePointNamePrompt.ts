@@ -14,16 +14,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-export const DEFAULT_PROFILE_NAME = 'main'
+import * as vscode from 'vscode'
+import { TracePointService } from '../TracePointService'
 
-export const CLAUDE_PROFILE_NAME = 'CLAUDE'
-
-export const PROJECT_DOCUMENT_VERSION = 4
-
-export const PROJECT_ID_FILE_NAME = 'code-trace-tree.project.id'
-
-export const REFRESH_REQUEST_FILE = 'code-trace-tree.refresh-request'
-
-export const SELECT_REQUEST_FILE = 'code-trace-tree.select-request'
-
-export const GLOBAL_APP_DIR_NAME = 'code-trace-tree'
+/**
+ * Resolves the name used when creating a trace point.
+ * Returns `undefined` when the user cancels a name prompt (caller should abort).
+ * Returns `""` when name prompting is disabled.
+ */
+export async function resolveNewTracePointName(
+  service: TracePointService,
+  prompt: string,
+  initialValue?: string
+): Promise<string | undefined> {
+  if (!service.isNamePromptEnabled()) return ''
+  return vscode.window.showInputBox({
+    prompt,
+    placeHolder: 'Leave empty for no name',
+    value: initialValue
+  })
+}

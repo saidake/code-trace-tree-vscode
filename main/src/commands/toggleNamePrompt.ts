@@ -14,16 +14,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-export const DEFAULT_PROFILE_NAME = 'main'
+import * as vscode from 'vscode'
+import { TracePointService } from '../TracePointService'
 
-export const CLAUDE_PROFILE_NAME = 'CLAUDE'
-
-export const PROJECT_DOCUMENT_VERSION = 4
-
-export const PROJECT_ID_FILE_NAME = 'code-trace-tree.project.id'
-
-export const REFRESH_REQUEST_FILE = 'code-trace-tree.refresh-request'
-
-export const SELECT_REQUEST_FILE = 'code-trace-tree.select-request'
-
-export const GLOBAL_APP_DIR_NAME = 'code-trace-tree'
+export function registerToggleNamePrompt(
+  context: vscode.ExtensionContext,
+  service: TracePointService
+) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codeTraceTree.toggleNamePrompt', () => {
+      service.setNamePromptEnabled(!service.isNamePromptEnabled())
+    })
+  )
+}

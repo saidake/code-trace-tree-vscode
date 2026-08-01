@@ -21,7 +21,8 @@ import {
   TracePointNode,
   TracePointNodeXml,
   TraceProfile,
-  TraceProfileXmlShape
+  TraceProfileXmlShape,
+  TraceType
 } from '../domain/types'
 import { asArray, parseXml, serializeXml } from './xmlUtils'
 
@@ -39,24 +40,36 @@ export interface ParsedMulti {
   profiles: TraceProfile[]
 }
 
+function parseTraceType(raw: unknown): TraceType {
+  const value = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+  if (value === 'FILE' || value === 'DIRECTORY' || value === 'LINE') return value
+  return 'LINE'
+}
+
 /** Build XML-friendly node tree (omit isValid / projectPath). */
 export function nodeToXml(node: TracePointNode, parentId: string | undefined): TracePointNodeXml {
   const tp = node.tracePoint
+  const xmlTp: TracePointNodeXml['tracePoint'] = {
+    traceName: tp.traceName ?? '',
+    traceType: tp.traceType ?? 'LINE',
+    baseName: tp.baseName ?? '',
+    tracePath: tp.tracePath ?? ''
+  }
+  if (tp.traceType === 'LINE') {
+    xmlTp.lineNumber = tp.lineNumber
+    xmlTp.lineContent = tp.lineContent ?? ''
+    xmlTp.totalOccurrences = tp.totalOccurrences
+    xmlTp.occurrenceIndex = tp.occurrenceIndex
+  }
+  if (tp.description) {
+    xmlTp.description = tp.description
+  }
   const xml: TracePointNodeXml = {
     id: node.id,
     parentId: parentId ?? '',
-    tracePoint: {
-      name: tp.name ?? '',
-      fileName: tp.fileName ?? '',
-      filePath: tp.filePath ?? '',
-      lineNumber: tp.lineNumber,
-      lineContent: tp.lineContent ?? '',
-      totalOccurrences: tp.totalOccurrences,
-      occurrenceIndex: tp.occurrenceIndex
-    }
-  }
-  if (tp.description) {
-    xml.tracePoint.description = tp.description
+    tracePoint: xmlTp
   }
   if (node.children.length > 0) {
     xml.children = {
@@ -68,23 +81,50 @@ export function nodeToXml(node: TracePointNode, parentId: string | undefined): T
 
 /** Parse a node from XML; projectPath is filled later from the workspace. */
 export function nodeFromXml(nodeXml: TracePointNodeXml, projectPath: string): TracePointNode {
-  const tpXml = nodeXml.tracePoint
+  const tpXml = nodeXml.tracePoint ?? {}
   const id = String(nodeXml.id || uuidv4())
   const parentIdRaw = nodeXml.parentId
   const parentId =
     parentIdRaw != null && String(parentIdRaw).trim() !== '' ? String(parentIdRaw) : undefined
 
-  const tracePoint: TracePoint = {
-    name: String(tpXml?.name ?? ''),
-    fileName: String(tpXml?.fileName ?? ''),
-    filePath: String(tpXml?.filePath ?? ''),
-    lineNumber: Number(tpXml?.lineNumber ?? -1),
-    projectPath,
-    lineContent: tpXml?.lineContent != null ? String(tpXml.lineContent) : '',
-    isValid: true,
-    totalOccurrences: Number(tpXml?.totalOccurrences ?? 1),
-    occurrenceIndex: Number(tpXml?.occurrenceIndex ?? 1),
-    description: tpXml?.description != null ? String(tpXml.description) : undefined
+  // Backward-compat: old name/fileName/filePath without traceType → LINE
+  const hasLegacy =
+    tpXml.traceType == null &&
+    (tpXml.name != null || tpXml.fileName != null || tpXml.filePath != null)
+  const traceType = hasLegacy ? 'LINE' : parseTraceType(tpXml.traceType)
+  const traceName = String(tpXml.traceName ?? tpXml.name ?? '')
+  const baseName = String(tpXml.baseName ?? tpXml.fileName ?? '')
+  const tracePath = String(tpXml.tracePath ?? tpXml.filePath ?? '')
+
+  let tracePoint: TracePoint
+  if (traceType === 'FILE' || traceType === 'DIRECTORY') {
+    tracePoint = {
+      traceName,
+      traceType,
+      baseName,
+      tracePath,
+      lineNumber: 0,
+      projectPath,
+      lineContent: null,
+      isValid: true,
+      totalOccurrences: 0,
+      occurrenceIndex: 0,
+      description: tpXml.description != null ? String(tpXml.description) : undefined
+    }
+  } else {
+    tracePoint = {
+      traceName,
+      traceType: 'LINE',
+      baseName,
+      tracePath,
+      lineNumber: Number(tpXml.lineNumber ?? -1),
+      projectPath,
+      lineContent: tpXml.lineContent != null ? String(tpXml.lineContent) : '',
+      isValid: true,
+      totalOccurrences: Number(tpXml.totalOccurrences ?? 1),
+      occurrenceIndex: Number(tpXml.occurrenceIndex ?? 1),
+      description: tpXml.description != null ? String(tpXml.description) : undefined
+    }
   }
 
   const childrenXml = asArray(nodeXml.children?.tracePointNode)

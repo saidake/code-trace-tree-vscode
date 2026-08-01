@@ -14,16 +14,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-export const DEFAULT_PROFILE_NAME = 'main'
+import { TracePoint } from '../domain/types'
 
-export const CLAUDE_PROFILE_NAME = 'CLAUDE'
+/** Location suffix shown after the purple name (includes leading space via TreeItem.description). */
+export function formatLocationSuffix(tp: TracePoint): string {
+  const fileName = tp.baseName.includes('/')
+    ? tp.baseName.substring(tp.baseName.lastIndexOf('/') + 1)
+    : tp.baseName
+  switch (tp.traceType) {
+    case 'LINE':
+      return `(${fileName}:${tp.lineNumber})`
+    case 'FILE':
+      return `(${fileName})`
+    case 'DIRECTORY':
+      return `(${fileName}/)`
+  }
+}
 
-export const PROJECT_DOCUMENT_VERSION = 4
-
-export const PROJECT_ID_FILE_NAME = 'code-trace-tree.project.id'
-
-export const REFRESH_REQUEST_FILE = 'code-trace-tree.refresh-request'
-
-export const SELECT_REQUEST_FILE = 'code-trace-tree.select-request'
-
-export const GLOBAL_APP_DIR_NAME = 'code-trace-tree'
+/** Plain display text for clipboard / menus. */
+export function formatDisplayText(tp: TracePoint): string {
+  return `${tp.traceName} ${formatLocationSuffix(tp)}`
+}

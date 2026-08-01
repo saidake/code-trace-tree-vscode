@@ -16,31 +16,28 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
-import { resolveNewTracePointName } from './tracePointNamePrompt'
+import { formatDisplayText } from '../utils/displayText'
 
-export function registerCreateRootTracePoint(
+export function registerCopyTracePointText(
   context: vscode.ExtensionContext,
   service: TracePointService,
-  _treeDataProvider: TracePointTreeDataProvider
+  treeView: vscode.TreeView<vscode.TreeItem>
 ) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('codeTraceTree.createRootTracePoint', async () => {
-      const editor = vscode.window.activeTextEditor
-      if (!editor) {
-        vscode.window.showWarningMessage('No active editor.')
-        return
+    vscode.commands.registerCommand(
+      'codeTraceTree.copyTracePointText',
+      async (item?: vscode.TreeItem) => {
+        const selected = item ? [item] : treeView.selection
+        if (selected.length === 0) return
+        const lines: string[] = []
+        for (const treeItem of selected) {
+          const id = service.resolveNodeId(treeItem.id)
+          const node = id ? service.getTracePointNodeById(id) : null
+          if (node) lines.push(formatDisplayText(node.tracePoint))
+        }
+        if (lines.length === 0) return
+        await vscode.env.clipboard.writeText(lines.join('\n'))
       }
-      const lineNumber = editor.selection.active.line + 1
-      const name = await resolveNewTracePointName(
-        service,
-        'Enter name for the root trace point (optional)'
-      )
-      if (name === undefined) return
-      await service.addTracePoint(name, editor.document.uri, lineNumber)
-      service.highlightTracePointsInFile(editor.document)
-      service.notifyListeners()
-      service.saveState()
-    })
+    )
   )
 }

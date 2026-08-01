@@ -16,7 +16,11 @@
  */
 import * as fs from 'fs'
 import * as path from 'path'
-import { PROJECT_ID_FILE_NAME } from '../domain/constants'
+import {
+  PROJECT_ID_FILE_NAME,
+  REFRESH_REQUEST_FILE,
+  SELECT_REQUEST_FILE
+} from '../domain/constants'
 
 export function vscodeIdPath(projectBase: string): string {
   return path.join(projectBase, '.vscode', PROJECT_ID_FILE_NAME)
@@ -24,6 +28,22 @@ export function vscodeIdPath(projectBase: string): string {
 
 export function ideaIdPath(projectBase: string): string {
   return path.join(projectBase, '.idea', PROJECT_ID_FILE_NAME)
+}
+
+export function vscodeRefreshRequestPath(projectBase: string): string {
+  return path.join(projectBase, '.vscode', REFRESH_REQUEST_FILE)
+}
+
+export function ideaRefreshRequestPath(projectBase: string): string {
+  return path.join(projectBase, '.idea', REFRESH_REQUEST_FILE)
+}
+
+export function vscodeSelectRequestPath(projectBase: string): string {
+  return path.join(projectBase, '.vscode', SELECT_REQUEST_FILE)
+}
+
+export function ideaSelectRequestPath(projectBase: string): string {
+  return path.join(projectBase, '.idea', SELECT_REQUEST_FILE)
 }
 
 function readIdFile(filePath: string): string | undefined {

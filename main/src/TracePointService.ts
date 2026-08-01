@@ -16,11 +16,13 @@
  */
 // src/TracePointService.ts
 
+import * as fs from 'fs'
 import * as vscode from 'vscode'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_PROFILE_NAME } from './domain/constants'
+import { CLAUDE_PROFILE_NAME, DEFAULT_PROFILE_NAME } from './domain/constants'
 import {
+  ClaudeAssistTarget,
   NodeListener,
   NodeListenerEventType,
   ProfileListener,
@@ -28,7 +30,9 @@ import {
   TracePointNode,
   TraceProfile
 } from './domain/types'
+import { formatDisplayText, formatLocationSuffix } from './utils/displayText'
 import { ProjectStorage } from './storage/projectStorage'
+import * as ProjectIdFiles from './storage/projectIdFiles'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -38,13 +42,19 @@ export class TracePointService {
 
   private treeNodeMap: Map<string, vscode.TreeItem> = new Map()
   private listenersMap: Map<NodeListenerEventType, NodeListener[]> = new Map()
-  private fileNodesMap: Map<string, TracePointNode[]> = new Map() // filePath
+  private fileNodesMap: Map<string, TracePointNode[]> = new Map() // tracePath
 
   private selectedTracePointIds: Set<string> = new Set()
   private expandedTracePointIds: Set<string> = new Set()
   private highlighters: Map<string, vscode.TextEditorDecorationType> = new Map() // Key: fileUri
   private _highlightingEnabled: boolean = true
   private _descriptionAreaOpened: boolean = false
+  private _namePromptEnabled: boolean = true
+  private _claudeAssistEnabled: boolean = false
+  private _claudeAssistTarget: ClaudeAssistTarget = 'CURRENT'
+  private ignoreExternalChangesUntilMs = 0
+  private suppressPersist = false
+  private workspaceRoot: string | undefined
 
   private profiles: TraceProfile[] = [
     { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
@@ -58,6 +68,18 @@ export class TracePointService {
   private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
 
   private constructor(private context: vscode.ExtensionContext) {}
+
+  getBoundStorageFile(): string | undefined {
+    return this.storage?.getBoundStorageFile()
+  }
+
+  getWorkspaceRoot(): string | undefined {
+    return this.workspaceRoot
+  }
+
+  shouldIgnoreExternalChanges(): boolean {
+    return Date.now() < this.ignoreExternalChangesUntilMs
+  }
 
   static getInstance(context: vscode.ExtensionContext): TracePointService {
     if (!TracePointService.instance) {
@@ -75,52 +97,72 @@ export class TracePointService {
         return
       }
 
+      this.workspaceRoot = workspaceRoot
       this.storage = new ProjectStorage(workspaceRoot)
       const doc = this.storage.resolveAndLoad()
-
-      this.profiles = doc.profiles.map((p) => ({
-        name: p.name || DEFAULT_PROFILE_NAME,
-        tracePointNodes: p.tracePointNodes,
-        expandedTracePointIds: [...p.expandedTracePointIds]
-      }))
-      if (this.profiles.length === 0) {
-        this.profiles = [
-          { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
-        ]
-      }
-      this.activeProfileName =
-        doc.activeProfileName && this.profiles.some((p) => p.name === doc.activeProfileName)
-          ? doc.activeProfileName
-          : this.profiles[0].name
-      this._highlightingEnabled = doc.highlightingEnabled
-      this._descriptionAreaOpened = doc.descriptionAreaOpened
-
-      // Load active profile tree into working memory
-      await this.loadActiveProfileFromStore()
+      await this.applyDocument(doc)
       this.notifyProfileListeners()
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to load trace points: ${e}`)
     }
   }
 
+  private async applyDocument(doc: {
+    profiles: TraceProfile[]
+    activeProfileName: string
+    highlightingEnabled: boolean
+    descriptionAreaOpened: boolean
+    namePromptEnabled: boolean
+    claudeAssistEnabled: boolean
+    claudeAssistTarget: ClaudeAssistTarget
+  }) {
+    this.profiles = doc.profiles.map((p) => ({
+      name: p.name || DEFAULT_PROFILE_NAME,
+      tracePointNodes: p.tracePointNodes,
+      expandedTracePointIds: [...p.expandedTracePointIds]
+    }))
+    if (this.profiles.length === 0) {
+      this.profiles = [
+        { name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }
+      ]
+    }
+    this.activeProfileName =
+      doc.activeProfileName && this.profiles.some((p) => p.name === doc.activeProfileName)
+        ? doc.activeProfileName
+        : this.profiles[0].name
+    this._highlightingEnabled = doc.highlightingEnabled
+    this._descriptionAreaOpened = doc.descriptionAreaOpened
+    this._namePromptEnabled = doc.namePromptEnabled
+    this._claudeAssistEnabled = doc.claudeAssistEnabled
+    this._claudeAssistTarget = doc.claudeAssistTarget
+    await this.syncToggleContextKeys()
+    await this.loadActiveProfileFromStore()
+  }
+
   /** Debounce disk writes after mutations. */
   schedulePersist() {
+    if (this.suppressPersist) return
     if (this.persistTimer) clearTimeout(this.persistTimer)
     this.persistTimer = setTimeout(() => this.persistNow(), 300)
   }
 
   /** Flush active profile into the profile store and write global XML. */
   persistNow() {
+    if (this.suppressPersist) return
     if (this.persistTimer) {
       clearTimeout(this.persistTimer)
       this.persistTimer = undefined
     }
+    this.ignoreExternalChangesUntilMs = Date.now() + 1500
     this.syncActiveProfileToStore()
     this.storage?.save(
       this.profiles,
       this.activeProfileName,
       this._descriptionAreaOpened,
-      this._highlightingEnabled
+      this._highlightingEnabled,
+      this._namePromptEnabled,
+      this._claudeAssistEnabled,
+      this._claudeAssistTarget
     )
   }
 
@@ -173,12 +215,17 @@ export class TracePointService {
     return this.fileNodesMap.get(filePath)
   }
 
-  /** Valid trace points on a given relative file path + 1-based line. */
+  /** Valid LINE trace points on a given relative file path + 1-based line. */
   findValidTracePointsAt(filePath: string, lineNumber: number): TracePointNode[] {
     return (
       this.fileNodesMap
         .get(filePath)
-        ?.filter((n) => n.tracePoint.isValid && n.tracePoint.lineNumber === lineNumber) ?? []
+        ?.filter(
+          (n) =>
+            n.tracePoint.traceType === 'LINE' &&
+            n.tracePoint.isValid &&
+            n.tracePoint.lineNumber === lineNumber
+        ) ?? []
     )
   }
 
@@ -230,6 +277,70 @@ export class TracePointService {
   setDescriptionAreaOpened(opened: boolean) {
     this._descriptionAreaOpened = opened
     this.schedulePersist()
+  }
+
+  isNamePromptEnabled(): boolean {
+    return this._namePromptEnabled
+  }
+
+  setNamePromptEnabled(enabled: boolean) {
+    this._namePromptEnabled = enabled
+    void this.syncToggleContextKeys()
+    this.schedulePersist()
+  }
+
+  isClaudeAssistEnabled(): boolean {
+    return this._claudeAssistEnabled
+  }
+
+  getClaudeAssistTarget(): ClaudeAssistTarget {
+    return this._claudeAssistTarget
+  }
+
+  setClaudeAssistEnabled(enabled: boolean) {
+    this._claudeAssistEnabled = enabled
+    void this.syncToggleContextKeys()
+    this.schedulePersist()
+  }
+
+  async enableClaudeAssist(target: ClaudeAssistTarget) {
+    this._claudeAssistTarget = target
+    this._claudeAssistEnabled = true
+    if (target === 'CLAUDE') {
+      await this.ensureClaudeProfileActive()
+    }
+    await this.syncToggleContextKeys()
+    this.schedulePersist()
+  }
+
+  private async ensureClaudeProfileActive() {
+    const existing = this.profiles.find(
+      (p) => p.name.toLowerCase() === CLAUDE_PROFILE_NAME.toLowerCase()
+    )
+    if (!existing) {
+      await this.addProfile(CLAUDE_PROFILE_NAME)
+      return
+    }
+    existing.name = CLAUDE_PROFILE_NAME
+    if (this.activeProfileName.toLowerCase() === CLAUDE_PROFILE_NAME.toLowerCase()) {
+      this.activeProfileName = CLAUDE_PROFILE_NAME
+      this.notifyProfileListeners()
+    } else {
+      await this.switchProfile(CLAUDE_PROFILE_NAME)
+    }
+  }
+
+  private async syncToggleContextKeys() {
+    await vscode.commands.executeCommand(
+      'setContext',
+      'codeTraceTree.namePromptEnabled',
+      this._namePromptEnabled
+    )
+    await vscode.commands.executeCommand(
+      'setContext',
+      'codeTraceTree.claudeAssistEnabled',
+      this._claudeAssistEnabled
+    )
   }
 
   getActiveProfileName(): string {
@@ -527,26 +638,57 @@ export class TracePointService {
     const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent)
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1
 
-    const filePath = vscode.workspace.asRelativePath(file)
-    const fileName = path.basename(filePath)
+    const tracePath = vscode.workspace.asRelativePath(file)
+    const baseName = path.basename(tracePath)
     const tracePoint: TracePoint = {
-      name,
-      filePath,
-      fileName,
+      traceName: name,
+      traceType: 'LINE',
+      tracePath,
+      baseName,
       lineNumber,
       projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
       lineContent,
       isValid: true,
       totalOccurrences: totalOccurrences,
       occurrenceIndex,
-      description // Defaults to empty string
+      description
     }
-    const newNode: TracePointNode = {
-      id: uuidv4(),
-      tracePoint,
-      parentId,
-      children: []
+    this.insertTracePointNode(
+      { id: uuidv4(), tracePoint, parentId, children: [] },
+      parentId
+    )
+  }
+
+  /** Adds a FILE or DIRECTORY trace point from Explorer (no line anchor). */
+  async addPathTracePoint(
+    name: string,
+    uri: vscode.Uri,
+    parentId?: string,
+    description = ''
+  ) {
+    const stat = await vscode.workspace.fs.stat(uri)
+    const isDir = (stat.type & vscode.FileType.Directory) !== 0
+    const tracePath = vscode.workspace.asRelativePath(uri)
+    const tracePoint: TracePoint = {
+      traceName: name,
+      traceType: isDir ? 'DIRECTORY' : 'FILE',
+      tracePath,
+      baseName: path.basename(tracePath),
+      lineNumber: 0,
+      projectPath: vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
+      lineContent: null,
+      isValid: true,
+      totalOccurrences: 0,
+      occurrenceIndex: 0,
+      description
     }
+    this.insertTracePointNode(
+      { id: uuidv4(), tracePoint, parentId, children: [] },
+      parentId
+    )
+  }
+
+  private insertTracePointNode(newNode: TracePointNode, parentId?: string) {
     if (!parentId) {
       this.tracePointNodes.push(newNode)
     } else {
@@ -556,16 +698,14 @@ export class TracePointService {
       }
     }
     this.nodeMap.set(newNode.id, newNode)
-
     this.updateTreeItem(newNode)
-    // Keep the parent expanded when adding a child (do not do this on every rebuild)
     if (parentId) {
       this.expandTreeItem(this.getTracePointNodeById(parentId))
     }
-    if (!this.fileNodesMap.has(newNode.tracePoint.filePath)) {
-      this.fileNodesMap.set(newNode.tracePoint.filePath, [])
+    if (!this.fileNodesMap.has(newNode.tracePoint.tracePath)) {
+      this.fileNodesMap.set(newNode.tracePoint.tracePath, [])
     }
-    this.fileNodesMap.get(newNode.tracePoint.filePath)!.push(newNode)
+    this.fileNodesMap.get(newNode.tracePoint.tracePath)!.push(newNode)
   }
 
   getTracePointParentById(id?: string): TracePointNode | null {
@@ -589,10 +729,9 @@ export class TracePointService {
   async renameTracePoint(id: string, newName: string) {
     const tp = this.getTracePointNodeById(id)
     if (tp) {
-      tp.tracePoint.name = newName
+      tp.tracePoint.traceName = newName
       this.updateTreeItem(tp)
       const parentNode = this.getTracePointParentById(id)
-      console.log('[TEST] renameTracePoint, tp: ', tp, ' newName: ', newName)
       this.notifyListeners('refresh', new Set<TracePointNode | null>([parentNode]))
       this.saveState()
     }
@@ -604,7 +743,7 @@ export class TracePointService {
 
     const traverse = (node: TracePointNode) => {
       this.nodeMap.set(node.id, node)
-      const filePath = node.tracePoint.filePath
+      const filePath = node.tracePoint.tracePath
       if (!this.fileNodesMap.has(filePath)) {
         this.fileNodesMap.set(filePath, [])
       }
@@ -643,11 +782,11 @@ export class TracePointService {
 
   async highlightTracePointsInFile(document: vscode.TextDocument) {
     if (!this.isHighlightingEnabled()) return
-    console.log('highlightTracePointsInFile triggered')
     const filePath = vscode.workspace.asRelativePath(document.uri)
     const relevantTracePoints =
-      this.fileNodesMap.get(filePath)?.filter((tp) => tp.tracePoint.isValid) ?? []
-    console.log('relevantTracePoints: ', relevantTracePoints)
+      this.fileNodesMap
+        .get(filePath)
+        ?.filter((tp) => tp.tracePoint.traceType === 'LINE' && tp.tracePoint.isValid) ?? []
 
     this.removeHighlights(document.uri.fsPath)
 
@@ -701,7 +840,8 @@ export class TracePointService {
 
   async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
     const filePath = vscode.workspace.asRelativePath(event.document.uri)
-    const affectedTracePoints: TracePointNode[] = this.getTraceNodesByFilePath(filePath)!
+    const affectedTracePoints =
+      this.getTraceNodesByFilePath(filePath)?.filter((n) => n.tracePoint.traceType === 'LINE') ?? []
     if (affectedTracePoints.length === 0) return
 
     const newLines = event.document.getText().split(/\r?\n/)
@@ -718,8 +858,6 @@ export class TracePointService {
     const updatedNodes: TracePointNode[] = []
     let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
 
-    // console.log(`lineOffset: ${lineOffset}, changedLine: ${changedLine}`);
-    // console.log(`oldLines: ${oldLines}, newLinesCount: ${newLinesCount}`);
     for (const node of affectedTracePoints) {
       const tp = node.tracePoint
       if (!tp.isValid) {
@@ -814,101 +952,213 @@ export class TracePointService {
    * Recursively validate tracePoints and update tracePointMap
    */
   async validateTracePointsOnLoad(nodes: TracePointNode[] = this.tracePointNodes): Promise<void> {
-    console.log('validateTracePointsOnLoad triggered')
-
     const validateNode = async (node: TracePointNode): Promise<void> => {
-      const tracePoint = node.tracePoint
-
-      // Invalidate trace points with empty or missing required fields
-      if (
-        !node.id ||
-        !tracePoint.filePath ||
-        !tracePoint.projectPath ||
-        tracePoint.lineContent == null
-      ) {
-        node.tracePoint = { ...tracePoint, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
-      } else {
-        // Try to locate the file
-        const fileUri = vscode.Uri.file(path.join(tracePoint.projectPath, tracePoint.filePath))
-        let document: vscode.TextDocument | undefined
+      const tp = node.tracePoint
+      if (!node.id || !tp.tracePath || !tp.projectPath) {
+        node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
+      } else if (tp.traceType === 'FILE' || tp.traceType === 'DIRECTORY') {
+        const abs = path.join(tp.projectPath, tp.tracePath)
         try {
-          document = await vscode.workspace.openTextDocument(fileUri)
+          const st = fs.statSync(abs)
+          const ok =
+            tp.traceType === 'DIRECTORY' ? st.isDirectory() : st.isFile()
+          node.tracePoint = { ...tp, isValid: ok, totalOccurrences: 0, occurrenceIndex: 0 }
         } catch {
-          // File not found
-          node.tracePoint = {
-            ...tracePoint,
-            isValid: false,
-            totalOccurrences: 0,
-            occurrenceIndex: 0
-          }
+          node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
         }
-
-        if (document) {
-          // Invalid line number (out of range)
-          if (tracePoint.lineNumber > document.lineCount) {
-            node.tracePoint = {
-              ...tracePoint,
-              isValid: false,
-              totalOccurrences: 0,
-              occurrenceIndex: 0
-            }
-          } else {
-            // Check if current line content matches the stored one
-            const currentLineContent = document.lineAt(tracePoint.lineNumber - 1).text.trim()
-            if (currentLineContent === tracePoint.lineContent.trim()) {
-              // Line still matches, keep it as valid
-              node.tracePoint = { ...tracePoint, isValid: true }
-            } else {
-              // Content does not match at the original lineNumber, search the file for occurrences
-              const [totalOccurrences, matchingLines] = this.getLineOccurrences(
-                document,
-                tracePoint.lineContent
-              )
-              console.log(
-                `occurrence doesn't match: tracePoint.lineContent: ${tracePoint.lineContent} 
-                                totalOccurrences: ${totalOccurrences}, matchingLines: ${matchingLines}, 
-                                tracePoint.totalOccurrences: ${tracePoint.totalOccurrences}, tracePoint.occurrenceIndex: ${tracePoint.occurrenceIndex}`
-              )
-
-              // If the total occurrences count is the same and occurrenceIndex is still valid, update the line number
-              if (
-                totalOccurrences === tracePoint.totalOccurrences &&
-                tracePoint.occurrenceIndex >= 1 &&
-                tracePoint.occurrenceIndex <= totalOccurrences
-              ) {
-                const newLineNumber = matchingLines[tracePoint.occurrenceIndex - 1]
-                node.tracePoint = {
-                  ...tracePoint,
-                  lineNumber: newLineNumber,
-                  totalOccurrences,
-                  occurrenceIndex: tracePoint.occurrenceIndex,
-                  isValid: true
-                }
-              } else {
-                // Otherwise mark as invalid if mismatch or index is out of range
-                node.tracePoint = {
-                  ...tracePoint,
-                  isValid: false,
-                  totalOccurrences,
-                  occurrenceIndex: 0
-                }
-              }
-            }
-          }
+      } else {
+        const abs = path.join(tp.projectPath, tp.tracePath)
+        let lines: string[] | undefined
+        try {
+          lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/)
+        } catch {
+          node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
+        }
+        if (lines) {
+          node.tracePoint = this.rebindLineTracePoint(tp, lines)
         }
       }
 
-      // Recursively validate children
-      if (node.children && node.children.length > 0) {
-        for (const child of node.children) {
-          await validateNode(child)
-        }
+      for (const child of node.children) {
+        await validateNode(child)
       }
     }
 
-    // Validate all top-level nodes
     for (const node of nodes) {
       await validateNode(node)
+    }
+  }
+
+  /** Content-based LINE rebind (matches JetBrains / skill `trace_tree rebind`). */
+  rebindLineTracePoint(tp: TracePoint, lines: string[]): TracePoint {
+    const content = tp.lineContent?.trim()
+    if (!content) {
+      return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
+    }
+    const matches: number[] = []
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === content) matches.push(i + 1)
+    }
+    const total = matches.length
+    if (total === 0) {
+      return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
+    }
+    const oldLine = tp.lineNumber
+    let newLine: number
+    let newIndex: number
+    if (oldLine >= 1 && oldLine <= lines.length && lines[oldLine - 1].trim() === content) {
+      newLine = oldLine
+      newIndex = matches.indexOf(oldLine) + 1
+    } else if (total === 1) {
+      newLine = matches[0]
+      newIndex = 1
+    } else if (total === tp.totalOccurrences && tp.occurrenceIndex >= 1 && tp.occurrenceIndex <= total) {
+      newLine = matches[tp.occurrenceIndex - 1]
+      newIndex = tp.occurrenceIndex
+    } else {
+      newLine = matches.reduce((best, n) =>
+        Math.abs(n - oldLine) < Math.abs(best - oldLine) ? n : best
+      )
+      newIndex = matches.indexOf(newLine) + 1
+    }
+    return {
+      ...tp,
+      lineNumber: newLine,
+      totalOccurrences: total,
+      occurrenceIndex: newIndex,
+      isValid: true
+    }
+  }
+
+  async rebindLineNodesForPaths(relativePaths?: string[]): Promise<boolean> {
+    const paths =
+      relativePaths && relativePaths.length > 0
+        ? relativePaths
+        : [...this.fileNodesMap.keys()]
+    let changed = false
+    const root = this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!root) return false
+    for (const relativePath of paths) {
+      const nodes = this.fileNodesMap.get(relativePath)
+      if (!nodes) continue
+      const abs = path.join(root, relativePath)
+      let lines: string[]
+      try {
+        lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/)
+      } catch {
+        continue
+      }
+      for (const node of nodes) {
+        if (node.tracePoint.traceType !== 'LINE') continue
+        const rebound = this.rebindLineTracePoint(node.tracePoint, lines)
+        if (
+          rebound.lineNumber !== node.tracePoint.lineNumber ||
+          rebound.isValid !== node.tracePoint.isValid ||
+          rebound.occurrenceIndex !== node.tracePoint.occurrenceIndex
+        ) {
+          node.tracePoint = rebound
+          this.updateTreeItem(node)
+          changed = true
+        }
+      }
+    }
+    if (changed) {
+      this.applyHighlightsToAllEditors()
+      this.notifyListeners()
+      this.schedulePersist()
+    }
+    return changed
+  }
+
+  async reloadFromExternalStorage(_reason = 'manual'): Promise<boolean> {
+    if (this.shouldIgnoreExternalChanges()) return false
+    const doc = this.storage?.reloadBoundDocument()
+    if (!doc) return false
+    this.suppressPersist = true
+    try {
+      await this.applyDocument(doc)
+      this.notifyProfileListeners()
+      this.clearRefreshRequestFiles()
+    } finally {
+      this.suppressPersist = false
+    }
+    return true
+  }
+
+  async consumeSelectRequest(treeView: vscode.TreeView<vscode.TreeItem>): Promise<void> {
+    const root = this.workspaceRoot
+    if (!root) return
+    const candidates = [
+      ProjectIdFiles.vscodeSelectRequestPath(root),
+      ProjectIdFiles.ideaSelectRequestPath(root)
+    ]
+    let requestPath: string | undefined
+    let requestedIds: string[] = []
+    for (const candidate of candidates) {
+      if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue
+      try {
+        requestedIds = fs
+          .readFileSync(candidate, 'utf8')
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+        requestPath = candidate
+        break
+      } catch {
+        // try next
+      }
+    }
+    this.clearSelectRequestFiles()
+    if (!requestPath || requestedIds.length === 0) return
+
+    const resolved = requestedIds
+      .map((id) => this.getTracePointNodeById(id))
+      .filter((n): n is TracePointNode => !!n)
+    if (resolved.length === 0) return
+
+    await vscode.commands.executeCommand('codeTraceTree.view.focus')
+    const ids = resolved.map((n) => n.id)
+    for (const id of ids) {
+      const item = this.getTreeNodeById(id)
+      if (item) await treeView.reveal(item, { expand: true, select: false, focus: false })
+    }
+    const firstItem = this.getTreeNodeById(ids[0])
+    if (firstItem) {
+      await treeView.reveal(firstItem, { expand: true, select: true, focus: true })
+    }
+    this.selectTracePoints(ids)
+    if (resolved.length === 1) {
+      await this.navigateToTracePoint(resolved[0], treeView)
+    }
+  }
+
+  private clearRefreshRequestFiles() {
+    const root = this.workspaceRoot
+    if (!root) return
+    for (const p of [
+      ProjectIdFiles.vscodeRefreshRequestPath(root),
+      ProjectIdFiles.ideaRefreshRequestPath(root)
+    ]) {
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private clearSelectRequestFiles() {
+    const root = this.workspaceRoot
+    if (!root) return
+    for (const p of [
+      ProjectIdFiles.vscodeSelectRequestPath(root),
+      ProjectIdFiles.ideaSelectRequestPath(root)
+    ]) {
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p)
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -917,13 +1167,18 @@ export class TracePointService {
     treeView: vscode.TreeView<vscode.TreeItem>
   ) {
     const tp = tracePointNode.tracePoint
-    const fileUri = vscode.Uri.file(path.join(tp.projectPath, tp.filePath))
-    const doc = await vscode.workspace.openTextDocument(fileUri)
+    const targetUri = vscode.Uri.file(path.join(tp.projectPath, tp.tracePath))
+    if (tp.traceType === 'DIRECTORY') {
+      await vscode.commands.executeCommand('revealInExplorer', targetUri)
+      return
+    }
+    const doc = await vscode.workspace.openTextDocument(targetUri)
     const editor = await vscode.window.showTextDocument(doc)
-    const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0)
-    editor.selection = new vscode.Selection(range.start, range.end)
-    editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
-    // Re-select and focus the tree item to retain blue highlight
+    if (tp.traceType === 'LINE' && tp.lineNumber > 0) {
+      const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0)
+      editor.selection = new vscode.Selection(range.start, range.end)
+      editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
+    }
     const selected = treeView.selection
     if (selected.length == 1) {
       treeView.reveal(selected[0], { select: true, focus: true })
@@ -944,11 +1199,11 @@ export class TracePointService {
       const node = this.getTracePointNodeById(id)
       affectedParentNodes.add(this.getTracePointNodeById(node?.parentId))
       if (node) {
-        if (node.tracePoint.filePath) {
-          const arr = this.fileNodesMap.get(node.tracePoint.filePath)
+        if (node.tracePoint.tracePath) {
+          const arr = this.fileNodesMap.get(node.tracePoint.tracePath)
           if (arr) {
             this.fileNodesMap.set(
-              node.tracePoint.filePath,
+              node.tracePoint.tracePath,
               arr.filter((n) => n.id !== node.id)
             )
           }
@@ -1006,7 +1261,7 @@ export class TracePointService {
   }
 
   updateInFileNodesMap(prevFilePath: string, node: TracePointNode) {
-    if (prevFilePath == node.tracePoint.filePath) return
+    if (prevFilePath == node.tracePoint.tracePath) return
     // Remove the node from the previous node list
     const prevList = this.fileNodesMap.get(prevFilePath)
     if (prevList) {
@@ -1016,10 +1271,10 @@ export class TracePointService {
       }
     }
     // Add the node to the new file path
-    if (!this.fileNodesMap.has(node.tracePoint.filePath)) {
-      this.fileNodesMap.set(node.tracePoint.filePath, [])
+    if (!this.fileNodesMap.has(node.tracePoint.tracePath)) {
+      this.fileNodesMap.set(node.tracePoint.tracePath, [])
     }
-    this.fileNodesMap.get(node.tracePoint.filePath)!.push(node)
+    this.fileNodesMap.get(node.tracePoint.tracePath)!.push(node)
   }
   updateTreeItem(tracePointNode: TracePointNode) {
     // Determine collapsible state only from this profile's expanded ids
@@ -1031,7 +1286,8 @@ export class TracePointService {
         : vscode.TreeItemCollapsibleState.Collapsed
     }
     const tracePoint = tracePointNode.tracePoint
-    const label = `${tracePoint.name || ''} (${tracePoint.fileName}: ${tracePoint.lineNumber})`
+    const label = tracePoint.traceName || ''
+    const location = formatLocationSuffix(tracePoint)
     const prevItem = this.treeNodeMap.get(tracePointNode.id)
     if (prevItem) {
       prevItem.collapsibleState = collapsibleState
@@ -1041,27 +1297,27 @@ export class TracePointService {
     // Profile-scoped id prevents cross-profile expand/selection restore
     item.id = this.toTreeItemId(tracePointNode.id)
     item.contextValue = 'traceable'
-    item.description = tracePoint.description
-      ? tracePoint.description.length > 50
-        ? tracePoint.description.substring(0, 50) + '...'
-        : tracePoint.description
-      : ''
-    item.tooltip = undefined // Explicitly disable tooltip on hover
+    // VS Code renders description after the label with a space
+    item.description = location
     item.command = {
       command: 'codeTraceTree.goToTracePoint',
       title: 'Go to Trace Point',
       arguments: [item]
     }
 
+    const display = formatDisplayText(tracePoint)
     if (!tracePoint.isValid) {
       item.iconPath = new vscode.ThemeIcon(
         'circle-slash',
         new vscode.ThemeColor('disabledForeground')
       )
-      item.tooltip = 'This trace point is invalid or outdated.'
+      item.tooltip = `${display}\nThis trace point is invalid or outdated.`
+    } else if (tracePoint.description) {
+      item.iconPath = undefined
+      item.tooltip = `${display}\n${tracePoint.description}`
     } else {
       item.iconPath = undefined
-      item.tooltip = undefined
+      item.tooltip = display
     }
 
     this.treeNodeMap.set(tracePointNode.id, item)

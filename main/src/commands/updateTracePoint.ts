@@ -38,8 +38,8 @@ export function registerUpdateTracePoint(
       }
       const lineNumber = editor.selection.active.line + 1
       const lineContent = editor.document.lineAt(lineNumber - 1).text.trim()
-      const filePath = vscode.workspace.asRelativePath(editor.document.uri)
-      const fileName = path.basename(filePath)
+      const tracePath = vscode.workspace.asRelativePath(editor.document.uri)
+      const baseName = path.basename(tracePath)
       const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || ''
       const [totalOccurrences, matchingLines] = service.getLineOccurrences(
         editor.document,
@@ -52,11 +52,12 @@ export function registerUpdateTracePoint(
         const tp = service.getTracePointNodeById(service.resolveNodeId(treeItem.id))
         if (!tp) continue
         affectedParentNodes.add(service.getTracePointNodeById(tp.parentId))
-        const prevFilePath = tp.tracePoint.filePath
+        const prevPath = tp.tracePoint.tracePath
         tp.tracePoint = {
           ...tp.tracePoint,
-          fileName,
-          filePath,
+          traceType: 'LINE',
+          baseName,
+          tracePath,
           projectPath,
           lineNumber,
           lineContent,
@@ -66,7 +67,7 @@ export function registerUpdateTracePoint(
           description: undefined
         }
         service.updateTreeItem(tp)
-        service.updateInFileNodesMap(prevFilePath, tp)
+        service.updateInFileNodesMap(prevPath, tp)
       }
       service.applyHighlightsToAllEditors(editor)
       service.notifyListeners('refresh', affectedParentNodes)

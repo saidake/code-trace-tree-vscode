@@ -17,7 +17,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/constants'
-import { ProjectDocument, TraceProfile } from '../domain/types'
+import { ClaudeAssistTarget, ProjectDocument, TraceProfile } from '../domain/types'
 import {
   nodeFromXml,
   nodeToXml,
@@ -25,6 +25,13 @@ import {
   profileToXmlShape
 } from '../utils/traceProfileXml'
 import { asArray, parseXml, serializeXml } from '../utils/xmlUtils'
+
+function parseClaudeAssistTarget(raw: unknown): ClaudeAssistTarget {
+  const value = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+  return value === 'CLAUDE' ? 'CLAUDE' : 'CURRENT'
+}
 
 /** Parse project document XML (`data.xml` design, version 4). */
 export function parseProjectDocument(xml: string, storageFile?: string): ProjectDocument {
@@ -60,6 +67,10 @@ export function parseProjectDocument(xml: string, storageFile?: string): Project
     descriptionAreaOpened: String(root.descriptionAreaOpened) === 'true',
     highlightingEnabled:
       root.highlightingEnabled == null ? true : String(root.highlightingEnabled) === 'true',
+    namePromptEnabled:
+      root.namePromptEnabled == null ? true : String(root.namePromptEnabled) === 'true',
+    claudeAssistEnabled: String(root.claudeAssistEnabled) === 'true',
+    claudeAssistTarget: parseClaudeAssistTarget(root.claudeAssistTarget),
     storageFile
   }
 }
@@ -80,6 +91,9 @@ export function projectDocumentToXml(doc: ProjectDocument): string {
       updatedAt: String(doc.updatedAt),
       activeProfileName: doc.activeProfileName,
       highlightingEnabled: String(doc.highlightingEnabled),
+      namePromptEnabled: String(doc.namePromptEnabled),
+      claudeAssistEnabled: String(doc.claudeAssistEnabled),
+      claudeAssistTarget: doc.claudeAssistTarget,
       traceProfiles: {
         traceProfile: doc.profiles.map((p) => profileToXmlShape(p))
       },
