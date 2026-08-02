@@ -67,22 +67,37 @@ fi
 
 app_dir="$(global_app_dir)"
 project_id=""
-if [[ -f "$project_root/.idea/code-trace-tree.project.id" ]]; then
-  project_id="$(tr -d '[:space:]' < "$project_root/.idea/code-trace-tree.project.id")"
-elif [[ -f "$project_root/.vscode/code-trace-tree.project.id" ]]; then
+if [[ -f "$project_root/.vscode/code-trace-tree.project.id" ]]; then
   project_id="$(tr -d '[:space:]' < "$project_root/.vscode/code-trace-tree.project.id")"
+elif [[ -f "$project_root/.idea/code-trace-tree.project.id" ]]; then
+  project_id="$(tr -d '[:space:]' < "$project_root/.idea/code-trace-tree.project.id")"
 fi
 
 storage_xml=""
 if [[ -d "$app_dir" ]]; then
   if [[ -n "$project_id" ]]; then
-    while IFS= read -r -d '' xml; do
-      pid="$(xml_tag_value "$xml" "projectId")"
+    canonical="$app_dir/${project_id}.xml"
+    if [[ -f "$canonical" ]]; then
+      pid="$(xml_tag_value "$canonical" "projectId")"
       if [[ "$pid" == "$project_id" ]]; then
-        storage_xml="$xml"
-        break
+        storage_xml="$canonical"
       fi
-    done < <(find "$app_dir" -maxdepth 1 -type f -name '*.xml' -print0 | sort -z)
+    fi
+    # Legacy fallback: previous releases used <FolderName>.xml
+    if [[ -z "$storage_xml" ]]; then
+      while IFS= read -r -d '' xml; do
+        [[ "$xml" == "$canonical" ]] && continue
+        pid="$(xml_tag_value "$xml" "projectId")"
+        if [[ "$pid" == "$project_id" ]]; then
+          if [[ ! -e "$canonical" ]] && mv "$xml" "$canonical" 2>/dev/null; then
+            storage_xml="$canonical"
+          else
+            storage_xml="$xml"
+          fi
+          break
+        fi
+      done < <(find "$app_dir" -maxdepth 1 -type f -name '*.xml' -print0 | sort -z)
+    fi
   fi
 
   if [[ -z "$storage_xml" ]]; then

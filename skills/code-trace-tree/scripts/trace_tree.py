@@ -50,7 +50,7 @@ def global_app_dir() -> Path:
 
 
 def read_project_id(project_root: Path) -> str:
-    for rel in (".idea/code-trace-tree.project.id", ".vscode/code-trace-tree.project.id"):
+    for rel in (".vscode/code-trace-tree.project.id", ".idea/code-trace-tree.project.id"):
         p = project_root / rel
         if p.is_file():
             return p.read_text(encoding="utf-8").strip()
@@ -79,9 +79,25 @@ def resolve_storage(project_root: Path) -> Path:
     xmls = sorted(app_dir.glob("*.xml")) if app_dir.is_dir() else []
 
     if project_id:
+        canonical = app_dir / f"{project_id}.xml"
+        if canonical.is_file() and xml_tag_text(canonical, "projectId") == project_id:
+            return canonical
+        # Legacy fallback: previous releases used <FolderName>.xml
         for xml in xmls:
-            if xml_tag_text(xml, "projectId") == project_id:
-                return xml
+            try:
+                if xml.resolve() == canonical.resolve():
+                    continue
+            except OSError:
+                pass
+            if xml_tag_text(xml, "projectId") != project_id:
+                continue
+            if not canonical.exists():
+                try:
+                    xml.rename(canonical)
+                    return canonical
+                except OSError:
+                    pass
+            return xml
 
     target = normalize_path_key(str(project_root))
     for xml in xmls:

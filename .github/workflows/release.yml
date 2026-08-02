@@ -1,8 +1,8 @@
 # Build and Release
 #
-# Builds the VSIX and per-agent skill ZIPs, attaches them to the GitHub Release.
+# Builds the VSIX and shared agent skill ZIP, attaches them to the GitHub Release.
 # Triggered on push of a git tag matching v* (e.g. v1.0.0).
-# Attachments: plugin .vsix + code-trace-tree-skill-<agent>-X.Y.Z.zip
+# Attachments: plugin .vsix + code-trace-tree-skill-X.Y.Z.zip
 
 name: Build and Release
 
@@ -28,10 +28,6 @@ jobs:
           cache: yarn
           cache-dependency-path: main/yarn.lock
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
@@ -43,16 +39,21 @@ jobs:
       - name: Package extension
         run: npx --yes @vscode/vsce package
 
-      - name: Package agent skill ZIPs
+      - name: Package agent skill ZIP
         working-directory: .
         run: |
           set -euo pipefail
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          python skills/package_skills.py --zip --version "$VERSION"
+          mkdir -p dist/skills
+          rm -f dist/skills/code-trace-tree-skill-*.zip
+          (
+            cd skills
+            zip -r "../dist/skills/code-trace-tree-skill-${VERSION}.zip" code-trace-tree \
+              -x '*/__pycache__/*' '*.pyc' '*/.DS_Store'
+          )
           ls -la dist/skills/
-          unzip -l "dist/skills/code-trace-tree-skill-claude-${VERSION}.zip"
-          echo "SKILL_DIR=dist/skills" >> "$GITHUB_ENV"
+          unzip -l "dist/skills/code-trace-tree-skill-${VERSION}.zip"
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
@@ -60,7 +61,7 @@ jobs:
           name: code-trace-tree
           path: main/*.vsix
 
-      - name: Upload skill artifacts
+      - name: Upload skill artifact
         uses: actions/upload-artifact@v4
         with:
           name: code-trace-tree-skill
@@ -75,16 +76,16 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
           VSIX="$(ls main/*.vsix | head -n1)"
+          SKILL_ZIP="dist/skills/code-trace-tree-skill-${VERSION}.zip"
           TITLE="Code Trace Tree ${TAG}"
-          mapfile -t SKILL_ZIPS < <(ls dist/skills/code-trace-tree-skill-*.zip)
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$VSIX" "${SKILL_ZIPS[@]}" --clobber
+            gh release upload "$TAG" "$VSIX" "$SKILL_ZIP" --clobber
             gh release edit "$TAG" --title "$TITLE"
           else
             gh release create "$TAG" \
               --title "$TITLE" \
               --notes "" \
               "$VSIX" \
-              "${SKILL_ZIPS[@]}"
+              "$SKILL_ZIP"
           fi

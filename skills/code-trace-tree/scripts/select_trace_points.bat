@@ -35,10 +35,10 @@ exit /b 1
 
 :after_root
 set "PROJECT_ID="
-if exist "%PROJECT_ROOT%\.idea\code-trace-tree.project.id" (
-  set /p PROJECT_ID=<"%PROJECT_ROOT%\.idea\code-trace-tree.project.id"
-) else if exist "%PROJECT_ROOT%\.vscode\code-trace-tree.project.id" (
+if exist "%PROJECT_ROOT%\.vscode\code-trace-tree.project.id" (
   set /p PROJECT_ID=<"%PROJECT_ROOT%\.vscode\code-trace-tree.project.id"
+) else if exist "%PROJECT_ROOT%\.idea\code-trace-tree.project.id" (
+  set /p PROJECT_ID=<"%PROJECT_ROOT%\.idea\code-trace-tree.project.id"
 )
 if defined PROJECT_ID (
   for /f "tokens=* delims= " %%A in ("!PROJECT_ID!") do set "PROJECT_ID=%%A"

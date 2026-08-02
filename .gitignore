@@ -6,13 +6,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Generated from skills/code-trace-tree via: python skills/package_skills.py --sync
-.claude/skills/code-trace-tree/
-.cursor/skills/code-trace-tree/
-.github/skills/code-trace-tree/
-.agents/skills/code-trace-tree/
-.gemini/skills/code-trace-tree/
-
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 

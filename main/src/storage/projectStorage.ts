@@ -30,6 +30,10 @@ import * as ProjectIdFiles from './projectIdFiles'
 /**
  * Resolves and persists hybrid project storage (local project id + global XML).
  *
+ * Global file naming: `<projectId>.xml`.
+ * Legacy `FolderName.xml` files (previous releases) are still found by scanning
+ * `<projectId>` inside XML and best-effort renamed to the canonical name.
+ *
  * Resolution on project open:
  * - Case A: match by project id → update path/updatedAt
  * - Case B: match by path (copy-on-write) → new id + new XML file
@@ -96,7 +100,7 @@ export class ProjectStorage {
     const byPath = this.findDocumentByPath(this.projectBase)
     if (byPath) {
       const newId = uuidv4()
-      const newFile = this.allocateStorageFile(path.basename(this.projectBase))
+      const newFile = this.allocateStorageFile(newId)
       const copied: ProjectDocument = {
         version: PROJECT_DOCUMENT_VERSION,
         projectId: newId,
@@ -119,7 +123,7 @@ export class ProjectStorage {
 
     // Case C: new project
     const newId = uuidv4()
-    const newFile = this.allocateStorageFile(path.basename(this.projectBase))
+    const newFile = this.allocateStorageFile(newId)
     const fresh: ProjectDocument = {
       version: PROJECT_DOCUMENT_VERSION,
       projectId: newId,
@@ -186,17 +190,11 @@ export class ProjectStorage {
     this.boundProjectId = doc.projectId
   }
 
-  private allocateStorageFile(folderName: string): string {
+  /** Canonical global storage path: `<appDir>/<projectId>.xml`. */
+  private allocateStorageFile(projectId: string): string {
     const dir = resolveAppDir()
     fs.mkdirSync(dir, { recursive: true })
-    const safeName = (folderName || 'project').replace(/[<>:"/\\|?*]/g, '_')
-    let candidate = path.join(dir, `${safeName}.xml`)
-    let index = 1
-    while (fs.existsSync(candidate)) {
-      candidate = path.join(dir, `${safeName}-${index}.xml`)
-      index++
-    }
-    return candidate
+    return path.join(dir, `${projectId}.xml`)
   }
 
   private listProjectXmlFiles(): string[] {
@@ -209,18 +207,50 @@ export class ProjectStorage {
       .filter((file) => fs.statSync(file).isFile())
   }
 
+  /**
+   * Case A lookup:
+   * 1. Fast path — open `<projectId>.xml` when present
+   * 2. Legacy fallback — scan other `*.xml` for matching `<projectId>`
+   * 3. Best-effort rename legacy file → `<projectId>.xml`
+   */
   private findDocumentByProjectId(projectId: string): ProjectDocument | undefined {
+    const canonical = this.allocateStorageFile(projectId)
+
+    if (fs.existsSync(canonical) && fs.statSync(canonical).isFile()) {
+      try {
+        const doc = parseProjectFile(canonical)
+        if (doc.projectId === projectId) {
+          return { ...doc, storageFile: canonical }
+        }
+      } catch {
+        // Fall through to legacy scan
+      }
+    }
+
     for (const file of this.listProjectXmlFiles()) {
+      if (path.resolve(file) === path.resolve(canonical)) continue
       try {
         const doc = parseProjectFile(file)
-        if (doc.projectId === projectId) {
-          return { ...doc, storageFile: file }
-        }
+        if (doc.projectId !== projectId) continue
+        const migrated = this.migrateLegacyStorageFile(file, canonical)
+        return { ...doc, storageFile: migrated }
       } catch {
         // Skip unreadable storage files
       }
     }
     return undefined
+  }
+
+  /** Rename legacy FolderName.xml → projectId.xml when the target is free. */
+  private migrateLegacyStorageFile(legacyFile: string, canonicalFile: string): string {
+    if (path.resolve(legacyFile) === path.resolve(canonicalFile)) return legacyFile
+    if (fs.existsSync(canonicalFile)) return legacyFile
+    try {
+      fs.renameSync(legacyFile, canonicalFile)
+      return canonicalFile
+    } catch {
+      return legacyFile
+    }
   }
 
   private findDocumentByPath(absolutePath: string): ProjectDocument | undefined {

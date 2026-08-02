@@ -2,6 +2,10 @@
 ![Build](https://github.com/saidake/code-trace-tree-vscode/workflows/Build/badge.svg)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%20v3%20or%20later-blue.svg)](./LICENSE)
 
+<img src="docs/assets/logo.png" width="100" alt="Code Trace Tree logo">
+
+----
+
 <!-- Plugin description -->
 <p>
   Code Trace Tree is a VS Code extension that lets you trace code in a tree structure.
@@ -10,15 +14,11 @@
 <p>
   Pair it with the Agent Skill so Claude Code, Cursor, GitHub Copilot, Codex, or Gemini CLI can search,
   add, move, and rebind traces, refresh the IDE, and—when <b>Agent Notes</b> is enabled—auto-sync
-  topic-related workflow points as you discuss code.
+  topic-related workflow points as you discuss code.<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately first, then
   add the Code Trace Tree skill.
 </p>
 <!-- Plugin description end -->
-
-<img src="docs/assets/logo.png" width="100">
-
-----
 
 <!-- Plugin description -->
 <h1>Agent Skill</h1>
@@ -50,15 +50,15 @@
   Resolve / refresh / select helper scripts are plain shell or batch and do not need Python.
 </p>
 <p>
-  Shared skill source in this repo: <code>skills/code-trace-tree/</code>.
-  Release zips are built with <code>python skills/package_skills.py --zip</code>.
+  Shared skill source in this repo: <code>skills/code-trace-tree/</code>
+  (same package for every agent; only the extract path differs).
+  Releases attach <code>code-trace-tree-skill-&lt;version&gt;.zip</code>.
 </p>
 
 <h2>Install skill — extract locations</h2>
 <p>
-  Download <code>code-trace-tree-skill-&lt;agent&gt;-X.Y.Z.zip</code> from the GitHub Release
-  (for example <code>code-trace-tree-skill-claude-0.0.1.zip</code>,
-  <code>code-trace-tree-skill-cursor-0.0.1.zip</code>).
+  Download <code>code-trace-tree-skill-0.0.1.zip</code> from the GitHub Release
+  (one zip for all agents).
   Remove any existing <code>code-trace-tree</code> skill folder first, then extract into the
   skills directory for your agent:
 </p>
@@ -75,6 +75,24 @@
   </tbody>
 </table>
 
+<h2>Install example (Claude Code, Linux &amp; macOS)</h2>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v0.0.1/code-trace-tree-skill-0.0.1.zip -o code-trace-tree-skill-0.0.1.zip</code>
+<code>rm -rf ~/.claude/skills/code-trace-tree</code>
+<code>mkdir -p ~/.claude/skills</code>
+<code>unzip code-trace-tree-skill-0.0.1.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-0.0.1.zip</code>
+</pre>
+<p>Project-local: extract into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and extract into that agent’s folder from the table above.</p>
+
+<h2>Install example (Claude Code, Windows PowerShell)</h2>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v0.0.1/code-trace-tree-skill-0.0.1.zip" -OutFile "code-trace-tree-skill-0.0.1.zip"</code>
+<code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
+<code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-0.0.1.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-0.0.1.zip"</code>
+</pre>
+<p>Project-local: extract into <code>.claude\skills\</code>. For Cursor / Copilot / Codex / Gemini, use the same zip and change the destination path using the table above.</p>
+
 <h1>Storage</h1>
 <p>Trace data is stored in a shared global folder:</p>
 <ul>
@@ -82,20 +100,6 @@
   <li>macOS: <code>~/Library/Application Support/code-trace-tree</code></li>
   <li>Linux: <code>$XDG_CONFIG_HOME/code-trace-tree</code> or <code>~/.config/code-trace-tree</code></li>
 </ul>
-<p>
-  Each project keeps only a small id file under <code>.vscode/code-trace-tree.project.id</code>
-  (falls back to <code>.idea/code-trace-tree.project.id</code> when present).
-  Old unused XML files are not deleted automatically — remove them from that folder if you no longer need them.
-</p>
-<p>
-  External agents can edit the global XML and ask the IDE to reload by writing
-  <code>signals/&lt;projectId&gt;.request_refresh</code> under the global storage folder
-  (or by saving the XML while the project is open).
-  To select nodes in the view (and navigate when exactly one id is listed), write one
-  node UUID per line to <code>signals/&lt;projectId&gt;.select_trace_points</code>.
-  Signal files expire after 60 seconds. All open IDE windows for that project watch the same
-  signals folder. See <code>skills/code-trace-tree/</code> for the shared agent skill and helper scripts.
-</p>
 <!-- Plugin description end -->
 
 # Development
@@ -103,9 +107,7 @@
 - Open the project root in VS Code / Cursor
 - Install deps: `cd main && yarn install`
 - Press **F5** to launch an Extension Development Host
-- Shared agent skill source: `skills/code-trace-tree/` (see [skills/README.md](skills/README.md))
-  - Package zips: `python skills/package_skills.py --zip`
-  - Sync into local agent dirs: `python skills/package_skills.py --sync`
+- Shared agent skill source: `skills/code-trace-tree/`
 
 # License
 

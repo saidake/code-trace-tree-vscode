@@ -43,10 +43,10 @@ if defined LOCALAPPDATA (
 )
 
 set "PROJECT_ID="
-if exist "%PROJECT_ROOT%\.idea\code-trace-tree.project.id" (
-  set /p PROJECT_ID=<"%PROJECT_ROOT%\.idea\code-trace-tree.project.id"
-) else if exist "%PROJECT_ROOT%\.vscode\code-trace-tree.project.id" (
+if exist "%PROJECT_ROOT%\.vscode\code-trace-tree.project.id" (
   set /p PROJECT_ID=<"%PROJECT_ROOT%\.vscode\code-trace-tree.project.id"
+) else if exist "%PROJECT_ROOT%\.idea\code-trace-tree.project.id" (
+  set /p PROJECT_ID=<"%PROJECT_ROOT%\.idea\code-trace-tree.project.id"
 )
 if defined PROJECT_ID (
   for /f "tokens=* delims= " %%A in ("!PROJECT_ID!") do set "PROJECT_ID=%%A"
@@ -56,13 +56,38 @@ set "STORAGE_XML="
 if not exist "%APP_DIR%\" goto print_result
 
 if defined PROJECT_ID (
-  for %%F in ("%APP_DIR%\*.xml") do (
-    if not defined STORAGE_XML (
-      for /f "usebackq tokens=*" %%L in (`findstr /i /c:"<projectId>" "%%~fF"`) do (
-        set "LINE=%%L"
-        set "LINE=!LINE:*<projectId>=!"
-        for /f "delims=<" %%V in ("!LINE!") do set "PID=%%V"
-        if /I "!PID!"=="!PROJECT_ID!" set "STORAGE_XML=%%~fF"
+  set "CANONICAL=%APP_DIR%\%PROJECT_ID%.xml"
+  if exist "!CANONICAL!" (
+    for /f "usebackq tokens=*" %%L in (`findstr /i /c:"<projectId>" "!CANONICAL!"`) do (
+      set "LINE=%%L"
+      set "LINE=!LINE:*<projectId>=!"
+      for /f "delims=<" %%V in ("!LINE!") do set "PID=%%V"
+      if /I "!PID!"=="!PROJECT_ID!" set "STORAGE_XML=!CANONICAL!"
+    )
+  )
+  REM Legacy fallback: previous releases used FolderName.xml
+  if not defined STORAGE_XML (
+    for %%F in ("%APP_DIR%\*.xml") do (
+      if not defined STORAGE_XML (
+        if /I not "%%~fF"=="!CANONICAL!" (
+          for /f "usebackq tokens=*" %%L in (`findstr /i /c:"<projectId>" "%%~fF"`) do (
+            set "LINE=%%L"
+            set "LINE=!LINE:*<projectId>=!"
+            for /f "delims=<" %%V in ("!LINE!") do set "PID=%%V"
+            if /I "!PID!"=="!PROJECT_ID!" (
+              if not exist "!CANONICAL!" (
+                move /Y "%%~fF" "!CANONICAL!" >nul 2>&1
+                if exist "!CANONICAL!" (
+                  set "STORAGE_XML=!CANONICAL!"
+                ) else (
+                  set "STORAGE_XML=%%~fF"
+                )
+              ) else (
+                set "STORAGE_XML=%%~fF"
+              )
+            )
+          )
+        )
       )
     )
   )

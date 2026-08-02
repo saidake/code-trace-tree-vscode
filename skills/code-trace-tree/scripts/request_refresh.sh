@@ -46,10 +46,10 @@ if [[ -z "${project_root:-}" ]]; then
 fi
 
 project_id=""
-if [[ -f "$project_root/.idea/code-trace-tree.project.id" ]]; then
-  project_id="$(tr -d '[:space:]' < "$project_root/.idea/code-trace-tree.project.id")"
-elif [[ -f "$project_root/.vscode/code-trace-tree.project.id" ]]; then
+if [[ -f "$project_root/.vscode/code-trace-tree.project.id" ]]; then
   project_id="$(tr -d '[:space:]' < "$project_root/.vscode/code-trace-tree.project.id")"
+elif [[ -f "$project_root/.idea/code-trace-tree.project.id" ]]; then
+  project_id="$(tr -d '[:space:]' < "$project_root/.idea/code-trace-tree.project.id")"
 fi
 if [[ -z "$project_id" ]]; then
   echo "ERROR: no project id file. Open the project once in the IDE with the plugin installed." >&2
