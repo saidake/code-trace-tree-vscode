@@ -50,7 +50,7 @@ def global_app_dir() -> Path:
 
 
 def read_project_id(project_root: Path) -> str:
-    for rel in (".vscode/code-trace-tree.project.id", ".idea/code-trace-tree.project.id"):
+    for rel in (".idea/code-trace-tree.project.id", ".vscode/code-trace-tree.project.id"):
         p = project_root / rel
         if p.is_file():
             return p.read_text(encoding="utf-8").strip()
@@ -1021,14 +1021,29 @@ def signals_dir() -> Path:
     return global_app_dir() / "signals"
 
 
-def request_refresh(project_root: Path) -> None:
+def request_refresh(project_root: Path) -> Optional[Path]:
     project_id = read_project_id(project_root)
     if not project_id:
-        return
+        return None
     dest = signals_dir()
     dest.mkdir(parents=True, exist_ok=True)
     req = dest / f"{project_id}.request_refresh"
     req.write_text(str(int(time.time() * 1000)) + "\n", encoding="utf-8")
+    return req
+
+
+def request_select(project_root: Path, ids: Sequence[str]) -> Path:
+    project_id = read_project_id(project_root)
+    if not project_id:
+        raise SystemExit(
+            "ERROR: no project id file. Open the project once in the IDE with the plugin installed."
+        )
+    dest = signals_dir()
+    dest.mkdir(parents=True, exist_ok=True)
+    req = dest / f"{project_id}.select_trace_points"
+    lines = [i.strip() for i in ids if i and i.strip()]
+    req.write_text(("\n".join(lines) + ("\n" if lines else "")), encoding="utf-8")
+    return req
 
 
 def load_context(project: Optional[str], profile: Optional[str]):
