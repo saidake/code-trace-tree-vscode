@@ -13,10 +13,11 @@
 </p>
 <p>
   Pair it with the Agent Skill so Claude Code, Cursor, GitHub Copilot, Codex, or Gemini CLI can search,
-  add, move, and rebind traces, refresh the IDE, and—when <b>Agent Notes</b> is enabled—auto-sync
-  topic-related workflow points as you discuss code.<br/>
-  This extension does <b>not</b> include an AI agent; install your preferred agent separately first, then
-  add the Code Trace Tree skill.
+  add, move, and rebind traces, refresh the IDE, and—when <b>Agent Notes</b> is enabled and the
+  <code>code-trace-tree</code> skill is <b>loaded</b>—auto-sync topic-related workflow points as you
+  discuss code.<br/>
+  This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
+  install and load the Code Trace Tree skill.
 </p>
 <!-- Plugin description end -->
 
@@ -57,8 +58,9 @@
 
 <h1>Agent Skill</h1>
 <p>
-  This extension does <b>not</b> ship an AI agent. Install one of the supported agents first, then add the
-  Code Trace Tree skill so the agent can talk to the extension.
+  This extension does <b>not</b> ship an AI agent. Install one of the supported agents first, then install
+  the Code Trace Tree skill and ensure it is <b>loaded</b> in the agent session so the agent can talk
+  to the extension. <b>Agent Notes</b> only auto-syncs when that skill is loaded.
 </p>
 <p>Supported agents:</p>
 <ul>
@@ -75,7 +77,7 @@
   <li>Rebind line locations after source edits on disk</li>
   <li>Ask the IDE to reload / refresh extension data</li>
   <li>Select or navigate to nodes in the Code Trace Tree view</li>
-  <li>Auto-sync topic-related traces when <b>Agent Notes</b> is enabled in the IDE</li>
+  <li>Auto-sync topic-related traces when <b>Agent Notes</b> is enabled and this skill is loaded</li>
 </ul>
 <p>
   <b>Python required:</b> the main skill ops (<code>trace_tree</code> search / add / move / delete / rebind)
@@ -91,7 +93,7 @@
 
 <h2>Install skill — extract locations</h2>
 <p>
-  Download <code>code-trace-tree-skill-1.1.5.zip</code> from the GitHub Release
+  Download <code>code-trace-tree-skill-1.1.6.zip</code> from the GitHub Release
   (one zip for all agents).
   Remove any existing <code>code-trace-tree</code> skill folder first, then extract into the
   skills directory for your agent:
@@ -110,20 +112,20 @@
 </table>
 
 <h2>Install example (Claude Code, Linux &amp; macOS)</h2>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.1.5/code-trace-tree-skill-1.1.5.zip -o code-trace-tree-skill-1.1.5.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.1.6/code-trace-tree-skill-1.1.6.zip -o code-trace-tree-skill-1.1.6.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.1.5.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.1.5.zip</code>
+<code>unzip code-trace-tree-skill-1.1.6.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.1.6.zip</code>
 </pre>
 <p>Project-local: extract into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and extract into that agent’s folder from the table above.</p>
 
 <h2>Install example (Claude Code, Windows PowerShell)</h2>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.1.5/code-trace-tree-skill-1.1.5.zip" -OutFile "code-trace-tree-skill-1.1.5.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.1.6/code-trace-tree-skill-1.1.6.zip" -OutFile "code-trace-tree-skill-1.1.6.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.1.5.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.1.5.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.1.6.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.1.6.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code>. For Cursor / Copilot / Codex / Gemini, use the same zip and change the destination path using the table above.</p>
 

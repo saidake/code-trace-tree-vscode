@@ -266,7 +266,7 @@ Editing the global XML alone is usually enough (the plugin watches it). Always w
 
 ## Agent Notes action
 
-The IDE toolbar toggle **Agent Notes** (storage flags `claudeAssistEnabled` / `claudeAssistTarget` below) applies to any agent using this skill. This plugin does not include an AI agent.
+The IDE toolbar toggle **Agent Notes** (storage flags `claudeAssistEnabled` / `claudeAssistTarget` below) applies only when this skill is **loaded** in the agent session. The plugin/extension does not include an AI agent.
 
 Check project XML flags after resolving storage:
 

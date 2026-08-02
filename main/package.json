@@ -2,7 +2,7 @@
   "name": "code-trace-tree",
   "displayName": "Code Trace Tree",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "publisher": "CraigBrown",
   "license": "GPL-3.0-or-later",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
@@ -112,7 +112,7 @@
       },
       {
         "command": "codeTraceTree.toggleClaudeAssist",
-        "title": "Agent Notes: allow an external AI agent to auto-sync topic-related traces when it touches code. This extension does not include an AI agent—install Claude Code, Cursor, Copilot, Codex, or Gemini separately and add the Code Trace Tree skill.",
+        "title": "Agent Notes: allow an external AI agent with the code-trace-tree skill loaded to auto-sync topic-related traces when it touches code. Prerequisite: skill loaded in the agent session. This extension does not include an AI agent—install one separately, then install and load the skill.",
         "shortTitle": "Agent Notes",
         "icon": "$(lightbulb)",
         "enablement": "view == codeTraceTree.view"

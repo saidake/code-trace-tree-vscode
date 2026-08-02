@@ -17,8 +17,9 @@
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 
-const AGENT_NOTES_NO_AI =
-  'This extension does not include an AI agent—install one separately and add the Code Trace Tree skill.'
+const AGENT_NOTES_PREREQ =
+  'Prerequisite: the code-trace-tree skill must be loaded in the agent session. ' +
+  'This extension does not include an AI agent—install one separately, then install and load the skill.'
 
 export function registerToggleClaudeAssist(
   context: vscode.ExtensionContext,
@@ -28,7 +29,7 @@ export function registerToggleClaudeAssist(
     vscode.commands.registerCommand('codeTraceTree.toggleClaudeAssist', async () => {
       if (service.isClaudeAssistEnabled()) {
         service.setClaudeAssistEnabled(false)
-        vscode.window.showInformationMessage(`Agent Notes disabled. ${AGENT_NOTES_NO_AI}`)
+        vscode.window.showInformationMessage(`Agent Notes disabled. ${AGENT_NOTES_PREREQ}`)
         return
       }
 
@@ -48,8 +49,9 @@ export function registerToggleClaudeAssist(
         {
           title: 'Enable Agent Notes',
           placeHolder:
-            'External AI agent may sync topic-related traces each turn that touched code. ' +
-            AGENT_NOTES_NO_AI
+            'When on, an external AI agent with the code-trace-tree skill loaded may sync ' +
+            'topic-related traces each turn that touched code. ' +
+            AGENT_NOTES_PREREQ
         }
       )
       if (!choice) return
@@ -57,7 +59,7 @@ export function registerToggleClaudeAssist(
       const targetLabel =
         choice.target === 'AGENT' ? 'AGENT profile' : 'current profile'
       vscode.window.showInformationMessage(
-        `Agent Notes enabled (${targetLabel}). ${AGENT_NOTES_NO_AI}`
+        `Agent Notes enabled (${targetLabel}). ${AGENT_NOTES_PREREQ}`
       )
     })
   )
