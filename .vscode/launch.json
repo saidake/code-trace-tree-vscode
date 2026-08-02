@@ -13,6 +13,20 @@
         "${workspaceFolder}/main/out/**/*.js"
       ],
       "sourceMaps": true,
+      "preLaunchTask": "compile"
+    },
+    {
+      "name": "Run Extension (watch)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/main"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/main/out/**/*.js"
+      ],
+      "sourceMaps": true,
       "preLaunchTask": "watch"
     }
   ]

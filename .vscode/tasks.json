@@ -2,6 +2,22 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "compile",
+      "type": "npm",
+      "script": "compile",
+      "path": "main/",
+      "problemMatcher": "$tsc",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
       "label": "watch",
       "type": "npm",
       "script": "watch",
@@ -14,17 +30,6 @@
         "showReuseMessage": false,
         "clear": false
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
-    },
-    {
-      "label": "compile",
-      "type": "npm",
-      "script": "compile",
-      "path": "main/",
-      "problemMatcher": "$tsc",
       "group": "build"
     }
   ]

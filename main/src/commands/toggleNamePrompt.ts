@@ -23,7 +23,11 @@ export function registerToggleNamePrompt(
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.toggleNamePrompt', () => {
-      service.setNamePromptEnabled(!service.isNamePromptEnabled())
+      const enabled = !service.isNamePromptEnabled()
+      service.setNamePromptEnabled(enabled)
+      vscode.window.showInformationMessage(
+        `Prompt for name ${enabled ? 'enabled' : 'disabled'}.`
+      )
     })
   )
 }

@@ -98,18 +98,21 @@
       },
       {
         "command": "codeTraceTree.toggleHighlights",
-        "title": "Toggle Highlights",
+        "title": "Toggle the visibility of trace point highlights in files",
+        "shortTitle": "Toggle Highlights",
         "icon": "$(eye)"
       },
       {
         "command": "codeTraceTree.toggleNamePrompt",
-        "title": "Prompt for Name",
+        "title": "When enabled, ask for a name when creating a trace point; when disabled, create with an empty name",
+        "shortTitle": "Prompt for Name",
         "icon": "$(edit)",
         "enablement": "view == codeTraceTree.view"
       },
       {
         "command": "codeTraceTree.toggleClaudeAssist",
-        "title": "Agent Notes",
+        "title": "Agent Notes: allow an external AI agent to auto-sync topic-related traces when it touches code. This extension does not include an AI agent—install Claude Code, Cursor, Copilot, Codex, or Gemini separately and add the Code Trace Tree skill.",
+        "shortTitle": "Agent Notes",
         "icon": "$(lightbulb)",
         "enablement": "view == codeTraceTree.view"
       },

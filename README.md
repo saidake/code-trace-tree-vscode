@@ -9,7 +9,7 @@
 <!-- Plugin description -->
 <p>
   Code Trace Tree is a VS Code extension that lets you trace code in a tree structure.
-  Double-click any trace point to navigate to its source, with full support for hierarchical parent-child structure.
+  Double-click any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
   Pair it with the Agent Skill so Claude Code, Cursor, GitHub Copilot, Codex, or Gemini CLI can search,
@@ -21,6 +21,36 @@
 <!-- Plugin description end -->
 
 <!-- Plugin description -->
+<h1>How to use</h1>
+<ol>
+  <li>Open the <b>Code Trace Tree</b> activity bar view.</li>
+  <li>Use the <b>Profile</b> webview above the tree to switch trees, add a profile, or delete one.</li>
+  <li>In the editor, right-click a line and choose:
+    <ul>
+      <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree</li>
+      <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree</li>
+      <li><b>Update Selected Trace Points</b> — move the selected tree node(s) to the current line</li>
+      <li><b>Go to the Trace Point in the tree panel</b> — shown when the current line is a highlighted trace point; selects and reveals that node in the tree</li>
+    </ul>
+  </li>
+  <li>In the <b>Explorer</b>, right-click a file or directory and choose:
+    <ul>
+      <li><b>Create a Root File/Directory Trace Point</b> — add a file or directory node at the root</li>
+      <li><b>Create File/Directory Trace Point (Under selected)</b> — add that file/directory under the selected tree node(s)</li>
+    </ul>
+  </li>
+  <li>Double-click a node in the tree to jump to that location (line, file, or Explorer for directories).</li>
+  <li>Right-click a node and choose <b>Copy Trace Point Text</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
+  <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions.</li>
+</ol>
+<p>
+  <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),
+  not generic lines like <code>}</code> or <code>return;</code>.
+  The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
+  When the same trimmed text appears more than once, agents must pass <code>--line</code> (or
+  <code>[file, line, content]</code>) so each occurrence can be a distinct tip.
+</p>
+
 <h1>Agent Skill</h1>
 <p>
   This extension does <b>not</b> ship an AI agent. Install one of the supported agents first, then add the
@@ -39,7 +69,7 @@
   <li>Resolve the bound global storage XML for the project</li>
   <li>Search, add, move, and delete trace points</li>
   <li>Rebind line locations after source edits on disk</li>
-  <li>Ask the IDE to reload / refresh plugin data</li>
+  <li>Ask the IDE to reload / refresh extension data</li>
   <li>Select or navigate to nodes in the Code Trace Tree view</li>
   <li>Auto-sync topic-related traces when <b>Agent Notes</b> is enabled in the IDE</li>
 </ul>
@@ -100,6 +130,13 @@
   <li>macOS: <code>~/Library/Application Support/code-trace-tree</code></li>
   <li>Linux: <code>$XDG_CONFIG_HOME/code-trace-tree</code> or <code>~/.config/code-trace-tree</code></li>
 </ul>
+<p>
+  Each project uses <code>&lt;projectId&gt;.xml</code> in that folder
+  (legacy <code>&lt;FolderName&gt;.xml</code> files from older releases are still resolved and
+  renamed when found). The project id is stored in
+  <code>.vscode/code-trace-tree.project.id</code>
+  (falls back to <code>.idea/code-trace-tree.project.id</code>).
+</p>
 <!-- Plugin description end -->
 
 # Development
