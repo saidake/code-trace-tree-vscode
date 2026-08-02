@@ -202,7 +202,7 @@ REM After editing source on disk:
 "<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" rebind --file src\A.java
 ```
 
-Default profile: Agent Notes target when enabled (`AGENT` / active); otherwise `<activeProfileName>`.
+Default profile when Agent Notes is enabled: `AGENT` if `<claudeAssistTarget>` is `AGENT`, else `<activeProfileName>` (`CURRENT`). Otherwise `<activeProfileName>`.
 
 **Rebind after disk edits:** Claude does not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `trace_tree rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences.
 
@@ -270,12 +270,12 @@ Check project XML flags after resolving storage:
 
 | Flag | Meaning |
 |------|---------|
-| `claudeAssistEnabled` | `true` → the agent may auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
-| `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `AGENT` → edit/create profile named `AGENT` (legacy `CLAUDE` is migrated) |
+| `claudeAssistEnabled` | Storage key for the **Agent Notes** toggle. `true` → the agent may auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
+| `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `AGENT` → edit/create profile named **`AGENT`**. Only these two values are valid today. |
 
 When **enabled** and the current turn **touched code** (read, edited, or discussed concrete source for the topic):
 
-1. Resolve the target profile (`CURRENT` or `AGENT`; `trace_tree` honors assist flags by default).
+1. Resolve the target profile (`CURRENT` → active name, or `AGENT`; `trace_tree` honors assist flags by default).
 2. Use `trace_tree add` / `move` / `delete` for the **discussed topic** only (follow Preferred code workflow format). Prefer scripts over hand-editing occurrence fields.
 3. After modifying source files, run `trace_tree rebind` (with `--file` for touched paths when possible) so LINE locations track the new text.
 4. Add short `--description` notes when extra context helps; keep `--name` concise.
