@@ -112,7 +112,7 @@ Line comparisons always use trimmed text: `documentLine.trim() == lineContent.tr
 
 For agent-written `LINE` nodes:
 
-1. Prefer `scripts/trace_tree.py` (`add` / `move` / `delete` / `rebind`) with locator `[file, content]` or `[file, line, content]` — do **not** pass occurrence fields.
+1. Prefer `scripts/trace_tree.py` (`add` / `move` / `delete` / `rebind`) with locator `[file, content]` or `[file, line, content]` — do **not** pass occurrence fields. For parents, prefer repeated `--parent-id` (shell-safe on bash and Windows) over `--parent` JSON.
 2. The script stores **trimmed** `lineContent`, verifies the line text, then sets `totalOccurrences` / `occurrenceIndex` by scanning the file.
 3. When the same trimmed text appears more than once in a file, pass `--line` / `[file, line, content]`. Idempotent add keys on file + content + `occurrenceIndex`, so each occurrence can be a separate node.
 4. After agent edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).

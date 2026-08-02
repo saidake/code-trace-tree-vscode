@@ -221,6 +221,36 @@ def parse_parent_path(raw: Optional[str]) -> List[NodeRef]:
     return [parse_node_ref(item) for item in data]
 
 
+def parent_refs_from_args(args: argparse.Namespace, *, required: bool) -> List[NodeRef]:
+    """Prefer repeated --parent-id (shell-safe); optional --parent JSON for locators.
+
+    Do not mix --parent-id and --parent. Omit both on add → root. On move, one form
+    is required (`--parent []` for root).
+    """
+    ids = getattr(args, "parent_ids", None)
+    raw = getattr(args, "parent", None)
+    if ids and raw is not None:
+        raise SystemExit(
+            "ERROR: use either repeated --parent-id or --parent, not both"
+        )
+    if ids is not None:
+        refs: List[NodeRef] = []
+        for pid in ids:
+            text = (pid or "").strip()
+            if not text:
+                raise SystemExit("ERROR: empty --parent-id")
+            refs.append(NodeRef(id=text))
+        return refs
+    if raw is not None:
+        return parse_parent_path(raw)
+    if required:
+        raise SystemExit(
+            "ERROR: move requires --parent-id ID [--parent-id ID ...] "
+            "or --parent JSON (use --parent [] for root)"
+        )
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Occurrences + source resolution (script-only; Claude never supplies these)
 # ---------------------------------------------------------------------------
@@ -1091,7 +1121,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
         args.project, args.profile
     )
-    parent_path = parse_parent_path(args.parent)
+    parent_path = parent_refs_from_args(args, required=False)
     parent = resolve_parent_path(roots_el, parent_path)
     parent_id = child_text(parent, "id") if parent is not None else ""
 
@@ -1255,7 +1285,7 @@ def cmd_move(args: argparse.Namespace) -> int:
         args.project, args.profile
     )
     node, container, _old_parent = resolve_target_node(roots_el, args, project_root)
-    parent_path = parse_parent_path(args.parent)
+    parent_path = parent_refs_from_args(args, required=True)
     new_parent = resolve_parent_path(roots_el, parent_path)
 
     moved_ids = set(collect_descendant_ids(node))
@@ -1518,12 +1548,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("--line", type=int)
     p_add.add_argument("--content")
     p_add.add_argument(
-        "--parent",
-        default="[]",
+        "--parent-id",
+        action="append",
+        dest="parent_ids",
+        default=None,
+        metavar="ID",
         help=(
-            'JSON parent path: ids and/or ["file","content"] / '
-            '["file",line,"content"] from rootward → parent. [] = root. '
-            'Prefer ids from search when available.'
+            "Parent node UUID; repeat rootward → immediate parent "
+            "(shell-safe; preferred over --parent). Omit for root."
+        ),
+    )
+    p_add.add_argument(
+        "--parent",
+        default=None,
+        help=(
+            'Optional JSON parent path: ids and/or ["file","content"] / '
+            '["file",line,"content"]. Prefer repeated --parent-id. '
+            "Do not combine with --parent-id."
         ),
     )
     p_add.add_argument("--name", default="")
@@ -1538,11 +1579,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_locator_flags(p_move)
     p_move.add_argument(
+        "--parent-id",
+        action="append",
+        dest="parent_ids",
+        default=None,
+        metavar="ID",
+        help=(
+            "New parent node UUID; repeat rootward → immediate parent "
+            "(shell-safe; preferred). For root, use --parent [] instead."
+        ),
+    )
+    p_move.add_argument(
         "--parent",
-        required=True,
+        default=None,
         help=(
             'JSON parent path (use [] for root): ids and/or '
-            '["file","content"] / ["file",line,"content"]'
+            '["file","content"] / ["file",line,"content"]. '
+            "Prefer repeated --parent-id. Do not combine with --parent-id."
         ),
     )
     p_move.set_defaults(func=cmd_move)

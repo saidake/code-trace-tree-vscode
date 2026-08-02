@@ -127,20 +127,36 @@ JSON output includes `resolve: { reason, needle, resolved, totalOccurrences, occ
 
 ### Parent path
 
-`--parent` is a JSON array from rootward ancestor → immediate parent (`[]` = root). Each step may be:
+**Preferred (bash and Windows):** repeat `--parent-id` from rootward ancestor → immediate parent. Omit for root on `add`. Works the same in `.sh` / `.bat` / PowerShell (no JSON quoting).
+
+```bash
+# Child of one node:
+… trace_tree.sh add … --parent-id "$PARENT_ID"
+# Deeper path (rootward → parent):
+… trace_tree.sh add … --parent-id "$ID_A" --parent-id "$ID_B"
+```
+
+```bat
+…\trace_tree.bat add … --parent-id %PARENT_ID%
+…\trace_tree.bat add … --parent-id %ID_A% --parent-id %ID_B%
+…\trace_tree.bat move --id %NODE_ID% --parent []
+```
+
+Optional `--parent` JSON (do **not** combine with `--parent-id`) for locator forms or root on `move`:
 
 | Form | Example |
 |------|---------|
-| Node id (preferred) | `"3d41c2d1-…"` |
-| `[file, content]` | `["src/A.java", "void methodA() {"]` — only when content is unique |
-| `[file, line, content]` | `["src/A.java", 10, "void methodA() {"]` — required when content repeats |
+| Root | `--parent []` (needed for `move` to root; `add` defaults to root) |
+| Node id in JSON | `--parent '["3d41c2d1-…"]'` |
+| `[file, content]` | `--parent '[["src/A.java","void methodA() {"]]'` — only when content is unique |
+| `[file, line, content]` | `--parent '[["src/A.java",10,"void methodA() {"]]'` — when content repeats |
 
-Bare strings are **UUIDs only**, not `traceName` labels. Prefer **ids from a prior `search`/`add`**.
+Bare strings inside `--parent` JSON are **UUIDs only**, not `traceName` labels. Prefer **`--parent-id` from a prior `search`/`add`**.
 
 ```text
 method A def
   method B call
-    method B def   ← add with parent [idA, idB]  or  [[file,"…A…"],[file,"…B…"]]
+    method B def   ← add with --parent-id idA --parent-id idB
 ```
 
 **CLI shape:** `trace_tree.py <subcommand> [flags…]`  
@@ -161,9 +177,10 @@ bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" search
 bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add --file src/A.java --content '.handleEmailTriggerRequest(' --name 'handleEmail'
 bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add --file src/A.java --line 10 --content 'void methodA() {' --name 'methodA'
 bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add src/B.java 40 'void methodB() {' \
-  --parent '["'"$PARENT_ID"'"]' \
+  --parent-id "$PARENT_ID" \
   --name 'methodB'
-# or without ids: --parent '[["src/A.java","void methodA() {"],["src/A.java","methodB();"]]'
+bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add --file src/C.java --line 20 --content 'void methodC() {' \
+  --parent-id "$ID_A" --parent-id "$ID_B" --name 'methodC'
 bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" move --file src/B.java --content 'void methodB() {' --parent '[]'
 bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" delete --id <uuid>
 # After editing source on disk (IDE DocumentListener will NOT run):
@@ -173,9 +190,12 @@ bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" rebind --file sr
 
 ```bat
 REM Windows — absolute script path; do not cd into the skill folder
+REM Prefer --parent-id (repeatable); avoids PowerShell/cmd JSON quoting issues
 "<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" search
 "<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" add --file src\A.java --content ".handleEmailTriggerRequest(" --name handleEmail
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" move --id <uuid> --parent "[]"
+"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" add --file src\B.java --line 40 --content "void methodB() {" --parent-id %PARENT_ID% --name methodB
+"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" add --file src\C.java --line 20 --content "void methodC() {" --parent-id %ID_A% --parent-id %ID_B% --name methodC
+"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" move --id <uuid> --parent []
 "<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" delete --file src\A.java --content "void methodA() {"
 REM After editing source on disk:
 "<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" rebind
@@ -191,7 +211,7 @@ Default profile: Agent Notes target when enabled (`AGENT` / active); otherwise `
 | Goal | How |
 |------|-----|
 | List / find traces | `trace_tree search` (or parse profile XML) |
-| Add root / child | `trace_tree add` with `--parent` (ids preferred; idempotent if already present) |
+| Add root / child | `trace_tree add` with `--parent-id` (repeatable; idempotent if already present) |
 | Reparent node | `trace_tree move` |
 | Remove node + subtree | `trace_tree delete` |
 | Repair lines after source edits | `trace_tree rebind` (required after agent disk edits) |

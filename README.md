@@ -52,6 +52,7 @@
   The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
   When the same trimmed text appears more than once, agents must pass <code>--line</code> (or
   <code>[file, line, content]</code>) so each occurrence can be a distinct tip.
+  For parent nodes, prefer repeated <code>--parent-id</code> (bash and Windows) over JSON <code>--parent</code>.
 </p>
 
 <h1>Agent Skill</h1>
