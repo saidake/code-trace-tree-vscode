@@ -19,6 +19,7 @@ import { TracePointService } from './TracePointService'
 
 export class DescriptionViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView
+  private _messageDisposable?: vscode.Disposable
 
   constructor(
     private _extensionUri: vscode.Uri,
@@ -35,10 +36,14 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtml()
 
-    webviewView.webview.onDidReceiveMessage(async (msg) => {
-      if (msg.command === 'descriptionChanged') {
-        await this.service.updateTracePointDescription(msg.itemId, msg.description)
-      }
+    // Avoid stacking handlers if the view is resolved again after hide/show.
+    this._messageDisposable?.dispose()
+    this._messageDisposable = webviewView.webview.onDidReceiveMessage(async (msg) => {
+      if (msg.command !== 'descriptionChanged') return
+      const itemId = typeof msg.itemId === 'string' ? msg.itemId : ''
+      if (!itemId) return
+      const description = typeof msg.description === 'string' ? msg.description : ''
+      await this.service.updateTracePointDescription(itemId, description)
     })
 
     this.updateView()
@@ -85,7 +90,6 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
                     transition: background-color 0.2s ease;
                 "
                 disabled
-                oninput="vscode.postMessage({command: 'descriptionChanged', description: this.value, itemId: window.currentItemId})"
             ></textarea>
             <style>
                 textarea:not(:disabled) {
@@ -107,14 +111,34 @@ export class DescriptionViewProvider implements vscode.WebviewViewProvider {
             <script>
                 const vscode = acquireVsCodeApi();
                 window.currentItemId = '';
+                let applyingFromHost = false;
+
+                const textarea = document.getElementById('desc');
+                textarea.addEventListener('input', () => {
+                    // Ignore host-driven updates (selection switch / clear) so we never
+                    // persist an empty value against the previous node.
+                    if (applyingFromHost) return;
+                    const itemId = window.currentItemId;
+                    if (!itemId) return;
+                    vscode.postMessage({
+                        command: 'descriptionChanged',
+                        description: textarea.value,
+                        itemId
+                    });
+                });
 
                 window.addEventListener('message', event => {
                     const { command, description, disabled, itemId } = event.data;
-                    if (command === 'updateDescription') {
-                        const textarea = document.getElementById('desc');
-                        textarea.value = description;
-                        textarea.disabled = disabled;
-                        window.currentItemId = itemId;
+                    if (command !== 'updateDescription') return;
+                    applyingFromHost = true;
+                    try {
+                        // Bind identity before mutating value so any spurious input
+                        // cannot attribute the new text to the previous node.
+                        window.currentItemId = itemId || '';
+                        textarea.disabled = !!disabled;
+                        textarea.value = description || '';
+                    } finally {
+                        applyingFromHost = false;
                     }
                 });
             </script>

@@ -740,15 +740,17 @@ export class TracePointService {
   }
 
   async updateTracePointDescription(id: string, newDescription: string) {
+    if (!id) return
     const tp = this.getTracePointNodeById(id)
-    if (tp) {
-      tp.tracePoint.description = newDescription
-      this.updateTreeItem(tp)
-      this.notifyListeners('update-description', null)
-      const parentNode = this.getTracePointParentById(id)
-      this.notifyListeners('refresh', new Set<TracePointNode | null>([parentNode]))
-      this.saveState()
-    }
+    if (!tp) return
+    const next = newDescription ?? ''
+    if ((tp.tracePoint.description || '') === next) return
+    tp.tracePoint.description = next
+    // Update the existing TreeItem in place (tooltip). Avoid tree refresh here:
+    // refreshing on every keystroke can clear selection while VS Code is also
+    // opening files / reloading views, which raced and wiped descriptions.
+    this.updateTreeItem(tp)
+    this.schedulePersist()
   }
 
   async renameTracePoint(id: string, newName: string) {
