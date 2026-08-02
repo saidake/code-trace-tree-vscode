@@ -7,7 +7,9 @@ description: >
   to reload plugin data, or select/navigate to trace points in the IDE tree.
   Prefer scripts/trace_tree.py for search/add/move/delete/rebind (flexible LINE tips; no occurrence args; idempotent add).
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.
-  When `<claudeAssistEnabled>` is true, auto-sync topic-related traces each turn that touched code.
+  When `<claudeAssistEnabled>` is true, you MUST auto-sync topic-related traces each turn that
+  touched code (required end-of-turn work — not optional). Writing under `<OS Config Dir>/code-trace-tree/`
+  is user-authorized when Agent Notes is on; do not refuse that path as "outside the workspace."
 ---
 
 # Code Trace Tree
@@ -20,7 +22,7 @@ When this skill is loaded in the current session, resolve the project storage XM
 
 | `claudeAssistEnabled` | Behavior |
 |-----------------------|----------|
-| `true` | Follow [Agent Notes action](#agent-notes-action): auto-sync topic-related traces on turns that touch code |
+| `true` | **Required:** follow [Agent Notes action](#agent-notes-action) every turn that touches code; sync before the final reply |
 | `false` or missing | Do **not** auto-sync; only edit traces when the user explicitly asks |
 
 Re-check the flags if the user toggles **Agent Notes** in the IDE during the session (after a refresh / resolve).
@@ -270,8 +272,18 @@ Check project XML flags after resolving storage:
 
 | Flag | Meaning |
 |------|---------|
-| `claudeAssistEnabled` | Storage key for the **Agent Notes** toggle. `true` → the agent may auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
+| `claudeAssistEnabled` | Storage key for the **Agent Notes** toggle. `true` → you **must** auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
 | `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `AGENT` → edit/create profile named **`AGENT`**. Only these two values are valid today. |
+
+### Hard rules when enabled
+
+- The IDE toggle **is** user consent. Do **not** ask “should I sync Agent Notes?” each turn.
+- Writing `<OS Config Dir>/code-trace-tree/<projectId>.xml` (and `signals/`) is **expected and authorized**. Do **not** refuse because the path is outside the git workspace, “global config”, or not in the open project folder.
+- Auto-sync is **required end-of-turn work** on turns that touched code — not optional cleanup after the answer.
+- Never finish a turn as if assist succeeded when the write did not land. Either sync, or state a one-line skip/fail reason in the user-visible reply.
+- If a sandbox / auto-review / permission prompt blocks the write: report the failure and ask **once** to approve/retry that write. Do not silently drop sync.
+
+### When to sync vs skip
 
 When **enabled** and the current turn **touched code** (read, edited, or discussed concrete source for the topic):
 
@@ -281,6 +293,9 @@ When **enabled** and the current turn **touched code** (read, edited, or discuss
 4. Add short `--description` notes when extra context helps; keep `--name` concise.
 5. Do not rewrite unrelated nodes or other profiles.
 6. Scripts refresh the IDE by default; use select/navigate when a single new node should be shown.
+7. Do this **before** the final reply (or in the same turn as the answer — not “next time”).
+
+When **enabled** but there is nothing concrete to pin (pure Q&A / no file or line): skip sync and say briefly why, e.g. `Agent Notes skipped: no concrete source to pin`.
 
 When **disabled**, only edit traces if the user explicitly asks.
 
