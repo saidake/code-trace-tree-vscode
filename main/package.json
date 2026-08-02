@@ -1,5 +1,5 @@
 {
-  "name": "code-trace-tree",
+  "name": "codetracetree",
   "displayName": "Code Trace Tree",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
   "version": "1.1.5",
