@@ -1,6 +1,7 @@
 # Code Trace Tree data format
 
-Root document (`version="4"`) stored under global central storage.
+Root document (`version="4"`) stored as `<OS Config Dir>/code-trace-tree/<projectId>.xml`.
+Legacy `<FolderName>.xml` files are still resolved by scanning `<projectId>` inside XML.
 
 ## Project document
 
@@ -111,10 +112,11 @@ Line comparisons always use trimmed text: `documentLine.trim() == lineContent.tr
 
 For agent-written `LINE` nodes:
 
-1. Prefer `scripts/trace_tree.py` (`add` / `move` / `delete` / `rebind`) with locator `[file, line, trimmed content]` — do **not** pass occurrence fields.
+1. Prefer `scripts/trace_tree.py` (`add` / `move` / `delete` / `rebind`) with locator `[file, content]` or `[file, line, content]` — do **not** pass occurrence fields.
 2. The script stores **trimmed** `lineContent`, verifies the line text, then sets `totalOccurrences` / `occurrenceIndex` by scanning the file.
-3. After Claude edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).
-4. If editing XML by hand: count matching trimmed lines → `totalOccurrences`; set `occurrenceIndex` (1-based) for the intended `lineNumber`.
+3. When the same trimmed text appears more than once in a file, pass `--line` / `[file, line, content]`. Idempotent add keys on file + content + `occurrenceIndex`, so each occurrence can be a separate node.
+4. After agent edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).
+5. If editing XML by hand: count matching trimmed lines → `totalOccurrences`; set `occurrenceIndex` (1-based) for the intended `lineNumber`.
 
 ## Agent Notes flags (storage: Claude Assist)
 

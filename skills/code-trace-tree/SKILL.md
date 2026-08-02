@@ -111,18 +111,19 @@ Use the skill’s `scripts/trace_tree.py` (via `trace_tree.sh` / `trace_tree.bat
 
 ### LINE locators (forgiving)
 
-Stored identity is still `[file, line, full-trimmed-line]`. Callers may pass a **stale line** and/or a **unique substring** of the line; the script resolves against the source file and stores the full trimmed line. `--line` is optional when `content` uniquely resolves.
+Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them.
 
 | Tip | Result |
 |-----|--------|
 | Exact line + full trimmed text | Used as-is |
-| Wrong/stale line + unique content | Line corrected (`unique_exact` / `nearest_exact`) |
-| Distinctive substring (e.g. `.handleEmailTriggerRequest(`) | Anchors the matching line; stores full trimmed text |
-| Multi-line call | Prefer the most distinctive physical line (often the `.methodName(` continuation), not a weak receiver-only line |
+| Unique content (one match in file) | `--line` optional; line corrected if stale |
+| Same trimmed text on 2+ lines | **Must** pass `--line` (or `[file, line, content]`); otherwise error |
+| Distinctive substring (e.g. `.handleEmailTriggerRequest(`) | Anchors the matching line when unique; if several matches, pass `--line` |
+| Multi-line call | Prefer the most distinctive physical line (often the `.methodName(` continuation) |
 
-JSON output includes `resolve: { reason, needle, resolved }` so you can see what was stored.
+JSON output includes `resolve: { reason, needle, resolved, totalOccurrences, occurrenceIndex }`.
 
-**Idempotent add:** If a LINE/FILE/DIRECTORY node with the same identity already exists, `add` returns `"skipped": true` with the existing id (exit 0) instead of erroring. Search first only when you need to inspect the tree; re-adding the same tip is safe.
+**Idempotent add:** Same identity → `"skipped": true` (exit 0). For LINE, identity is file + content + **occurrenceIndex** (so two `featureFlagService,` tips at different lines both add). FILE/DIRECTORY identity is path + type.
 
 ### Parent path
 
@@ -131,10 +132,10 @@ JSON output includes `resolve: { reason, needle, resolved }` so you can see what
 | Form | Example |
 |------|---------|
 | Node id (preferred) | `"3d41c2d1-…"` |
-| `[file, content]` | `["src/A.java", "void methodA() {"]` |
-| `[file, line, content]` | `["src/A.java", 10, "void methodA() {"]` |
+| `[file, content]` | `["src/A.java", "void methodA() {"]` — only when content is unique |
+| `[file, line, content]` | `["src/A.java", 10, "void methodA() {"]` — required when content repeats |
 
-Tree lookup tolerates stale lines and unique substrings. Prefer **ids from a prior `search`/`add`** for deep trees.
+Bare strings are **UUIDs only**, not `traceName` labels. Prefer **ids from a prior `search`/`add`**.
 
 ```text
 method A def

@@ -194,6 +194,11 @@ def parse_node_ref(item: Any) -> NodeRef:
                 line=int(item[1]),
                 content=str(item[2]).strip(),
             )
+        if len(item) >= 4:
+            raise SystemExit(
+                "ERROR: do not pass occurrenceIndex/totalOccurrences in locators. "
+                "Use [file, content] or [file, line, content]; the script computes occurrences."
+            )
         raise SystemExit(
             f"ERROR: LINE locator must be [file, content] or [file, line, content], got {item!r}"
         )
@@ -253,8 +258,20 @@ def _pick_nearest(candidates: Sequence[int], hint_line: Optional[int]) -> int:
 @dataclass(frozen=True)
 class SourceResolve:
     locator: LineLocator
-    reason: str  # exact | unique_exact | nearest_exact | unique_substring | nearest_substring
+    reason: str  # exact | unique_exact | unique_substring | nearest_substring
     needle: str
+
+
+def _ambiguous_line_error(
+    rel_file: str, needle: str, match_lines_1based: Sequence[int]
+) -> SystemExit:
+    listed = ", ".join(str(n) for n in match_lines_1based)
+    return SystemExit(
+        f"ERROR: ambiguous LINE content in {rel_file}: {needle!r} matches "
+        f"{len(match_lines_1based)} lines ({listed}). "
+        f"Pass --line N or use locator [file, line, content] to pick one occurrence. "
+        f"Do not pass occurrenceIndex/totalOccurrences — the script computes them."
+    )
 
 
 def resolve_source_locator(
@@ -266,6 +283,7 @@ def resolve_source_locator(
     """Resolve a possibly-stale / substring LINE tip against the source file.
 
     Always returns a locator whose `content` is the **full trimmed line**.
+    Duplicate trimmed lines require an explicit `--line` (no silent nearest pick).
     """
     needle = content.strip()
     if not needle:
@@ -283,18 +301,44 @@ def resolve_source_locator(
 
     exact_matches = match_lines(lines, needle)
     if exact_matches:
-        chosen = _pick_nearest(exact_matches, line)
-        reason = "unique_exact" if len(exact_matches) == 1 else "nearest_exact"
-        loc = LineLocator.from_parts(rel_file, chosen, needle)
-        return SourceResolve(loc, reason, needle)
+        if len(exact_matches) == 1:
+            chosen = exact_matches[0]
+            loc = LineLocator.from_parts(rel_file, chosen, needle)
+            return SourceResolve(loc, "unique_exact", needle)
+        if line is not None and line in exact_matches:
+            loc = LineLocator.from_parts(rel_file, line, needle)
+            return SourceResolve(loc, "exact", needle)
+        if line is None:
+            raise _ambiguous_line_error(rel_file, needle, exact_matches)
+        actual_at = ""
+        if 1 <= line <= len(lines):
+            actual_at = f"; line {line} is currently {lines[line - 1].strip()!r}"
+        else:
+            actual_at = f"; line {line} is out of range (1..{len(lines)})"
+        listed = ", ".join(str(n) for n in exact_matches)
+        raise SystemExit(
+            f"ERROR: LINE content {needle!r} in {rel_file} does not match line {line}"
+            f"{actual_at}. Matching lines: {listed}. "
+            f"Pass --line for one of those lines, or fix --content."
+        )
 
     containing = match_lines_containing(lines, needle)
     if containing:
+        if len(containing) == 1:
+            chosen = containing[0]
+            full = lines[chosen - 1].strip()
+            loc = LineLocator.from_parts(rel_file, chosen, full)
+            return SourceResolve(loc, "unique_substring", needle)
+        if line is None:
+            raise _ambiguous_line_error(rel_file, needle, containing)
+        if line in containing:
+            full = lines[line - 1].strip()
+            loc = LineLocator.from_parts(rel_file, line, full)
+            return SourceResolve(loc, "nearest_substring", needle)
         chosen = _pick_nearest(containing, line)
         full = lines[chosen - 1].strip()
-        reason = "unique_substring" if len(containing) == 1 else "nearest_substring"
         loc = LineLocator.from_parts(rel_file, chosen, full)
-        return SourceResolve(loc, reason, needle)
+        return SourceResolve(loc, "nearest_substring", needle)
 
     actual_at = ""
     if line is not None and 1 <= line <= len(lines):
@@ -545,10 +589,28 @@ def matches_path_locator(node: ET.Element, path: str, type_filter: Optional[str]
     return norm_rel(child_text(tp, "tracePath")) == norm_rel(path)
 
 
+def _looks_like_uuid(value: str) -> bool:
+    text = value.strip()
+    if len(text) != 36:
+        return False
+    parts = text.split("-")
+    if len(parts) != 5 or [len(p) for p in parts] != [8, 4, 4, 4, 12]:
+        return False
+    hexdigits = set("0123456789abcdefABCDEF")
+    return all(c in hexdigits for c in text if c != "-")
+
+
 def find_by_id(roots_el: ET.Element, node_id: str) -> Tuple[ET.Element, ET.Element, str]:
     matches = [(n, c, p) for n, _, p, c in walk_tree(roots_el) if child_text(n, "id") == node_id]
     if not matches:
-        raise SystemExit(f"ERROR: no node with id {node_id}")
+        if _looks_like_uuid(node_id):
+            raise SystemExit(f"ERROR: no node with id {node_id}")
+        raise SystemExit(
+            f"ERROR: no node with id {node_id!r}. "
+            "Bare --parent strings are node UUIDs, not traceName labels. "
+            "Use an id from search/add, or a locator "
+            "[file, content] / [file, line, content]."
+        )
     if len(matches) > 1:
         raise SystemExit(f"ERROR: duplicate id {node_id}")
     return matches[0]
@@ -618,9 +680,17 @@ def find_by_line_locator(
             )
         return soft[0]
     if len(loose) > 1:
+        by_line = [
+            (n, c, p)
+            for n, c, p in loose
+            if child_text(node_trace(n), "lineNumber") == str(loc.line)
+        ]
+        if len(by_line) == 1:
+            return by_line[0]
         ids = ", ".join(child_text(n, "id") for n, _, _ in loose)
         raise SystemExit(
-            f"ERROR: multiple LINE nodes match [{loc.file!r}, {loc.content!r}] (ignoring line): {ids}"
+            f"ERROR: multiple LINE nodes match [{loc.file!r}, {loc.content!r}] "
+            f"(duplicate content; pass --line or --id): {ids}"
         )
     return loose[0]
 
@@ -646,35 +716,94 @@ def resolve_parent_path(
             # Allow id lookup anywhere if scoped child search missed (stale path shape)
             matches = find_nodes_by_ref([n for n, _, _, _ in walk_tree(roots_el)], ref)
         if not matches:
+            if ref.id and not _looks_like_uuid(ref.id):
+                raise SystemExit(
+                    f"ERROR: parent path step {i} not found: {ref.describe()}. "
+                    "Bare strings are node UUIDs, not traceName labels. "
+                    "Use an id from search/add, or "
+                    "[file, content] / [file, line, content]."
+                )
+            hint = ""
+            if ref.file and ref.content and ref.line is None:
+                hint = (
+                    " If this content appears more than once, use "
+                    "[file, line, content]."
+                )
             raise SystemExit(
-                f"ERROR: parent path step {i} not found: {ref.describe()}"
+                f"ERROR: parent path step {i} not found: {ref.describe()}.{hint}"
             )
         if len(matches) > 1:
             ids = ", ".join(child_text(n, "id") for n in matches)
+            hint = ""
+            if ref.file and ref.content and ref.line is None:
+                hint = " Pass [file, line, content] to disambiguate."
             raise SystemExit(
-                f"ERROR: parent path step {i} is ambiguous ({ids}): {ref.describe()}"
+                f"ERROR: parent path step {i} is ambiguous ({ids}): "
+                f"{ref.describe()}.{hint}"
             )
         current = matches[0]
     return current
 
 
 def find_existing_line_node(
-    roots_el: ET.Element, loc: LineLocator
+    roots_el: ET.Element,
+    loc: LineLocator,
+    occurrence_index: int,
 ) -> Optional[ET.Element]:
-    """Same physical line (file + full trimmed content), ignoring stale line numbers."""
-    matches = [
-        n
-        for n, _, _, _ in walk_tree(roots_el)
-        if matches_line_locator(n, loc, strict_line=False)
-    ]
+    """Same occurrence: file + trimmed content + occurrenceIndex (1-based)."""
+    matches: List[ET.Element] = []
+    for n, _, _, _ in walk_tree(roots_el):
+        if not matches_line_locator(n, loc, strict_line=False):
+            continue
+        tp = node_trace(n)
+        try:
+            stored_index = int(child_text(tp, "occurrenceIndex") or "0")
+        except ValueError:
+            stored_index = 0
+        if stored_index == occurrence_index:
+            matches.append(n)
+        elif stored_index <= 0 and child_text(tp, "lineNumber") == str(loc.line):
+            matches.append(n)
     if not matches:
         return None
     if len(matches) > 1:
         ids = ", ".join(child_text(n, "id") for n in matches)
         raise SystemExit(
-            f"ERROR: multiple LINE nodes share [{loc.file!r}, {loc.content!r}]: {ids}"
+            f"ERROR: multiple LINE nodes share "
+            f"[{loc.file!r}, {loc.content!r}, occurrenceIndex={occurrence_index}]: {ids}"
         )
     return matches[0]
+
+
+def refresh_line_occurrence_fields(
+    roots_el: ET.Element,
+    project_root: Path,
+    rel_file: str,
+    content: str,
+) -> None:
+    """Recompute totalOccurrences / occurrenceIndex for all LINE nodes with this tip."""
+    content = content.strip()
+    rel_file = norm_rel(rel_file)
+    lines = read_source_lines(project_root, rel_file)
+    if lines is None:
+        return
+    match_nums = match_lines(lines, content)
+    total = len(match_nums)
+    for n, _, _, _ in walk_tree(roots_el):
+        tp = node_trace(n)
+        if child_text(tp, "traceType") != "LINE":
+            continue
+        if norm_rel(child_text(tp, "tracePath")) != rel_file:
+            continue
+        if child_text(tp, "lineContent") != content:
+            continue
+        set_child_text(tp, "totalOccurrences", str(total))
+        try:
+            ln = int(child_text(tp, "lineNumber") or "0")
+        except ValueError:
+            continue
+        if ln in match_nums:
+            set_child_text(tp, "occurrenceIndex", str(match_nums.index(ln) + 1))
 
 
 def find_existing_path_node(
@@ -979,12 +1108,17 @@ def cmd_add(args: argparse.Namespace) -> int:
             project_root, args.file, args.line, args.content
         )
         loc = resolved.locator
+        total, occ_index = compute_occurrences(
+            project_root, loc.file, loc.line, loc.content
+        )
         resolve_meta = {
             "reason": resolved.reason,
             "needle": resolved.needle,
             "resolved": [loc.file, loc.line, loc.content],
+            "totalOccurrences": total,
+            "occurrenceIndex": occ_index,
         }
-        existing = find_existing_line_node(roots_el, loc)
+        existing = find_existing_line_node(roots_el, loc, occ_index)
         if existing is not None:
             _print_add_result(
                 {
@@ -1050,6 +1184,10 @@ def cmd_add(args: argparse.Namespace) -> int:
         return 0
 
     attach_under(parent, roots_el, node)
+    if kind == "LINE":
+        refresh_line_occurrence_fields(
+            roots_el, project_root, loc.file, loc.content
+        )
     bump_updated_at(root)
     write_atomic(tree, storage_xml)
     if not args.no_refresh:
