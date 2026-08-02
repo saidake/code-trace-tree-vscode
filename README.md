@@ -20,6 +20,9 @@
 </p>
 <!-- Plugin description end -->
 
+# Preview
+![](docs/assets/preview-vscode.png)
+
 <!-- Plugin description -->
 <h1>How to use</h1>
 <ol>

@@ -28,6 +28,21 @@
       ],
       "sourceMaps": true,
       "preLaunchTask": "watch"
+    },
+    {
+      "name": "Run Extension (fresh UI)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/main",
+        "--user-data-dir=${workspaceFolder}/.vscode-test/user-data-fresh"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/main/out/**/*.js"
+      ],
+      "sourceMaps": true,
+      "preLaunchTask": "compile"
     }
   ]
 }
