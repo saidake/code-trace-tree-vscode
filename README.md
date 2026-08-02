@@ -2,7 +2,7 @@
 ![Build](https://github.com/saidake/code-trace-tree-vscode/workflows/Build/badge.svg)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%20v3%20or%20later-blue.svg)](./LICENSE)
 
-<img src="docs/assets/logo.png" width="100" alt="Code Trace Tree logo">
+<img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 
 ----
 
