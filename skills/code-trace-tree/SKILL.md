@@ -48,6 +48,16 @@ On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per sessio
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
 ```
 
+### Windows PowerShell quoting
+
+If the agent shell is **PowerShell**, inner `"` in `--content` (and similar flags) are often stripped — e.g. `@PostMapping("/testPost")` arrives as `@PostMapping(/testPost)`, so LINE matching fails even with a correct `--line`. Insert `--%` (stop-parsing) after the script path and before those flags. `--%` is PowerShell-only (not cmd.exe / bash / Git Bash).
+
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" --% add --file src/A.java --line 38 --content "@PostMapping(\"/testPost\")" --name testPost
+```
+
+Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.g. `--content "@PostMapping(" --line 38`).
+
 ## Storage layout
 
 | Piece | Location |
@@ -104,7 +114,7 @@ Use the skill’s `scripts/trace_tree.py` to search, add, move, delete, and rebi
 
 ### LINE locators (forgiving)
 
-Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them.
+Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell quoting](#windows-powershell-quoting)) or use a substring tip plus `--line`.
 
 | Tip | Result |
 |-----|--------|
