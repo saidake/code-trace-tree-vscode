@@ -468,6 +468,9 @@ export class TracePointService {
       this.rebuildTreeNodeMap()
       this.applyHighlightsToAllEditors()
       this.notifyListeners()
+      // Selection was cleared for the new profile; refresh the description pane so it
+      // does not keep the previous profile's text.
+      this.notifyListeners('update-description', null)
     } finally {
       this.endIgnoreExpandEventsSoon()
     }
@@ -525,6 +528,7 @@ export class TracePointService {
     this.applyHighlightsToAllEditors()
     this.syncActiveProfileToStore()
     this.notifyListeners()
+    this.notifyListeners('update-description', null)
     this.schedulePersist()
   }
 
