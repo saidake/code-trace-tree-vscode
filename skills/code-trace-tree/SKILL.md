@@ -14,7 +14,7 @@ description: >
 
 Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
 
-## Session startup: check Agent Notes
+## On skill load: check Agent Notes
 
 When this skill is loaded in the current session, resolve the project storage XML and read `<claudeAssistEnabled>` (and `<claudeAssistTarget>`). Keep those values for the rest of the session:
 
