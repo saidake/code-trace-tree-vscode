@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/constants'
-import { ClaudeAssistTarget, ProjectDocument, TraceProfile } from '../domain/types'
+import { ProjectDocument, TraceProfile } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import {
   cloneProfiles,
@@ -100,8 +100,6 @@ export class ProjectStorage {
         descriptionAreaOpened: byPath.descriptionAreaOpened,
         highlightingEnabled: byPath.highlightingEnabled,
         namePromptEnabled: byPath.namePromptEnabled,
-        claudeAssistEnabled: byPath.claudeAssistEnabled,
-        claudeAssistTarget: byPath.claudeAssistTarget,
         storageFile: newFile
       }
       ProjectIdFiles.writeProjectId(this.projectBase, newId)
@@ -123,8 +121,6 @@ export class ProjectStorage {
       descriptionAreaOpened: false,
       highlightingEnabled: true,
       namePromptEnabled: true,
-      claudeAssistEnabled: false,
-      claudeAssistTarget: 'CURRENT',
       storageFile: newFile
     }
     ProjectIdFiles.writeProjectId(this.projectBase, newId)
@@ -138,9 +134,7 @@ export class ProjectStorage {
     activeProfileName: string,
     descriptionAreaOpened: boolean,
     highlightingEnabled: boolean,
-    namePromptEnabled: boolean,
-    claudeAssistEnabled: boolean,
-    claudeAssistTarget: ClaudeAssistTarget
+    namePromptEnabled: boolean
   ): void {
     const file = this.boundFile
     const projectId = this.boundProjectId
@@ -160,8 +154,6 @@ export class ProjectStorage {
       descriptionAreaOpened,
       highlightingEnabled,
       namePromptEnabled,
-      claudeAssistEnabled,
-      claudeAssistTarget,
       storageFile: file
     }
     this.saveDocument(doc)

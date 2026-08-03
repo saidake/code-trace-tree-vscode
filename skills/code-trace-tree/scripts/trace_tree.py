@@ -50,7 +50,7 @@ def global_app_dir() -> Path:
 
 
 def read_project_id(project_root: Path) -> str:
-    for rel in (".vscode/code-trace-tree.project.id", ".idea/code-trace-tree.project.id"):
+    for rel in (".idea/code-trace-tree.project.id", ".vscode/code-trace-tree.project.id"):
         p = project_root / rel
         if p.is_file():
             return p.read_text(encoding="utf-8").strip()
@@ -219,6 +219,36 @@ def parse_parent_path(raw: Optional[str]) -> List[NodeRef]:
             "[file,line,content]"
         )
     return [parse_node_ref(item) for item in data]
+
+
+def parent_refs_from_args(args: argparse.Namespace, *, required: bool) -> List[NodeRef]:
+    """Prefer repeated --parent-id (shell-safe); optional --parent JSON for locators.
+
+    Do not mix --parent-id and --parent. Omit both on add → root. On move, one form
+    is required (`--parent []` for root).
+    """
+    ids = getattr(args, "parent_ids", None)
+    raw = getattr(args, "parent", None)
+    if ids and raw is not None:
+        raise SystemExit(
+            "ERROR: use either repeated --parent-id or --parent, not both"
+        )
+    if ids is not None:
+        refs: List[NodeRef] = []
+        for pid in ids:
+            text = (pid or "").strip()
+            if not text:
+                raise SystemExit("ERROR: empty --parent-id")
+            refs.append(NodeRef(id=text))
+        return refs
+    if raw is not None:
+        return parse_parent_path(raw)
+    if required:
+        raise SystemExit(
+            "ERROR: move requires --parent-id ID [--parent-id ID ...] "
+            "or --parent JSON (use --parent [] for root)"
+        )
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -845,10 +875,6 @@ def attach_under(parent: Optional[ET.Element], roots_el: ET.Element, node: ET.El
         children.append(node)
 
 
-AGENT_PROFILE_NAME = "AGENT"
-LEGACY_CLAUDE_PROFILE_NAME = "CLAUDE"
-
-
 def get_or_create_profile(root: ET.Element, name: str) -> ET.Element:
     profiles = ensure_child(root, "traceProfiles")
     for profile in profiles.findall("traceProfile"):
@@ -861,53 +887,11 @@ def get_or_create_profile(root: ET.Element, name: str) -> ET.Element:
     return profile
 
 
-def is_agent_assist_target(target: str) -> bool:
-    return target in (AGENT_PROFILE_NAME, LEGACY_CLAUDE_PROFILE_NAME)
-
-
-def migrate_claude_profile_to_agent(root: ET.Element) -> None:
-    """Rename legacy CLAUDE profile / target to AGENT in-place."""
-    target = child_text(root, "claudeAssistTarget", "CURRENT").upper()
-    if target == LEGACY_CLAUDE_PROFILE_NAME:
-        set_child_text(root, "claudeAssistTarget", AGENT_PROFILE_NAME)
-
-    profiles = root.find("traceProfiles")
-    if profiles is None:
-        return
-    agent_el = None
-    legacy_el = None
-    for profile in profiles.findall("traceProfile"):
-        name = child_text(profile, "name")
-        if name.upper() == AGENT_PROFILE_NAME:
-            agent_el = profile
-        elif name.upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            legacy_el = profile
-    if legacy_el is not None and agent_el is None:
-        set_child_text(legacy_el, "name", AGENT_PROFILE_NAME)
-        if child_text(root, "activeProfileName", "").upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-    elif legacy_el is not None and agent_el is not None:
-        if child_text(root, "activeProfileName", "").upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-        if child_text(agent_el, "name") != AGENT_PROFILE_NAME:
-            set_child_text(agent_el, "name", AGENT_PROFILE_NAME)
-    elif agent_el is not None and child_text(agent_el, "name") != AGENT_PROFILE_NAME:
-        was_active = child_text(root, "activeProfileName", "").upper() == child_text(agent_el, "name").upper()
-        set_child_text(agent_el, "name", AGENT_PROFILE_NAME)
-        if was_active:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-
-
 def resolve_profile_name(root: ET.Element, override: Optional[str]) -> str:
     if override:
         return override
-    assist = child_text(root, "claudeAssistEnabled").lower() == "true"
-    target = child_text(root, "claudeAssistTarget", "CURRENT").upper()
-    if assist and is_agent_assist_target(target):
-        return AGENT_PROFILE_NAME
     active = child_text(root, "activeProfileName", "main")
     return active or "main"
-
 
 def profile_roots(profile: ET.Element) -> ET.Element:
     return ensure_child(profile, "tracePointNodes")
@@ -991,14 +975,29 @@ def signals_dir() -> Path:
     return global_app_dir() / "signals"
 
 
-def request_refresh(project_root: Path) -> None:
+def request_refresh(project_root: Path) -> Optional[Path]:
     project_id = read_project_id(project_root)
     if not project_id:
-        return
+        return None
     dest = signals_dir()
     dest.mkdir(parents=True, exist_ok=True)
     req = dest / f"{project_id}.request_refresh"
     req.write_text(str(int(time.time() * 1000)) + "\n", encoding="utf-8")
+    return req
+
+
+def request_select(project_root: Path, ids: Sequence[str]) -> Path:
+    project_id = read_project_id(project_root)
+    if not project_id:
+        raise SystemExit(
+            "ERROR: no project id file. Open the project once in the IDE with the plugin installed."
+        )
+    dest = signals_dir()
+    dest.mkdir(parents=True, exist_ok=True)
+    req = dest / f"{project_id}.select_trace_points"
+    lines = [i.strip() for i in ids if i and i.strip()]
+    req.write_text(("\n".join(lines) + ("\n" if lines else "")), encoding="utf-8")
+    return req
 
 
 def load_context(project: Optional[str], profile: Optional[str]):
@@ -1007,15 +1006,8 @@ def load_context(project: Optional[str], profile: Optional[str]):
     storage_xml = resolve_storage(project_root)
     tree = ET.parse(storage_xml)
     root = tree.getroot()
-    migrate_claude_profile_to_agent(root)
     profile_name = resolve_profile_name(root, profile)
     profile_el = get_or_create_profile(root, profile_name)
-    if (
-        child_text(root, "claudeAssistEnabled").lower() == "true"
-        and is_agent_assist_target(child_text(root, "claudeAssistTarget", "CURRENT").upper())
-        and not profile
-    ):
-        set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
     roots_el = profile_roots(profile_el)
     return project_root, storage_xml, tree, root, profile_name, roots_el
 
@@ -1091,7 +1083,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
         args.project, args.profile
     )
-    parent_path = parse_parent_path(args.parent)
+    parent_path = parent_refs_from_args(args, required=False)
     parent = resolve_parent_path(roots_el, parent_path)
     parent_id = child_text(parent, "id") if parent is not None else ""
 
@@ -1255,7 +1247,7 @@ def cmd_move(args: argparse.Namespace) -> int:
         args.project, args.profile
     )
     node, container, _old_parent = resolve_target_node(roots_el, args, project_root)
-    parent_path = parse_parent_path(args.parent)
+    parent_path = parent_refs_from_args(args, required=True)
     new_parent = resolve_parent_path(roots_el, parent_path)
 
     moved_ids = set(collect_descendant_ids(node))
@@ -1518,12 +1510,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("--line", type=int)
     p_add.add_argument("--content")
     p_add.add_argument(
-        "--parent",
-        default="[]",
+        "--parent-id",
+        action="append",
+        dest="parent_ids",
+        default=None,
+        metavar="ID",
         help=(
-            'JSON parent path: ids and/or ["file","content"] / '
-            '["file",line,"content"] from rootward → parent. [] = root. '
-            'Prefer ids from search when available.'
+            "Parent node UUID; repeat rootward → immediate parent "
+            "(shell-safe; preferred over --parent). Omit for root."
+        ),
+    )
+    p_add.add_argument(
+        "--parent",
+        default=None,
+        help=(
+            'Optional JSON parent path: ids and/or ["file","content"] / '
+            '["file",line,"content"]. Prefer repeated --parent-id. '
+            "Do not combine with --parent-id."
         ),
     )
     p_add.add_argument("--name", default="")
@@ -1538,11 +1541,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_locator_flags(p_move)
     p_move.add_argument(
+        "--parent-id",
+        action="append",
+        dest="parent_ids",
+        default=None,
+        metavar="ID",
+        help=(
+            "New parent node UUID; repeat rootward → immediate parent "
+            "(shell-safe; preferred). For root, use --parent [] instead."
+        ),
+    )
+    p_move.add_argument(
         "--parent",
-        required=True,
+        default=None,
         help=(
             'JSON parent path (use [] for root): ids and/or '
-            '["file","content"] / ["file",line,"content"]'
+            '["file","content"] / ["file",line,"content"]. '
+            "Prefer repeated --parent-id. Do not combine with --parent-id."
         ),
     )
     p_move.set_defaults(func=cmd_move)

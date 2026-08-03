@@ -1,9 +1,9 @@
 {
-  "name": "code-trace-tree",
-  "displayName": "Code Trace Tree",
+  "name": "code-trace-tree-vscode",
+  "displayName": "Code Trace Tree for VS Code",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
-  "version": "0.0.1",
-  "publisher": "pidifa",
+  "version": "1.1.8",
+  "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
   "repository": {
@@ -16,6 +16,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "assets/icons/logo.png",
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -110,13 +111,6 @@
         "enablement": "view == codeTraceTree.view"
       },
       {
-        "command": "codeTraceTree.toggleClaudeAssist",
-        "title": "Agent Notes: allow an external AI agent to auto-sync topic-related traces when it touches code. This extension does not include an AI agent—install Claude Code, Cursor, Copilot, Codex, or Gemini separately and add the Code Trace Tree skill.",
-        "shortTitle": "Agent Notes",
-        "icon": "$(lightbulb)",
-        "enablement": "view == codeTraceTree.view"
-      },
-      {
         "command": "codeTraceTree.exportTracePoints",
         "title": "Export Trace Points",
         "icon": "$(cloud-upload)"
@@ -158,12 +152,6 @@
           "group": "navigation@350",
           "when": "view == codeTraceTree.view",
           "toggle": "codeTraceTree.namePromptEnabled"
-        },
-        {
-          "command": "codeTraceTree.toggleClaudeAssist",
-          "group": "navigation@360",
-          "when": "view == codeTraceTree.view",
-          "toggle": "codeTraceTree.claudeAssistEnabled"
         },
         {
           "command": "codeTraceTree.exportTracePoints",

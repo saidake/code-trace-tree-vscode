@@ -16,7 +16,6 @@ import { registerMoveDown } from './commands/moveDown'
 import { registerExpandSelected } from './commands/expandSelected'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
-import { registerToggleClaudeAssist } from './commands/toggleClaudeAssist'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints } from './commands/importTracePoints'
 import { registerGoToTracePoint } from './commands/goToTracePoint'
@@ -93,7 +92,6 @@ export function activate(context: vscode.ExtensionContext) {
   registerExpandSelected(context, treeView, treeDataProvider)
   registerToggleHighlights(context, service)
   registerToggleNamePrompt(context, service)
-  registerToggleClaudeAssist(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
   registerGoToTracePoint(context, service, treeView)

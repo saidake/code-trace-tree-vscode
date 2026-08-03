@@ -7,23 +7,16 @@ description: >
   to reload plugin data, or select/navigate to trace points in the IDE tree.
   Prefer scripts/trace_tree.py for search/add/move/delete/rebind (flexible LINE tips; no occurrence args; idempotent add).
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.
-  When `<claudeAssistEnabled>` is true, auto-sync topic-related traces each turn that touched code.
+  Only edit traces when the user explicitly asks. Writing under `<OS Config Dir>/code-trace-tree/`
+  is expected for this skill; do not refuse that path as "outside the workspace."
 ---
 
 # Code Trace Tree
 
 Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
 
-## On skill load: check Agent Notes
-
-When this skill is loaded in the current session, resolve the project storage XML and read `<claudeAssistEnabled>` (and `<claudeAssistTarget>`). Keep those values for the rest of the session:
-
-| `claudeAssistEnabled` | Behavior |
-|-----------------------|----------|
-| `true` | Follow [Agent Notes action](#agent-notes-action): auto-sync topic-related traces on turns that touch code |
-| `false` or missing | Do **not** auto-sync; only edit traces when the user explicitly asks |
-
-Re-check the flags if the user toggles **Agent Notes** in the IDE during the session (after a refresh / resolve).
+Only edit or sync traces when the user explicitly asks (for example: generate topic-related
+nodes, add a tip at a line, rebind after edits). Do not auto-sync every turn.
 
 ## Skill scripts location
 
@@ -39,23 +32,28 @@ Helper scripts live under `<Agent Skill Path>/code-trace-tree/scripts/`.
 | Codex | `~/.agents/skills` | `<repo>/.agents/skills` |
 | Gemini CLI | `~/.gemini/skills` | `<repo>/.gemini/skills` |
 
-On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per session, then invoke scripts with absolute paths. Keep the process CWD in the IDE project (do not `cd` into the skill folder).
+On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per session, then invoke scripts with absolute paths via `python` (or `python3` if that is what is on PATH). Keep the process CWD in the IDE project (do not `cd` into the skill folder).
 
-```bash
+```text
 # Example — substitute the absolute Agent Skill Path for THIS agent:
-bash "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.sh"
+python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
 ```
 
-```bat
-REM Example — substitute the absolute Agent Skill Path for THIS agent:
-"<Agent Skill Path>\code-trace-tree\scripts\request_refresh.bat"
+### Windows PowerShell quoting
+
+If the agent shell is **PowerShell**, inner `"` in `--content` (and similar flags) are often stripped — e.g. `@PostMapping("/testPost")` arrives as `@PostMapping(/testPost)`, so LINE matching fails even with a correct `--line`. Insert `--%` (stop-parsing) after the script path and before those flags. `--%` is PowerShell-only (not cmd.exe / bash / Git Bash).
+
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" --% add --file src/A.java --line 38 --content "@PostMapping(\"/testPost\")" --name testPost
 ```
+
+Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.g. `--content "@PostMapping(" --line 38`).
 
 ## Storage layout
 
 | Piece | Location |
 |-------|----------|
-| Project id | `.vscode/code-trace-tree.project.id` (prefer) or `.idea/code-trace-tree.project.id` |
+| Project id | `.idea/code-trace-tree.project.id` (prefer) or `.vscode/code-trace-tree.project.id` |
 | Global XML | `<OS Config Dir>/code-trace-tree/<projectId>.xml` (legacy `FolderName.xml` still resolved by scanning `<projectId>`) |
 | Refresh signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
@@ -68,14 +66,10 @@ REM Example — substitute the absolute Agent Skill Path for THIS agent:
 
 Resolve the bound XML with (optional project path discovers the IDE project root; default is CWD):
 
-```bash
-bash "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.sh"
-# optional: bash "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.sh" /path/to/project
-```
-
-```bat
-"<Agent Skill Path>\code-trace-tree\scripts\resolve_storage.bat"
-REM optional: "<Agent Skill Path>\code-trace-tree\scripts\resolve_storage.bat" C:\path\to\project
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py"
+# optional:
+python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" /path/to/project
 ```
 
 ## Preferred code workflow format
@@ -107,11 +101,11 @@ When adding LINE nodes, choose `lineContent` that stands out in the file so occu
 
 ## Trace tree ops
 
-Use the skill’s `scripts/trace_tree.py` (via `trace_tree.sh` / `trace_tree.bat`) to search, add, move, delete, and rebind nodes. Never pass occurrence fields.
+Use the skill’s `scripts/trace_tree.py` to search, add, move, delete, and rebind nodes. Never pass occurrence fields.
 
 ### LINE locators (forgiving)
 
-Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them.
+Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell quoting](#windows-powershell-quoting)) or use a substring tip plus `--line`.
 
 | Tip | Result |
 |-----|--------|
@@ -127,71 +121,73 @@ JSON output includes `resolve: { reason, needle, resolved, totalOccurrences, occ
 
 ### Parent path
 
-`--parent` is a JSON array from rootward ancestor → immediate parent (`[]` = root). Each step may be:
+**Preferred:** repeat `--parent-id` from rootward ancestor → immediate parent. Omit for root on `add`. Avoids JSON quoting issues in shells.
+
+```text
+# Child of one node:
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add … --parent-id "$PARENT_ID"
+# Deeper path (rootward → parent):
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add … --parent-id "$ID_A" --parent-id "$ID_B"
+# Move to root:
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" move --id "$NODE_ID" --parent []
+```
+
+Optional `--parent` JSON (do **not** combine with `--parent-id`) for locator forms or root on `move`:
 
 | Form | Example |
 |------|---------|
-| Node id (preferred) | `"3d41c2d1-…"` |
-| `[file, content]` | `["src/A.java", "void methodA() {"]` — only when content is unique |
-| `[file, line, content]` | `["src/A.java", 10, "void methodA() {"]` — required when content repeats |
+| Root | `--parent []` (needed for `move` to root; `add` defaults to root) |
+| Node id in JSON | `--parent '["3d41c2d1-…"]'` |
+| `[file, content]` | `--parent '[["src/A.java","void methodA() {"]]'` — only when content is unique |
+| `[file, line, content]` | `--parent '[["src/A.java",10,"void methodA() {"]]'` — when content repeats |
 
-Bare strings are **UUIDs only**, not `traceName` labels. Prefer **ids from a prior `search`/`add`**.
+Bare strings inside `--parent` JSON are **UUIDs only**, not `traceName` labels. Prefer **`--parent-id` from a prior `search`/`add`**.
 
 ```text
 method A def
   method B call
-    method B def   ← add with parent [idA, idB]  or  [[file,"…A…"],[file,"…B…"]]
+    method B def   ← add with --parent-id idA --parent-id idB
 ```
 
-**CLI shape:** `trace_tree.py <subcommand> [flags…]`  
+**CLI shape:** `python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" <subcommand> [flags…]`  
 Shared flags (`--project`, `--profile`, `--dry-run`, `--no-refresh`) may appear **before or after** the subcommand:
 
-```bash
+```text
 # Both OK (absolute `<Agent Skill Path>/...` scripts; keep CWD in the project):
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" search --project /path/to/project
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" --project /path/to/project search
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" search --project /path/to/project
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" --project /path/to/project search
 ```
 
-Omit `--project` when the process CWD is already inside the IDE project (scripts walk upward to find `.vscode` / `.idea` / `.git`).
+Omit `--project` when the process CWD is already inside the IDE project (scripts walk upward to find `.idea` / `.vscode` / `.git`).
 
-```bash
-# macOS / Linux — absolute script path; do not cd into the skill folder
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" search
+```text
+# Absolute script path; do not cd into the skill folder
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" search
 # line optional when content uniquely resolves; substring OK for distinctive tips:
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add --file src/A.java --content '.handleEmailTriggerRequest(' --name 'handleEmail'
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add --file src/A.java --line 10 --content 'void methodA() {' --name 'methodA'
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" add src/B.java 40 'void methodB() {' \
-  --parent '["'"$PARENT_ID"'"]' \
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add --file src/A.java --content '.handleEmailTriggerRequest(' --name 'handleEmail'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add --file src/A.java --line 10 --content 'void methodA() {' --name 'methodA'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add src/B.java 40 'void methodB() {' \
+  --parent-id "$PARENT_ID" \
   --name 'methodB'
-# or without ids: --parent '[["src/A.java","void methodA() {"],["src/A.java","methodB();"]]'
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" move --file src/B.java --content 'void methodB() {' --parent '[]'
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" delete --id <uuid>
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add --file src/C.java --line 20 --content 'void methodC() {' \
+  --parent-id "$ID_A" --parent-id "$ID_B" --name 'methodC'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" move --file src/B.java --content 'void methodB() {' --parent '[]'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" delete --id <uuid>
 # After editing source on disk (IDE DocumentListener will NOT run):
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" rebind
-bash "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.sh" rebind --file src/A.java --file src/B.java
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" rebind
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" rebind --file src/A.java --file src/B.java
 ```
 
-```bat
-REM Windows — absolute script path; do not cd into the skill folder
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" search
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" add --file src\A.java --content ".handleEmailTriggerRequest(" --name handleEmail
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" move --id <uuid> --parent "[]"
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" delete --file src\A.java --content "void methodA() {"
-REM After editing source on disk:
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" rebind
-"<Agent Skill Path>\code-trace-tree\scripts\trace_tree.bat" rebind --file src\A.java
-```
+Default profile: `<activeProfileName>` (or pass `--profile`).
 
-Default profile: Agent Notes target when enabled (`AGENT` / active); otherwise `<activeProfileName>`.
-
-**Rebind after disk edits:** Claude does not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `trace_tree rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences.
+**Rebind after disk edits:** Agents do not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `trace_tree rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences.
 
 ## Safe operations
 
 | Goal | How |
 |------|-----|
 | List / find traces | `trace_tree search` (or parse profile XML) |
-| Add root / child | `trace_tree add` with `--parent` (ids preferred; idempotent if already present) |
+| Add root / child | `trace_tree add` with `--parent-id` (repeatable; idempotent if already present) |
 | Reparent node | `trace_tree move` |
 | Remove node + subtree | `trace_tree delete` |
 | Repair lines after source edits | `trace_tree rebind` (required after agent disk edits) |
@@ -206,24 +202,20 @@ IntelliJ (with the plugin loaded) reloads the bound XML, refreshes the Code Trac
 All under `<Agent Skill Path>/code-trace-tree/scripts/` (see Skill scripts location):
 
 - XML schema details: [references/data-format.md](references/data-format.md)
-- Resolve storage: `resolve_storage.sh` / `resolve_storage.bat`
-- Trace tree ops: `trace_tree.sh` / `trace_tree.bat` → `trace_tree.py`
-- Request IDE refresh: `request_refresh.sh` / `request_refresh.bat`
-- Select / navigate: `select_trace_points.sh` / `select_trace_points.bat`
+- Resolve storage: `resolve_storage.py`
+- Trace tree ops: `trace_tree.py`
+- Request IDE refresh: `request_refresh.py`
+- Select / navigate: `select_trace_points.py`
 
 ## Edit plugin data action
 
-1. **Resolve** the project id + global XML (`resolve_storage.sh` / `.bat` via Agent Skill Path).
+1. **Resolve** the project id + global XML (`resolve_storage.py` via Agent Skill Path).
 2. **Read** the XML. Schema: [references/data-format.md](references/data-format.md).
 3. **Edit** carefully (see rules below). Prefer atomic write: write `*.xml.tmp` then replace.
 4. **Refresh IDE** so IntelliJ reloads in-memory state:
 
-```bash
-bash "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.sh"
-```
-
-```bat
-"<Agent Skill Path>\code-trace-tree\scripts\request_refresh.bat"
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
 ```
 
 Editing the global XML alone is usually enough (the plugin watches it). Always write the refresh signal after agent edits so reload is explicit.
@@ -242,28 +234,6 @@ Editing the global XML alone is usually enough (the plugin watches it). Always w
 - Do not delete unrelated profiles. Default profile name is `main`.
 - If the IDE has the project open, finish XML edits **before** writing the refresh request.
 
-## Agent Notes action
-
-The IDE toolbar toggle **Agent Notes** (storage flags `claudeAssistEnabled` / `claudeAssistTarget` below) applies to any agent using this skill. This plugin does not include an AI agent.
-
-Check project XML flags after resolving storage:
-
-| Flag | Meaning |
-|------|---------|
-| `claudeAssistEnabled` | `true` → the agent may auto-sync topic-related traces; `false`/missing → do **not** auto-sync |
-| `claudeAssistTarget` | `CURRENT` → edit `<activeProfileName>`; `AGENT` → edit/create profile named `AGENT` (legacy `CLAUDE` is migrated) |
-
-When **enabled** and the current turn **touched code** (read, edited, or discussed concrete source for the topic):
-
-1. Resolve the target profile (`CURRENT` or `AGENT`; `trace_tree` honors assist flags by default).
-2. Use `trace_tree add` / `move` / `delete` for the **discussed topic** only (follow Preferred code workflow format). Prefer scripts over hand-editing occurrence fields.
-3. After modifying source files, run `trace_tree rebind` (with `--file` for touched paths when possible) so LINE locations track the new text.
-4. Add short `--description` notes when extra context helps; keep `--name` concise.
-5. Do not rewrite unrelated nodes or other profiles.
-6. Scripts refresh the IDE by default; use select/navigate when a single new node should be shown.
-
-When **disabled**, only edit traces if the user explicitly asks.
-
 ## Select / navigate in the IDE action
 
 Write node UUIDs (one per line) to `signals/<projectId>.select_trace_points`, or use the helper scripts. Every open IDE window for that project watches the signal and selects / reveals those nodes. Stale signals (age > 60s) are ignored.
@@ -276,10 +246,6 @@ Write node UUIDs (one per line) to `signals/<projectId>.select_trace_points`, or
 
 Use after creating or locating traces when the user should see them in the IDE. Prefer a single id when you want the editor to jump to the source.
 
-```bash
-bash "<Agent Skill Path>/code-trace-tree/scripts/select_trace_points.sh" <id> [id...]
-```
-
-```bat
-"<Agent Skill Path>\code-trace-tree\scripts\select_trace_points.bat" <id> [id...]
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/select_trace_points.py" <id> [id...]
 ```
