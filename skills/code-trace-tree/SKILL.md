@@ -55,7 +55,8 @@ Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.
 |-------|----------|
 | Project id | `.idea/code-trace-tree.project.id` (prefer) or `.vscode/code-trace-tree.project.id` |
 | Global XML | `<OS Config Dir>/code-trace-tree/<projectId>.xml` (legacy `FolderName.xml` still resolved by scanning `<projectId>`) |
-| Refresh signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
+| Refresh signal (full) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
+| Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
 **OS Config Dir:**
@@ -70,6 +71,15 @@ Resolve the bound XML with (optional project path discovers the IDE project root
 python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py"
 # optional:
 python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" /path/to/project
+```
+
+If the project has never used Code Trace Tree, there is no project id / XML yet.
+Initialize storage before writing traces (or let `trace_tree add` / `move` / `delete` / `rebind` create it automatically):
+
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py"
+# optional:
+python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py" /path/to/project
 ```
 
 ## Preferred code workflow format
@@ -195,7 +205,19 @@ Default profile: `<activeProfileName>` (or pass `--profile`).
 
 ## After refresh
 
-IntelliJ (with the plugin loaded) reloads the bound XML, refreshes the Code Trace Tree tool window, and re-applies highlights. All open windows for that projectId watch the shared signals folder. Signal files older than 60s are ignored and removed.
+The IDE watches **signal files only** (not the XML path). After agent edits, always write a refresh signal.
+
+| Signal | Effect |
+|--------|--------|
+| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`) |
+| `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags |
+
+```text
+python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
+python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh_profile.py" main
+```
+
+All open windows for that projectId watch the shared signals folder. Signal files older than 60s are ignored and removed.
 
 ## Additional resources
 
@@ -203,22 +225,26 @@ All under `<Agent Skill Path>/code-trace-tree/scripts/` (see Skill scripts locat
 
 - XML schema details: [references/data-format.md](references/data-format.md)
 - Resolve storage: `resolve_storage.py`
+- Init storage (Case C when missing): `init_storage.py`
 - Trace tree ops: `trace_tree.py`
-- Request IDE refresh: `request_refresh.py`
+- Request full IDE refresh: `request_refresh.py`
+- Request one-profile IDE refresh: `request_refresh_profile.py`
 - Select / navigate: `select_trace_points.py`
 
 ## Edit plugin data action
 
-1. **Resolve** the project id + global XML (`resolve_storage.py` via Agent Skill Path).
+1. **Resolve** the project id + global XML (`resolve_storage.py`). If missing, run `init_storage.py` (mutating `trace_tree` commands also auto-init).
 2. **Read** the XML. Schema: [references/data-format.md](references/data-format.md).
 3. **Edit** carefully (see rules below). Prefer atomic write: write `*.xml.tmp` then replace.
-4. **Refresh IDE** so IntelliJ reloads in-memory state:
+4. **Refresh IDE** (required — the plugin does not watch the XML file):
 
 ```text
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
+# or one profile only:
+python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh_profile.py" main
 ```
 
-Editing the global XML alone is usually enough (the plugin watches it). Always write the refresh signal after agent edits so reload is explicit.
+Always write a refresh signal after agent edits so reload is explicit.
 
 ## Edit rules
 

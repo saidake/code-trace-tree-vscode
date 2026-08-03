@@ -104,6 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
     updateTracePointAtCaretContext(service)
     startExternalWatcher(context)
   })
+  service.setOnStorageBound(() => startExternalWatcher(context))
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => updateTracePointAtCaretContext(service)),
@@ -131,10 +132,12 @@ function startExternalWatcher(context: vscode.ExtensionContext) {
   externalWatcher?.dispose()
   externalWatcher = new ExternalStorageWatcher(
     projectId,
-    () => service.getBoundStorageFile(),
     () => service.shouldIgnoreExternalChanges(),
     (reason) => {
       void service.reloadFromExternalStorage(reason)
+    },
+    () => {
+      void service.handleExternalProfileRefreshRequest()
     },
     () => {
       void service.handleExternalSelectRequest(treeView)

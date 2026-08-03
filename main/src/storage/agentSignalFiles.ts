@@ -6,6 +6,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import {
+  REFRESH_PROFILE_SUFFIX,
   REFRESH_SUFFIX,
   SELECT_SUFFIX,
   SIGNAL_TTL_MS,
@@ -16,7 +17,9 @@ import { resolveAppDir } from './globalStoragePaths'
 /**
  * Global agent notify signals under `<appDir>/signals/`.
  *
- * - `<projectId>.request_refresh`
+ * - `<projectId>.request_refresh` — full project reload (all profiles + toolbar flags)
+ * - `<projectId>.request_refresh_profile` — one profile; body = profile name
+ *   (empty / missing name → active profile). Does not change activeProfileName or flags.
  * - `<projectId>.select_trace_points`
  *
  * Files older than SIGNAL_TTL_MS are ignored and deleted so a late IDE open does
@@ -32,6 +35,10 @@ export function refreshFileName(projectId: string): string {
   return `${projectId}${REFRESH_SUFFIX}`
 }
 
+export function refreshProfileFileName(projectId: string): string {
+  return `${projectId}${REFRESH_PROFILE_SUFFIX}`
+}
+
 export function selectFileName(projectId: string): string {
   return `${projectId}${SELECT_SUFFIX}`
 }
@@ -40,8 +47,26 @@ export function refreshPath(projectId: string): string {
   return path.join(signalsDir(), refreshFileName(projectId))
 }
 
+export function refreshProfilePath(projectId: string): string {
+  return path.join(signalsDir(), refreshProfileFileName(projectId))
+}
+
 export function selectPath(projectId: string): string {
   return path.join(signalsDir(), selectFileName(projectId))
+}
+
+/** First non-empty trimmed line of a profile-refresh signal (may be ""). */
+export function readProfileRefreshName(filePath: string): string {
+  try {
+    const line = fs
+      .readFileSync(filePath, 'utf8')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find(Boolean)
+    return line || ''
+  } catch {
+    return ''
+  }
 }
 
 export function deleteQuietly(filePath: string): void {
