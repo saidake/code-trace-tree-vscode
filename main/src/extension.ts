@@ -107,6 +107,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => updateTracePointAtCaretContext(service)),
+    vscode.window.onDidChangeVisibleTextEditors(() => {
+      service.applyHighlightsToAllEditors()
+    }),
     vscode.window.onDidChangeTextEditorSelection(() => updateTracePointAtCaretContext(service))
   )
   service.addNodeListener('refresh', () => updateTracePointAtCaretContext(service))
