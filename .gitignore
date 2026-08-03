@@ -61,6 +61,12 @@ web_modules/
 
 # Output of 'npm pack'
 *.tgz
+*.vsix
+
+# Generated copies for @vscode/vsce packaging (see scripts/prepare-vsix-assets.mjs)
+/main/README.md
+/main/LICENSE
+/main/docs/
 
 # Yarn Integrity file
 .yarn-integrity

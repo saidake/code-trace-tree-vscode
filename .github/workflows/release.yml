@@ -37,7 +37,7 @@ jobs:
           yarn version --new-version "$VERSION" --no-git-tag-version
 
       - name: Package extension
-        run: npx --yes @vscode/vsce package
+        run: yarn run package
 
       - name: Package agent skill ZIP
         working-directory: .
@@ -77,7 +77,7 @@ jobs:
           VERSION="${TAG#v}"
           VSIX="$(ls main/*.vsix | head -n1)"
           SKILL_ZIP="dist/skills/code-trace-tree-skill-${VERSION}.zip"
-          TITLE="Code Trace Tree ${TAG}"
+          TITLE="Code Trace Tree for VS Code ${TAG}"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$VSIX" "$SKILL_ZIP" --clobber
