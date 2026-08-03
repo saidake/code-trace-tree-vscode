@@ -1,7 +1,7 @@
 {
   "name": "code-trace-tree-vscode",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
   "repository": {
     "type": "git",

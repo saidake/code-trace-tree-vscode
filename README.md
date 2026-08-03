@@ -1,6 +1,6 @@
 # Code Trace Tree
 ![Build](https://github.com/saidake/code-trace-tree-vscode/workflows/Build/badge.svg)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%20v3%20or%20later-blue.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 <img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 
@@ -154,4 +154,4 @@
 
 # License
 
-This project is licensed under the [GNU General Public License v3.0 or later](./LICENSE).
+This project is licensed under the [MIT License](./LICENSE).
