@@ -21,6 +21,10 @@ export function registerCreateRootTracePoint(
         return
       }
       const lineNumber = editor.selection.active.line + 1
+      if (!editor.document.lineAt(lineNumber - 1).text.trim()) {
+        vscode.window.showWarningMessage('Cannot create a line trace point on an empty line.')
+        return
+      }
       const name = await resolveNewTracePointName(
         service,
         'Enter name for the root trace point (optional)'

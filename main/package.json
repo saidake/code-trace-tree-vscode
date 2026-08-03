@@ -109,6 +109,10 @@
         "title": "Copy Trace Point Text"
       },
       {
+        "command": "codeTraceTree.showLineContent",
+        "title": "Show Line Content"
+      },
+      {
         "command": "codeTraceTree.moveUp",
         "title": "Move Up",
         "icon": "$(arrow-up)"
@@ -199,17 +203,22 @@
         {
           "command": "codeTraceTree.copyTracePointText",
           "group": "navigation@50",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
         },
         {
           "command": "codeTraceTree.renameTracePoint",
           "group": "navigation@100",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
         },
         {
           "command": "codeTraceTree.deleteTracePoints",
           "group": "navigation@200",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
+        },
+        {
+          "command": "codeTraceTree.showLineContent",
+          "group": "navigation@900",
+          "when": "view == codeTraceTree.view && viewItem == traceableLine"
         }
       ],
       "explorer/context": [

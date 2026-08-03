@@ -30,11 +30,17 @@ fs.writeFileSync(path.join(mainDir, 'README.md'), readme)
 
 fs.copyFileSync(path.join(root, 'LICENSE'), path.join(mainDir, 'LICENSE'))
 
-const previewSrc = path.join(root, 'docs', 'assets', 'preview-vscode.png')
 const previewDestDir = path.join(mainDir, 'docs', 'assets')
-if (fs.existsSync(previewSrc)) {
-  fs.mkdirSync(previewDestDir, { recursive: true })
-  fs.copyFileSync(previewSrc, path.join(previewDestDir, 'preview-vscode.png'))
+fs.mkdirSync(previewDestDir, { recursive: true })
+for (const name of ['preview-1-vscode.png', 'preview-2-vscode.png']) {
+  const src = path.join(root, 'docs', 'assets', name)
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(previewDestDir, name))
+  }
+}
+const legacyPreview = path.join(previewDestDir, 'preview-vscode.png')
+if (fs.existsSync(legacyPreview)) {
+  fs.unlinkSync(legacyPreview)
 }
 
 console.log('Prepared main/README.md, main/LICENSE, and docs assets for vsce packaging')

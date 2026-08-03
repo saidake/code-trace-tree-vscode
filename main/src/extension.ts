@@ -26,6 +26,7 @@ import {
 import { registerRenameTracePoint } from './commands/renameTracePoint'
 import { registerDeleteTracePoints } from './commands/deleteTracePoints'
 import { registerCopyTracePointText } from './commands/copyTracePointText'
+import { registerShowLineContent } from './commands/showLineContent'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
 import { ProfileViewProvider } from './ProfileViewProvider'
 import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
@@ -99,6 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
   registerDeleteTracePoints(context, service, treeView, treeDataProvider)
   registerCopyTracePointText(context, service, treeView)
+  registerShowLineContent(context, service, treeView)
 
   service.loadState().then(() => {
     updateTracePointAtCaretContext(service)

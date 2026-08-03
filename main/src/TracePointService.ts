@@ -18,7 +18,7 @@ import {
   TracePointNode,
   TraceProfile
 } from './domain/types'
-import { formatDisplayText, formatLocationSuffix } from './utils/displayText'
+import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage } from './storage/projectStorage'
 
@@ -619,6 +619,9 @@ export class TracePointService {
     this.ensureStorage()
     const document = await vscode.workspace.openTextDocument(file)
     const lineContent = document.lineAt(lineNumber - 1).text.trim()
+    if (!lineContent) {
+      return
+    }
     const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent)
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1
 
@@ -706,7 +709,7 @@ export class TracePointService {
     const next = newDescription ?? ''
     if ((tp.tracePoint.description || '') === next) return
     tp.tracePoint.description = next
-    // Update the existing TreeItem in place (tooltip). Avoid tree refresh here:
+    // Update the existing TreeItem in place. Avoid tree refresh here:
     // refreshing on every keystroke can clear selection while VS Code is also
     // opening files / reloading views, which raced and wiped descriptions.
     this.updateTreeItem(tp)
@@ -1306,7 +1309,7 @@ export class TracePointService {
     const item = prevItem ? prevItem : new vscode.TreeItem(label, collapsibleState)
     // Profile-scoped id prevents cross-profile expand/selection restore
     item.id = this.toTreeItemId(tracePointNode.id)
-    item.contextValue = 'traceable'
+    item.contextValue = tracePoint.traceType === 'LINE' ? 'traceableLine' : 'traceablePath'
     // VS Code renders description after the label with a space
     item.description = location
     item.command = {
@@ -1315,20 +1318,15 @@ export class TracePointService {
       arguments: [item]
     }
 
-    const display = formatDisplayText(tracePoint)
     if (!tracePoint.isValid) {
       item.iconPath = new vscode.ThemeIcon(
         'circle-slash',
         new vscode.ThemeColor('disabledForeground')
       )
-      item.tooltip = `${display}\nThis trace point is invalid or outdated.`
-    } else if (tracePoint.description) {
-      item.iconPath = undefined
-      item.tooltip = `${display}\n${tracePoint.description}`
     } else {
       item.iconPath = undefined
-      item.tooltip = display
     }
+    item.tooltip = undefined
 
     this.treeNodeMap.set(tracePointNode.id, item)
   }
