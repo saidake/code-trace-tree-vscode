@@ -111,13 +111,6 @@
         "enablement": "view == codeTraceTree.view"
       },
       {
-        "command": "codeTraceTree.toggleClaudeAssist",
-        "title": "Agent Notes: allow an external AI agent with the code-trace-tree skill loaded to auto-sync topic-related traces when it touches code. Prerequisite: skill loaded in the agent session. This extension does not include an AI agent—install one separately, then install and load the skill.",
-        "shortTitle": "Agent Notes",
-        "icon": "$(lightbulb)",
-        "enablement": "view == codeTraceTree.view"
-      },
-      {
         "command": "codeTraceTree.exportTracePoints",
         "title": "Export Trace Points",
         "icon": "$(cloud-upload)"
@@ -159,12 +152,6 @@
           "group": "navigation@350",
           "when": "view == codeTraceTree.view",
           "toggle": "codeTraceTree.namePromptEnabled"
-        },
-        {
-          "command": "codeTraceTree.toggleClaudeAssist",
-          "group": "navigation@360",
-          "when": "view == codeTraceTree.view",
-          "toggle": "codeTraceTree.claudeAssistEnabled"
         },
         {
           "command": "codeTraceTree.exportTracePoints",

@@ -875,10 +875,6 @@ def attach_under(parent: Optional[ET.Element], roots_el: ET.Element, node: ET.El
         children.append(node)
 
 
-AGENT_PROFILE_NAME = "AGENT"
-LEGACY_CLAUDE_PROFILE_NAME = "CLAUDE"
-
-
 def get_or_create_profile(root: ET.Element, name: str) -> ET.Element:
     profiles = ensure_child(root, "traceProfiles")
     for profile in profiles.findall("traceProfile"):
@@ -891,53 +887,11 @@ def get_or_create_profile(root: ET.Element, name: str) -> ET.Element:
     return profile
 
 
-def is_agent_assist_target(target: str) -> bool:
-    return target in (AGENT_PROFILE_NAME, LEGACY_CLAUDE_PROFILE_NAME)
-
-
-def migrate_claude_profile_to_agent(root: ET.Element) -> None:
-    """Rename legacy CLAUDE profile / target to AGENT in-place."""
-    target = child_text(root, "claudeAssistTarget", "CURRENT").upper()
-    if target == LEGACY_CLAUDE_PROFILE_NAME:
-        set_child_text(root, "claudeAssistTarget", AGENT_PROFILE_NAME)
-
-    profiles = root.find("traceProfiles")
-    if profiles is None:
-        return
-    agent_el = None
-    legacy_el = None
-    for profile in profiles.findall("traceProfile"):
-        name = child_text(profile, "name")
-        if name.upper() == AGENT_PROFILE_NAME:
-            agent_el = profile
-        elif name.upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            legacy_el = profile
-    if legacy_el is not None and agent_el is None:
-        set_child_text(legacy_el, "name", AGENT_PROFILE_NAME)
-        if child_text(root, "activeProfileName", "").upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-    elif legacy_el is not None and agent_el is not None:
-        if child_text(root, "activeProfileName", "").upper() == LEGACY_CLAUDE_PROFILE_NAME:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-        if child_text(agent_el, "name") != AGENT_PROFILE_NAME:
-            set_child_text(agent_el, "name", AGENT_PROFILE_NAME)
-    elif agent_el is not None and child_text(agent_el, "name") != AGENT_PROFILE_NAME:
-        was_active = child_text(root, "activeProfileName", "").upper() == child_text(agent_el, "name").upper()
-        set_child_text(agent_el, "name", AGENT_PROFILE_NAME)
-        if was_active:
-            set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
-
-
 def resolve_profile_name(root: ET.Element, override: Optional[str]) -> str:
     if override:
         return override
-    assist = child_text(root, "claudeAssistEnabled").lower() == "true"
-    target = child_text(root, "claudeAssistTarget", "CURRENT").upper()
-    if assist and is_agent_assist_target(target):
-        return AGENT_PROFILE_NAME
     active = child_text(root, "activeProfileName", "main")
     return active or "main"
-
 
 def profile_roots(profile: ET.Element) -> ET.Element:
     return ensure_child(profile, "tracePointNodes")
@@ -1052,15 +1006,8 @@ def load_context(project: Optional[str], profile: Optional[str]):
     storage_xml = resolve_storage(project_root)
     tree = ET.parse(storage_xml)
     root = tree.getroot()
-    migrate_claude_profile_to_agent(root)
     profile_name = resolve_profile_name(root, profile)
     profile_el = get_or_create_profile(root, profile_name)
-    if (
-        child_text(root, "claudeAssistEnabled").lower() == "true"
-        and is_agent_assist_target(child_text(root, "claudeAssistTarget", "CURRENT").upper())
-        and not profile
-    ):
-        set_child_text(root, "activeProfileName", AGENT_PROFILE_NAME)
     roots_el = profile_roots(profile_el)
     return project_root, storage_xml, tree, root, profile_name, roots_el
 

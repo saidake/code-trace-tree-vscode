@@ -8,7 +8,7 @@ Prefer `trace_tree` scripts over hand-editing. Never persist `isValid`.
 
 ## Annotated full example
 
-Shows project flags, **two profiles** (`main` + `AGENT`), nested `LINE` → `FILE` / `DIRECTORY`
+Shows project flags, **two profiles** (`main` + `checkout`), nested `LINE` → `FILE` / `DIRECTORY`
 children in `main`, and a second `LINE` tip for the same trimmed text at a different
 occurrence (`occurrenceIndex`). Profiles are independent trees; node ids must be unique
 within a profile (prefer globally unique UUIDs).
@@ -26,10 +26,6 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
-  <!-- Agent Notes: false/missing → agents must not auto-sync -->
-  <claudeAssistEnabled>true</claudeAssistEnabled>
-  <!-- CURRENT = edit activeProfileName; AGENT = edit/create profile named AGENT -->
-  <claudeAssistTarget>AGENT</claudeAssistTarget>
 
   <traceProfiles>
     <!-- Profile 1: user / default tree -->
@@ -117,15 +113,15 @@ within a profile (prefer globally unique UUIDs).
       </expandedTracePointIds>
     </traceProfile>
 
-    <!-- Profile 2: dedicated Agent Notes tree (when claudeAssistTarget is AGENT) -->
+    <!-- Profile 2: optional second profile (any name) -->
     <traceProfile>
-      <name>AGENT</name>
+      <name>checkout</name>
       <tracePointNodes>
         <tracePointNode>
           <id>b3333333-3333-4333-8333-333333333333</id>
           <parentId />
           <tracePoint>
-            <traceName>agent topic root</traceName>
+            <traceName>checkout entry</traceName>
             <traceType>LINE</traceType>
             <baseName>CheckoutService.java</baseName>
             <tracePath>src/main/java/com/example/CheckoutService.java</tracePath>
@@ -133,7 +129,7 @@ within a profile (prefer globally unique UUIDs).
             <lineContent>public void checkout(Order order) {</lineContent>
             <totalOccurrences>1</totalOccurrences>
             <occurrenceIndex>1</occurrenceIndex>
-            <description>topic notes for the current agent discussion</description>
+            <description>checkout flow entry</description>
           </tracePoint>
           <children>
             <tracePointNode>
@@ -174,8 +170,6 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
-  <claudeAssistEnabled>false</claudeAssistEnabled>
-  <claudeAssistTarget>CURRENT</claudeAssistTarget>
   <traceProfiles>
     <traceProfile>
       <name>main</name>
@@ -184,7 +178,7 @@ within a profile (prefer globally unique UUIDs).
         <id>uuid</id>
       </expandedTracePointIds>
     </traceProfile>
-    <!-- Optional additional profiles, e.g. <name>AGENT</name> -->
+    <!-- Optional additional profiles -->
   </traceProfiles>
   <descriptionAreaOpened>false</descriptionAreaOpened>
 </project>
@@ -278,17 +272,6 @@ For agent-written `LINE` nodes:
 3. When the same trimmed text appears more than once in a file, pass `--line` / `[file, line, content]`. Idempotent add keys on file + content + `occurrenceIndex`, so each occurrence can be a separate node.
 4. After agent edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).
 5. If editing XML by hand: count matching trimmed lines → `totalOccurrences`; set `occurrenceIndex` (1-based) for the intended `lineNumber`.
-
-## Agent Notes flags
-
-UI label is **Agent Notes**. XML element names keep the historical `claudeAssist*` prefix.
-
-| Element | Values | Meaning |
-|---------|--------|---------|
-| `claudeAssistEnabled` | `true` / `false` (default `false`) | When true, an external agent may auto-sync topic-related traces |
-| `claudeAssistTarget` | `CURRENT` (default) or `AGENT` | Write into `<activeProfileName>`, or the dedicated profile named **`AGENT`** |
-
-Do **not** write `CLAUDE` as a target or profile name. Older files may still contain `CLAUDE`; the IDE and `trace_tree` migrate that to `AGENT` on load. Missing elements mean assist is off and target is `CURRENT`.
 
 ## Import/export
 

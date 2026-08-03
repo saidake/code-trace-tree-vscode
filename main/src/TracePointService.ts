@@ -9,9 +9,8 @@ import * as fs from 'fs'
 import * as vscode from 'vscode'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { AGENT_PROFILE_NAME, DEFAULT_PROFILE_NAME } from './domain/constants'
+import { DEFAULT_PROFILE_NAME } from './domain/constants'
 import {
-  ClaudeAssistTarget,
   NodeListener,
   NodeListenerEventType,
   ProfileListener,
@@ -21,7 +20,6 @@ import {
 } from './domain/types'
 import { formatDisplayText, formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
-import { migrateClaudeProfileToAgent } from './storage/projectDataXml'
 import { ProjectStorage } from './storage/projectStorage'
 
 export class TracePointService {
@@ -40,8 +38,6 @@ export class TracePointService {
   private _highlightingEnabled: boolean = true
   private _descriptionAreaOpened: boolean = false
   private _namePromptEnabled: boolean = true
-  private _claudeAssistEnabled: boolean = false
-  private _claudeAssistTarget: ClaudeAssistTarget = 'CURRENT'
   private ignoreExternalChangesUntilMs = 0
   private suppressPersist = false
   private workspaceRoot: string | undefined
@@ -107,8 +103,6 @@ export class TracePointService {
     highlightingEnabled: boolean
     descriptionAreaOpened: boolean
     namePromptEnabled: boolean
-    claudeAssistEnabled: boolean
-    claudeAssistTarget: ClaudeAssistTarget
   }) {
     this.profiles = doc.profiles.map((p) => ({
       name: p.name || DEFAULT_PROFILE_NAME,
@@ -124,24 +118,11 @@ export class TracePointService {
       doc.activeProfileName && this.profiles.some((p) => p.name === doc.activeProfileName)
         ? doc.activeProfileName
         : this.profiles[0].name
-    const { active: migratedActive, changed: profileMigrated } = migrateClaudeProfileToAgent(
-      this.profiles,
-      this.activeProfileName
-    )
-    this.activeProfileName =
-      migratedActive && this.profiles.some((p) => p.name === migratedActive)
-        ? migratedActive
-        : this.profiles[0].name
     this._highlightingEnabled = doc.highlightingEnabled
     this._descriptionAreaOpened = doc.descriptionAreaOpened
     this._namePromptEnabled = doc.namePromptEnabled
-    this._claudeAssistEnabled = doc.claudeAssistEnabled
-    this._claudeAssistTarget = doc.claudeAssistTarget
     await this.syncToggleContextKeys()
     await this.loadActiveProfileFromStore()
-    if (profileMigrated && !this.suppressPersist) {
-      this.schedulePersist()
-    }
   }
 
   /** Debounce disk writes after mutations. */
@@ -165,9 +146,7 @@ export class TracePointService {
       this.activeProfileName,
       this._descriptionAreaOpened,
       this._highlightingEnabled,
-      this._namePromptEnabled,
-      this._claudeAssistEnabled,
-      this._claudeAssistTarget
+      this._namePromptEnabled
     )
   }
 
@@ -294,66 +273,11 @@ export class TracePointService {
     this.schedulePersist()
   }
 
-  isClaudeAssistEnabled(): boolean {
-    return this._claudeAssistEnabled
-  }
-
-  getClaudeAssistTarget(): ClaudeAssistTarget {
-    return this._claudeAssistTarget
-  }
-
-  setClaudeAssistEnabled(enabled: boolean) {
-    this._claudeAssistEnabled = enabled
-    void this.syncToggleContextKeys()
-    this.schedulePersist()
-  }
-
-  async enableClaudeAssist(target: ClaudeAssistTarget) {
-    this._claudeAssistTarget = target
-    this._claudeAssistEnabled = true
-    if (target === 'AGENT') {
-      await this.ensureAgentProfileActive()
-    }
-    await this.syncToggleContextKeys()
-    this.schedulePersist()
-  }
-
-  private async ensureAgentProfileActive() {
-    const { active: migratedActive } = migrateClaudeProfileToAgent(
-      this.profiles,
-      this.activeProfileName
-    )
-    this.activeProfileName =
-      migratedActive && this.profiles.some((p) => p.name === migratedActive)
-        ? migratedActive
-        : this.activeProfileName
-    const existing = this.profiles.find(
-      (p) => p.name.toLowerCase() === AGENT_PROFILE_NAME.toLowerCase()
-    )
-    if (!existing) {
-      await this.addProfile(AGENT_PROFILE_NAME)
-      return
-    }
-    const wasActive = this.activeProfileName.toLowerCase() === existing.name.toLowerCase()
-    existing.name = AGENT_PROFILE_NAME
-    if (wasActive) {
-      this.activeProfileName = AGENT_PROFILE_NAME
-      this.notifyProfileListeners()
-    } else {
-      await this.switchProfile(AGENT_PROFILE_NAME)
-    }
-  }
-
   private async syncToggleContextKeys() {
     await vscode.commands.executeCommand(
       'setContext',
       'codeTraceTree.namePromptEnabled',
       this._namePromptEnabled
-    )
-    await vscode.commands.executeCommand(
-      'setContext',
-      'codeTraceTree.claudeAssistEnabled',
-      this._claudeAssistEnabled
     )
   }
 

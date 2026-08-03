@@ -11,9 +11,6 @@ export type ProfileListener = () => void
 
 export type TraceType = 'LINE' | 'FILE' | 'DIRECTORY'
 
-/** Where Agent Notes writes traces when enabled. Storage value CLAUDE migrates to AGENT. */
-export type ClaudeAssistTarget = 'CURRENT' | 'AGENT'
-
 export interface TracePoint {
   traceName: string
   traceType: TraceType
@@ -59,8 +56,6 @@ export interface ProjectDocument {
   descriptionAreaOpened: boolean
   highlightingEnabled: boolean
   namePromptEnabled: boolean
-  claudeAssistEnabled: boolean
-  claudeAssistTarget: ClaudeAssistTarget
   /** Absolute path of the XML file this document is bound to. */
   storageFile?: string
 }

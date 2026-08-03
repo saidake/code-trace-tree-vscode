@@ -6,12 +6,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import {
-  AGENT_PROFILE_NAME,
-  CLAUDE_PROFILE_NAME,
   DEFAULT_PROFILE_NAME,
   PROJECT_DOCUMENT_VERSION
 } from '../domain/constants'
-import { ClaudeAssistTarget, ProjectDocument, TraceProfile } from '../domain/types'
+import { ProjectDocument, TraceProfile } from '../domain/types'
 import {
   nodeFromXml,
   nodeToXml,
@@ -19,49 +17,6 @@ import {
   profileToXmlShape
 } from '../utils/traceProfileXml'
 import { asArray, parseXml, serializeXml } from '../utils/xmlUtils'
-
-/** Storage value CLAUDE is accepted on read and migrated to AGENT. */
-function parseClaudeAssistTarget(raw: unknown): ClaudeAssistTarget {
-  const value = String(raw ?? '')
-    .trim()
-    .toUpperCase()
-  return value === 'AGENT' || value === CLAUDE_PROFILE_NAME ? 'AGENT' : 'CURRENT'
-}
-
-/**
- * Renames a legacy `CLAUDE` profile to `AGENT` when needed.
- * @returns updated active profile name and whether any rename occurred
- */
-export function migrateClaudeProfileToAgent(
-  profiles: TraceProfile[],
-  activeProfileName: string
-): { active: string; changed: boolean } {
-  let changed = false
-  let active = activeProfileName
-  const agent = profiles.find((p) => p.name.toLowerCase() === AGENT_PROFILE_NAME.toLowerCase())
-  const legacy = profiles.find((p) => p.name.toLowerCase() === CLAUDE_PROFILE_NAME.toLowerCase())
-  if (legacy && !agent) {
-    const wasActive = active.toLowerCase() === legacy.name.toLowerCase()
-    legacy.name = AGENT_PROFILE_NAME
-    if (wasActive) active = AGENT_PROFILE_NAME
-    changed = true
-  } else if (legacy && agent) {
-    if (active.toLowerCase() === legacy.name.toLowerCase()) {
-      active = AGENT_PROFILE_NAME
-      changed = true
-    }
-    if (agent.name !== AGENT_PROFILE_NAME) {
-      agent.name = AGENT_PROFILE_NAME
-      changed = true
-    }
-  } else if (agent && agent.name !== AGENT_PROFILE_NAME) {
-    const wasActive = active.toLowerCase() === agent.name.toLowerCase()
-    agent.name = AGENT_PROFILE_NAME
-    if (wasActive) active = AGENT_PROFILE_NAME
-    changed = true
-  }
-  return { active, changed }
-}
 
 /** Parse project document XML (`data.xml` design, version 4). */
 export function parseProjectDocument(xml: string, storageFile?: string): ProjectDocument {
@@ -84,11 +39,10 @@ export function parseProjectDocument(xml: string, storageFile?: string): Project
       ? profiles
       : [{ name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }]
 
-  let activeProfileName =
+  const activeProfileName =
     String(root.activeProfileName || '').trim() ||
     profileList[0]?.name ||
     DEFAULT_PROFILE_NAME
-  activeProfileName = migrateClaudeProfileToAgent(profileList, activeProfileName).active
 
   return {
     version: Number(root['@_version'] ?? PROJECT_DOCUMENT_VERSION),
@@ -102,8 +56,6 @@ export function parseProjectDocument(xml: string, storageFile?: string): Project
       root.highlightingEnabled == null ? true : String(root.highlightingEnabled) === 'true',
     namePromptEnabled:
       root.namePromptEnabled == null ? true : String(root.namePromptEnabled) === 'true',
-    claudeAssistEnabled: String(root.claudeAssistEnabled) === 'true',
-    claudeAssistTarget: parseClaudeAssistTarget(root.claudeAssistTarget),
     storageFile
   }
 }
@@ -125,8 +77,6 @@ export function projectDocumentToXml(doc: ProjectDocument): string {
       activeProfileName: doc.activeProfileName,
       highlightingEnabled: String(doc.highlightingEnabled),
       namePromptEnabled: String(doc.namePromptEnabled),
-      claudeAssistEnabled: String(doc.claudeAssistEnabled),
-      claudeAssistTarget: doc.claudeAssistTarget,
       traceProfiles: {
         traceProfile: doc.profiles.map((p) => profileToXmlShape(p))
       },
