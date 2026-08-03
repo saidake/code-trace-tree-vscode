@@ -2,10 +2,14 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
+  "homepage": "https://github.com/saidake/code-trace-tree-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/saidake/code-trace-tree-vscode/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/saidake/code-trace-tree-vscode.git"
@@ -14,7 +18,33 @@
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "code-trace-tree",
+    "trace",
+    "trace-point",
+    "workflow",
+    "navigation",
+    "tree",
+    "bookmark",
+    "code-map",
+    "highlight",
+    "agent",
+    "agent-skill",
+    "claude",
+    "cursor",
+    "productivity"
+  ],
+  "galleryBanner": {
+    "color": "#0B0618",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "extensionKind": [
+    "workspace",
+    "ui"
   ],
   "icon": "assets/icons/logo.png",
   "activationEvents": [
