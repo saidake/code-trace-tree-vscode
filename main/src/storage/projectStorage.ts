@@ -26,7 +26,10 @@ import * as ProjectIdFiles from './projectIdFiles'
  * Resolution on project open:
  * - Case A: match by project id → update path/updatedAt
  * - Case B: match by path (copy-on-write) → new id + new XML file
- * - Case C: create a fresh project document with profile "main"
+ * - Case C: no match → return undefined (do not create id/XML until first real use)
+ *
+ * Call {@link ensureCreated} before the first persist that should bind storage
+ * (create trace point, add profile, import, or toolbar toggle).
  */
 export class ProjectStorage {
   private boundFile: string | undefined
@@ -59,7 +62,11 @@ export class ProjectStorage {
     }
   }
 
-  resolveAndLoad(): ProjectDocument {
+  /**
+   * Resolve existing storage (Case A / B). Returns undefined when nothing exists yet
+   * (lazy Case C — no disk writes).
+   */
+  resolveAndLoad(): ProjectDocument | undefined {
     fs.mkdirSync(resolveAppDir(), { recursive: true })
 
     const existingId = ProjectIdFiles.readProjectId(this.projectBase)
@@ -108,25 +115,28 @@ export class ProjectStorage {
       return copied
     }
 
-    // Case C: new project
+    // Case C: deferred — no project id / XML until ensureCreated()
+    return undefined
+  }
+
+  /**
+   * Bind storage for a new project (Case C) if not already bound.
+   * Writes the local project id file and allocates the global XML path;
+   * the first {@link save} writes the XML from in-memory state.
+   * @returns true when this call newly bound storage
+   */
+  ensureCreated(): boolean {
+    if (this.boundFile && this.boundProjectId) return false
+
+    fs.mkdirSync(resolveAppDir(), { recursive: true })
+    if (this.resolveAndLoad()) return true
+
     const newId = uuidv4()
     const newFile = this.allocateStorageFile(newId)
-    const fresh: ProjectDocument = {
-      version: PROJECT_DOCUMENT_VERSION,
-      projectId: newId,
-      path: this.projectBase,
-      updatedAt: Date.now(),
-      profiles: [{ name: DEFAULT_PROFILE_NAME, tracePointNodes: [], expandedTracePointIds: [] }],
-      activeProfileName: DEFAULT_PROFILE_NAME,
-      descriptionAreaOpened: false,
-      highlightingEnabled: true,
-      namePromptEnabled: true,
-      storageFile: newFile
-    }
     ProjectIdFiles.writeProjectId(this.projectBase, newId)
-    this.bind(fresh)
-    this.saveDocument(fresh)
-    return fresh
+    this.boundProjectId = newId
+    this.boundFile = newFile
+    return true
   }
 
   save(

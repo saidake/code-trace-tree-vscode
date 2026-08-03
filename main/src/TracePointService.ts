@@ -18,7 +18,7 @@ import {
   TracePointNode,
   TraceProfile
 } from './domain/types'
-import { formatDisplayText, formatLocationSuffix } from './utils/displayText'
+import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage } from './storage/projectStorage'
 
@@ -90,11 +90,43 @@ export class TracePointService {
       this.workspaceRoot = workspaceRoot
       this.storage = new ProjectStorage(workspaceRoot)
       const doc = this.storage.resolveAndLoad()
-      await this.applyDocument(doc)
+      if (doc) {
+        await this.applyDocument(doc)
+      } else {
+        // Lazy Case C: keep in-memory defaults until first real use
+        await this.syncToggleContextKeys()
+        await this.loadActiveProfileFromStore()
+      }
       this.notifyProfileListeners()
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to load trace points: ${e}`)
     }
+  }
+
+  private onStorageBound: (() => void) | undefined
+
+  /** Invoked once when Case C storage is first created (e.g. start external watcher). */
+  setOnStorageBound(callback: () => void) {
+    this.onStorageBound = callback
+  }
+
+  /**
+   * Create local project id + bind global XML path if this project has no storage yet.
+   * Call before the first persist for create / profile / import / toolbar toggles.
+   */
+  ensureStorage(): boolean {
+    if (!this.storage) {
+      const workspaceRoot =
+        this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+      if (!workspaceRoot) return false
+      this.workspaceRoot = workspaceRoot
+      this.storage = new ProjectStorage(workspaceRoot)
+    }
+    const created = this.storage.ensureCreated()
+    if (created) {
+      this.onStorageBound?.()
+    }
+    return created
   }
 
   private async applyDocument(doc: {
@@ -249,6 +281,7 @@ export class TracePointService {
   }
 
   setHighlightingEnabled(enabled: boolean) {
+    this.ensureStorage()
     this._highlightingEnabled = enabled
     this.applyHighlightsToAllEditors()
     this.schedulePersist()
@@ -259,6 +292,7 @@ export class TracePointService {
   }
 
   setDescriptionAreaOpened(opened: boolean) {
+    this.ensureStorage()
     this._descriptionAreaOpened = opened
     this.schedulePersist()
   }
@@ -268,6 +302,7 @@ export class TracePointService {
   }
 
   setNamePromptEnabled(enabled: boolean) {
+    this.ensureStorage()
     this._namePromptEnabled = enabled
     void this.syncToggleContextKeys()
     this.schedulePersist()
@@ -406,6 +441,7 @@ export class TracePointService {
     ) {
       return false
     }
+    this.ensureStorage()
     this.syncActiveProfileToStore()
     this.profiles.push({ name: trimmed, tracePointNodes: [], expandedTracePointIds: [] })
     this.activeProfileName = trimmed
@@ -430,6 +466,7 @@ export class TracePointService {
   }
 
   async replaceActiveProfileTree(nodes: TracePointNode[], expandedIds: string[]) {
+    this.ensureStorage()
     this.clearAllHighlights()
     this.selectedTracePointIds.clear()
     this.tracePointNodes = nodes
@@ -470,6 +507,7 @@ export class TracePointService {
     nodes: TracePointNode[],
     expandedIds: string[]
   ): Promise<string> {
+    this.ensureStorage()
     this.syncActiveProfileToStore()
     const name = this.allocateUniqueProfileName(desiredName)
     this.profiles.push({
@@ -486,6 +524,7 @@ export class TracePointService {
 
   async importAsNewProfiles(imported: TraceProfile[]): Promise<string[]> {
     if (imported.length === 0) return []
+    this.ensureStorage()
     this.syncActiveProfileToStore()
     const created: string[] = []
     for (const profile of imported) {
@@ -506,6 +545,7 @@ export class TracePointService {
 
   async mergeProfiles(imported: TraceProfile[], preferredActiveName?: string) {
     if (imported.length === 0) return
+    this.ensureStorage()
     this.syncActiveProfileToStore()
     for (const incoming of imported) {
       const existing = this.profiles.find(
@@ -538,6 +578,7 @@ export class TracePointService {
 
   async replaceAllProfiles(imported: TraceProfile[], preferredActiveName?: string) {
     if (imported.length === 0) return
+    this.ensureStorage()
     this.profiles = imported.map((p) => ({
       name: p.name.trim() || DEFAULT_PROFILE_NAME,
       tracePointNodes: p.tracePointNodes,
@@ -575,8 +616,12 @@ export class TracePointService {
     parentId?: string,
     description = ''
   ) {
+    this.ensureStorage()
     const document = await vscode.workspace.openTextDocument(file)
     const lineContent = document.lineAt(lineNumber - 1).text.trim()
+    if (!lineContent) {
+      return
+    }
     const [totalOccurrences, matchingLines] = this.getLineOccurrences(document, lineContent)
     const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1
 
@@ -608,6 +653,7 @@ export class TracePointService {
     parentId?: string,
     description = ''
   ) {
+    this.ensureStorage()
     const stat = await vscode.workspace.fs.stat(uri)
     const isDir = (stat.type & vscode.FileType.Directory) !== 0
     const tracePath = vscode.workspace.asRelativePath(uri)
@@ -663,7 +709,7 @@ export class TracePointService {
     const next = newDescription ?? ''
     if ((tp.tracePoint.description || '') === next) return
     tp.tracePoint.description = next
-    // Update the existing TreeItem in place (tooltip). Avoid tree refresh here:
+    // Update the existing TreeItem in place. Avoid tree refresh here:
     // refreshing on every keystroke can clear selection while VS Code is also
     // opening files / reloading views, which raced and wiped descriptions.
     this.updateTreeItem(tp)
@@ -1030,6 +1076,54 @@ export class TracePointService {
   }
 
   /**
+   * Reloads one profile from the bound XML into memory.
+   * Does not change activeProfileName or project toolbar flags.
+   * @param profileName empty/undefined → active profile
+   */
+  async reloadProfileFromExternalStorage(profileName?: string): Promise<boolean> {
+    if (this.shouldIgnoreExternalChanges()) return false
+    const doc = this.storage?.reloadBoundDocument()
+    if (!doc) return false
+    const name = (profileName || '').trim() || this.activeProfileName
+    const incoming = doc.profiles.find((p) => p.name === name)
+    if (!incoming) return false
+
+    this.suppressPersist = true
+    try {
+      const cloned = {
+        name: incoming.name || DEFAULT_PROFILE_NAME,
+        tracePointNodes: incoming.tracePointNodes,
+        expandedTracePointIds: [...incoming.expandedTracePointIds]
+      }
+      const idx = this.profiles.findIndex((p) => p.name === cloned.name)
+      if (idx >= 0) {
+        this.profiles[idx] = cloned
+      } else {
+        this.profiles.push(cloned)
+      }
+      if (cloned.name === this.activeProfileName) {
+        await this.loadActiveProfileFromStore()
+      }
+      this.notifyProfileListeners()
+    } finally {
+      this.suppressPersist = false
+    }
+    return true
+  }
+
+  /**
+   * Handles `<projectId>.request_refresh_profile` (body = profile name; empty → active).
+   */
+  async handleExternalProfileRefreshRequest(): Promise<void> {
+    const projectId = this.getBoundProjectId()
+    if (!projectId) return
+    const requestPath = AgentSignalFiles.refreshProfilePath(projectId)
+    if (!AgentSignalFiles.isFresh(requestPath)) return
+    const name = AgentSignalFiles.readProfileRefreshName(requestPath)
+    await this.reloadProfileFromExternalStorage(name || undefined)
+  }
+
+  /**
    * Selects / reveals trace points listed in the global select signal
    * (`signals/<projectId>.select_trace_points`, one UUID per line).
    * TTL-stale files are ignored; fresh signals are left for other windows.
@@ -1215,7 +1309,7 @@ export class TracePointService {
     const item = prevItem ? prevItem : new vscode.TreeItem(label, collapsibleState)
     // Profile-scoped id prevents cross-profile expand/selection restore
     item.id = this.toTreeItemId(tracePointNode.id)
-    item.contextValue = 'traceable'
+    item.contextValue = tracePoint.traceType === 'LINE' ? 'traceableLine' : 'traceablePath'
     // VS Code renders description after the label with a space
     item.description = location
     item.command = {
@@ -1224,20 +1318,15 @@ export class TracePointService {
       arguments: [item]
     }
 
-    const display = formatDisplayText(tracePoint)
     if (!tracePoint.isValid) {
       item.iconPath = new vscode.ThemeIcon(
         'circle-slash',
         new vscode.ThemeColor('disabledForeground')
       )
-      item.tooltip = `${display}\nThis trace point is invalid or outdated.`
-    } else if (tracePoint.description) {
-      item.iconPath = undefined
-      item.tooltip = `${display}\n${tracePoint.description}`
     } else {
       item.iconPath = undefined
-      item.tooltip = display
     }
+    item.tooltip = undefined
 
     this.treeNodeMap.set(tracePointNode.id, item)
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ask the IDE (Code Trace Tree plugin) to reload global storage for this project."""
+"""Ask the IDE to fully reload Code Trace Tree storage (all profiles + toolbar flags)."""
 from __future__ import annotations
 
 import sys
@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not read_project_id(project_root):
         print(
-            "ERROR: no project id file. Open the project once in the IDE with the plugin installed.",
+            "ERROR: no project id file. Run init_storage.py or create data in the IDE first.",
             file=sys.stderr,
         )
         return 2
@@ -27,14 +27,14 @@ def main(argv: list[str] | None = None) -> int:
     wrote = request_refresh(project_root)
     if wrote is None:
         print(
-            "ERROR: no project id file. Open the project once in the IDE with the plugin installed.",
+            "ERROR: no project id file. Run init_storage.py or create data in the IDE first.",
             file=sys.stderr,
         )
         return 2
 
     print(f"wrote={wrote}")
     print(
-        "IDE should reload Code Trace Tree data if the project is open "
+        "IDE should fully reload Code Trace Tree data if the project is open "
         "with the plugin (signal TTL 60s)."
     )
     return 0

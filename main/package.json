@@ -2,7 +2,7 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
@@ -37,10 +37,6 @@
     "cursor",
     "productivity"
   ],
-  "galleryBanner": {
-    "color": "#0B0618",
-    "theme": "dark"
-  },
   "pricing": "Free",
   "extensionKind": [
     "workspace",
@@ -111,6 +107,10 @@
       {
         "command": "codeTraceTree.copyTracePointText",
         "title": "Copy Trace Point Text"
+      },
+      {
+        "command": "codeTraceTree.showLineContent",
+        "title": "Show Line Content"
       },
       {
         "command": "codeTraceTree.moveUp",
@@ -203,17 +203,22 @@
         {
           "command": "codeTraceTree.copyTracePointText",
           "group": "navigation@50",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
         },
         {
           "command": "codeTraceTree.renameTracePoint",
           "group": "navigation@100",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
         },
         {
           "command": "codeTraceTree.deleteTracePoints",
           "group": "navigation@200",
-          "when": "view == codeTraceTree.view && viewItem == traceable"
+          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
+        },
+        {
+          "command": "codeTraceTree.showLineContent",
+          "group": "navigation@900",
+          "when": "view == codeTraceTree.view && viewItem == traceableLine"
         }
       ],
       "explorer/context": [

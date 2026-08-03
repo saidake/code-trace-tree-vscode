@@ -27,6 +27,10 @@ export function registerUpdateTracePoint(
       }
       const lineNumber = editor.selection.active.line + 1
       const lineContent = editor.document.lineAt(lineNumber - 1).text.trim()
+      if (!lineContent) {
+        vscode.window.showWarningMessage('Cannot update a trace point to an empty line.')
+        return
+      }
       const tracePath = vscode.workspace.asRelativePath(editor.document.uri)
       const baseName = path.basename(tracePath)
       const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || ''

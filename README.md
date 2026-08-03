@@ -1,6 +1,9 @@
 # Code Trace Tree
-![Build](https://github.com/saidake/code-trace-tree-vscode/workflows/Build/badge.svg)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/saidake/code-trace-tree-vscode?sort=semver)](https://github.com/saidake/code-trace-tree-vscode/releases/latest)
+[![Version](https://vsmarketplacebadges.dev/version/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+![Build](https://github.com/saidake/code-trace-tree-vscode/actions/workflows/release.yml/badge.svg)
 
 <img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 
@@ -20,7 +23,8 @@
 <!-- Plugin description end -->
 
 # Preview
-![](docs/assets/preview-vscode.png)
+![](docs/assets/preview-1-vscode.png)
+![](docs/assets/preview-2-vscode.png)
 
 <!-- Plugin description -->
 <h1>How to use</h1>
@@ -43,11 +47,12 @@
   </li>
   <li>Double-click a node in the tree to jump to that location (line, file, or Explorer for directories).</li>
   <li>Right-click a node and choose <b>Copy Trace Point Text</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
+  <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
   <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions.</li>
 </ol>
 <p>
   <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),
-  not generic lines like <code>}</code> or <code>return;</code>.
+  not generic lines like <code>}</code> or <code>return;</code>. Empty lines are not allowed.
   The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
 </p>
 
