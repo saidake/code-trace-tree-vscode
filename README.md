@@ -1,6 +1,9 @@
 # Code Trace Tree
-![Build](https://github.com/saidake/code-trace-tree-vscode/workflows/Build/badge.svg)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/saidake/code-trace-tree-vscode?sort=semver)](https://github.com/saidake/code-trace-tree-vscode/releases/latest)
+[![Version](https://vsmarketplacebadges.dev/version/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+![Build](https://github.com/saidake/code-trace-tree-vscode/actions/workflows/release.yml/badge.svg)
 
 <img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 

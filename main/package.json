@@ -37,10 +37,6 @@
     "cursor",
     "productivity"
   ],
-  "galleryBanner": {
-    "color": "#0B0618",
-    "theme": "dark"
-  },
   "pricing": "Free",
   "extensionKind": [
     "workspace",

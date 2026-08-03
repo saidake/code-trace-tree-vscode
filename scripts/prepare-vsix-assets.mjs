@@ -2,8 +2,9 @@
  * Copy root README / LICENSE / preview image into main/ so @vscode/vsce
  * includes them in the VSIX (Marketplace Overview + license metadata).
  *
- * Root README.md stays untouched for GitHub. The Marketplace copy strips
- * the title/badge/logo header and the Development section.
+ * Root README.md stays untouched for GitHub. The Marketplace copy keeps the
+ * first four badges (release, version, downloads, license) and strips the
+ * Build badge, logo, and Development section.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,10 +16,10 @@ const mainDir = path.join(root, 'main')
 let readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
 // Root README paths are repo-relative; rewrite for packaging from main/.
 readme = readme.replaceAll('main/assets/', 'assets/')
-// Drop GitHub-only header (title, badges, logo) before the first content block.
+// Keep title + first four badges; drop Build badge, logo, and ---- separator.
 readme = readme.replace(
-  /^# Code Trace Tree\r?\n[\s\S]*?\r?\n----\r?\n\r?\n/,
-  ''
+  /^# Code Trace Tree\r?\n([\s\S]*?)\r?\n!\[Build\][^\n]*\r?\n\r?\n<img[\s\S]*?\r?\n----\r?\n\r?\n/,
+  '$1\n\n'
 )
 // Drop Development section; keep License for the Marketplace page.
 readme = readme.replace(
