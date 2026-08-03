@@ -228,7 +228,9 @@
   "scripts": {
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "prepare-vsix": "node ../scripts/prepare-vsix-assets.mjs",
+    "package": "yarn run prepare-vsix && npx --yes @vscode/vsce package"
   },
   "devDependencies": {
     "@types/node": "16.x",
