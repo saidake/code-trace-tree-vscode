@@ -1090,8 +1090,8 @@ export class TracePointService {
     return true
   }
 
-  async reloadFromExternalStorage(_reason = 'manual'): Promise<boolean> {
-    if (this.shouldIgnoreExternalChanges()) return false
+  async reloadFromExternalStorage(_reason = 'manual', bypassIgnoreWindow = false): Promise<boolean> {
+    if (!bypassIgnoreWindow && this.shouldIgnoreExternalChanges()) return false
     const doc = this.storage?.reloadBoundDocument()
     if (!doc) return false
     this.suppressPersist = true
@@ -1110,8 +1110,11 @@ export class TracePointService {
    * Does not change activeProfileName or project toolbar flags.
    * @param profileName empty/undefined → active profile
    */
-  async reloadProfileFromExternalStorage(profileName?: string): Promise<boolean> {
-    if (this.shouldIgnoreExternalChanges()) return false
+  async reloadProfileFromExternalStorage(
+    profileName?: string,
+    bypassIgnoreWindow = false
+  ): Promise<boolean> {
+    if (!bypassIgnoreWindow && this.shouldIgnoreExternalChanges()) return false
     const doc = this.storage?.reloadBoundDocument()
     if (!doc) return false
     const name = (profileName || '').trim() || this.activeProfileName
@@ -1150,7 +1153,7 @@ export class TracePointService {
     const requestPath = AgentSignalFiles.refreshProfilePath(projectId)
     if (!AgentSignalFiles.isFresh(requestPath)) return
     const name = AgentSignalFiles.readProfileRefreshName(requestPath)
-    await this.reloadProfileFromExternalStorage(name || undefined)
+    await this.reloadProfileFromExternalStorage(name || undefined, true)
   }
 
   /**

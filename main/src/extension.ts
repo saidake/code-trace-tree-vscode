@@ -130,7 +130,11 @@ export function activate(context: vscode.ExtensionContext) {
   )
 }
 
-function startExternalWatcher(context: vscode.ExtensionContext) {
+function startExternalWatcher(
+  context: vscode.ExtensionContext,
+  options?: { replayExistingRefresh?: boolean }
+) {
+  const replayExistingRefresh = options?.replayExistingRefresh !== false
   const workspaceRoot =
     service.getWorkspaceRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
   if (!workspaceRoot) return
@@ -141,11 +145,12 @@ function startExternalWatcher(context: vscode.ExtensionContext) {
     externalWatcher = undefined
     if (!storageReadyWatcher) {
       storageReadyWatcher = new StorageReadyWatcher((signalProjectId) => {
-        void service
-          .handleStorageReadySignal(signalProjectId)
-          .then((bound) => {
-            if (bound) startExternalWatcher(context)
-          })
+        void service.handleStorageReadySignal(signalProjectId).then((bound) => {
+          if (bound) {
+            // Data already loaded via storage-ready; skip replaying request_refresh.
+            startExternalWatcher(context, { replayExistingRefresh: false })
+          }
+        })
       })
       storageReadyWatcher.start()
       context.subscriptions.push(storageReadyWatcher)
@@ -158,9 +163,8 @@ function startExternalWatcher(context: vscode.ExtensionContext) {
   externalWatcher?.dispose()
   externalWatcher = new ExternalStorageWatcher(
     projectId,
-    () => service.shouldIgnoreExternalChanges(),
     (reason) => {
-      void service.reloadFromExternalStorage(reason)
+      void service.reloadFromExternalStorage(reason, true)
     },
     () => {
       void service.handleExternalProfileRefreshRequest()
@@ -169,7 +173,7 @@ function startExternalWatcher(context: vscode.ExtensionContext) {
       void service.handleExternalSelectRequest(treeView)
     }
   )
-  externalWatcher.start()
+  externalWatcher.start(replayExistingRefresh)
   context.subscriptions.push(externalWatcher)
 }
 
