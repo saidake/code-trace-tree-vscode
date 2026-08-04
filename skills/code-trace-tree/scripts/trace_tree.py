@@ -1038,6 +1038,21 @@ def signals_dir() -> Path:
     return global_app_dir() / "signals"
 
 
+def write_storage_ready(project_root: Path) -> Optional[Path]:
+    """
+    Case C bind handshake: `signals/<projectId>.storage-ready` (no TTL).
+    Open IDEs compare the filename id to `.idea`/`.vscode` project id and bind when equal.
+    """
+    project_id = read_project_id(project_root)
+    if not project_id:
+        return None
+    dest = signals_dir()
+    dest.mkdir(parents=True, exist_ok=True)
+    req = dest / f"{project_id}.storage-ready"
+    req.write_text("1\n", encoding="utf-8")
+    return req
+
+
 def request_refresh(project_root: Path) -> Optional[Path]:
     """Full project reload signal (all profiles + toolbar flags). TTL uses file mtime."""
     project_id = read_project_id(project_root)
@@ -1048,6 +1063,8 @@ def request_refresh(project_root: Path) -> Optional[Path]:
     req = dest / f"{project_id}.request_refresh"
     # Body unused; overwrite so mtime advances (TTL).
     req.write_text("1\n", encoding="utf-8")
+    # Wake Case C IDE windows: bind via <projectId>.storage-ready, then replay refresh.
+    write_storage_ready(project_root)
     return req
 
 
@@ -1067,6 +1084,7 @@ def request_refresh_profile(
     req = dest / f"{project_id}.request_refresh_profile"
     body = (profile_name or "").strip()
     req.write_text((body + "\n") if body else "", encoding="utf-8")
+    write_storage_ready(project_root)
     return req
 
 

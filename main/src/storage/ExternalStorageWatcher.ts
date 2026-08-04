@@ -3,7 +3,6 @@
  *
  * SPDX-License-Identifier: MIT
  */
-import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import * as AgentSignalFiles from './agentSignalFiles'
@@ -18,6 +17,9 @@ const DEBOUNCE_MS = 400
  * - `<projectId>.request_refresh`
  * - `<projectId>.request_refresh_profile`
  * - `<projectId>.select_trace_points`
+ *
+ * Call only when a project id is already bound. For Case C (unbound), use
+ * StorageReadyWatcher until `<projectId>.storage-ready` binds storage.
  */
 export class ExternalStorageWatcher implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = []
@@ -35,12 +37,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
   ) {}
 
   start() {
-    const signals = AgentSignalFiles.signalsDir()
-    try {
-      fs.mkdirSync(signals, { recursive: true })
-    } catch {
-      // ignore
-    }
+    const signals = AgentSignalFiles.ensureSignalsDir()
     this.watchSignalsDir(signals)
 
     // Replay fresh signals written while the IDE was closed; drop stale ones.

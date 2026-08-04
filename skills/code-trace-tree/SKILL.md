@@ -55,6 +55,7 @@ Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.
 |-------|----------|
 | Project id | `.idea/code-trace-tree.project.id` (prefer) or `.vscode/code-trace-tree.project.id` |
 | Global XML | `<OS Config Dir>/code-trace-tree/<projectId>.xml` (legacy `FolderName.xml` still resolved by scanning `<projectId>`) |
+| Storage-ready (Case C bind) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.storage-ready` (no TTL; written by refresh scripts) |
 | Refresh signal (full) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
 | Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
@@ -205,19 +206,20 @@ Default profile: `<activeProfileName>` (or pass `--profile`).
 
 ## After refresh
 
-The IDE watches **signal files only** (not the XML path). After agent edits, always write a refresh signal.
+The IDE watches **signal files** (not the XML path). After agent edits, always write a refresh signal.
 
 | Signal | Effect |
 |--------|--------|
-| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`) |
-| `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags |
+| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
+| `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. |
+| `<projectId>.storage-ready` | Case C bind handshake (no TTL). IDE compares filename id to `.idea`/`.vscode` project id; on match, binds and watches global refresh/select signals. Does not create storage. |
 
 ```text
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh_profile.py" main
 ```
 
-All open windows for that projectId watch the shared signals folder. Signal files older than 60s are ignored and removed.
+Bound windows watch the shared global signals folder for that projectId. Unbound (Case C) windows watch `signals/*.storage-ready` until they bind. Refresh/select files older than 60s are ignored and removed; `storage-ready` has no TTL (agent overwrites).
 
 ## Additional resources
 

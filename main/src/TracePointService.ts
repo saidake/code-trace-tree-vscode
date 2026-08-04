@@ -21,6 +21,7 @@ import {
 import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage } from './storage/projectStorage'
+import { readProjectId } from './storage/projectIdFiles'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -1058,6 +1059,35 @@ export class TracePointService {
       this.schedulePersist()
     }
     return changed
+  }
+
+  /**
+   * Agent wrote `signals/<projectId>.storage-ready` after creating project id + XML (Case C).
+   * Bind only when that id matches `.idea`/`.vscode` `code-trace-tree.project.id`.
+   */
+  async handleStorageReadySignal(signalProjectId: string): Promise<boolean> {
+    if (this.getBoundProjectId()) return true
+    const workspaceRoot =
+      this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!workspaceRoot) return false
+    this.workspaceRoot = workspaceRoot
+
+    const localId = readProjectId(workspaceRoot)
+    if (!localId || localId !== signalProjectId) return false
+
+    const storage = this.storage ?? new ProjectStorage(workspaceRoot)
+    this.storage = storage
+    const doc = storage.resolveAndLoad()
+    if (!doc) return false
+    if (storage.getBoundProjectId() !== signalProjectId) return false
+    this.suppressPersist = true
+    try {
+      await this.applyDocument(doc)
+      this.notifyProfileListeners()
+    } finally {
+      this.suppressPersist = false
+    }
+    return true
   }
 
   async reloadFromExternalStorage(_reason = 'manual'): Promise<boolean> {

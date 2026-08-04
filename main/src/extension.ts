@@ -30,11 +30,13 @@ import { registerShowLineContent } from './commands/showLineContent'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
 import { ProfileViewProvider } from './ProfileViewProvider'
 import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
+import { StorageReadyWatcher } from './storage/StorageReadyWatcher'
 
 let service: TracePointService
 let treeDataProvider: TracePointTreeDataProvider
 let treeView: vscode.TreeView<vscode.TreeItem>
 let externalWatcher: ExternalStorageWatcher | undefined
+let storageReadyWatcher: StorageReadyWatcher | undefined
 
 export function activate(context: vscode.ExtensionContext) {
   service = TracePointService.getInstance(context)
@@ -129,8 +131,30 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function startExternalWatcher(context: vscode.ExtensionContext) {
+  const workspaceRoot =
+    service.getWorkspaceRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+  if (!workspaceRoot) return
+
   const projectId = service.getBoundProjectId()
-  if (!projectId) return
+  if (!projectId) {
+    externalWatcher?.dispose()
+    externalWatcher = undefined
+    if (!storageReadyWatcher) {
+      storageReadyWatcher = new StorageReadyWatcher((signalProjectId) => {
+        void service
+          .handleStorageReadySignal(signalProjectId)
+          .then((bound) => {
+            if (bound) startExternalWatcher(context)
+          })
+      })
+      storageReadyWatcher.start()
+      context.subscriptions.push(storageReadyWatcher)
+    }
+    return
+  }
+
+  storageReadyWatcher?.dispose()
+  storageReadyWatcher = undefined
   externalWatcher?.dispose()
   externalWatcher = new ExternalStorageWatcher(
     projectId,
@@ -153,4 +177,6 @@ export function deactivate() {
   service?.persistNow()
   externalWatcher?.dispose()
   externalWatcher = undefined
+  storageReadyWatcher?.dispose()
+  storageReadyWatcher = undefined
 }
