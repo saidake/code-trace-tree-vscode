@@ -145,7 +145,7 @@
         "title": "When enabled, ask for a name when creating a trace point; when disabled, create with an empty name",
         "shortTitle": "Prompt for Name",
         "icon": "$(edit)",
-        "enablement": "view == codeTraceTree.view"
+        "enablement": "view == codeTraceTree.view || view == codeTraceTree.empty"
       },
       {
         "command": "codeTraceTree.exportTracePoints",
@@ -176,38 +176,38 @@
         {
           "command": "codeTraceTree.moveUp",
           "group": "navigation@100",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         },
         {
           "command": "codeTraceTree.moveDown",
           "group": "navigation@200",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         },
         {
           "command": "codeTraceTree.toggleHighlights",
           "group": "navigation@300",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         },
         {
           "command": "codeTraceTree.toggleNamePrompt",
           "group": "navigation@350",
-          "when": "view == codeTraceTree.view",
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty",
           "toggle": "codeTraceTree.namePromptEnabled"
         },
         {
           "command": "codeTraceTree.exportTracePoints",
           "group": "navigation@400",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         },
         {
           "command": "codeTraceTree.importTracePoints",
           "group": "navigation@500",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         },
         {
           "command": "codeTraceTree.expandSelected",
           "group": "navigation@600",
-          "when": "view == codeTraceTree.view"
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         }
       ],
       "view/item/context": [
