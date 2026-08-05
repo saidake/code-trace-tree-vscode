@@ -11,7 +11,7 @@
 
 <!-- Plugin description -->
 <p>
-  Code Trace Tree is a VS Code extension that lets you trace code in a tree structure.
+  Trace code in a tree structure.
   Double-click any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
