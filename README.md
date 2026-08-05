@@ -144,11 +144,13 @@ Add a root trace point at the login handler, then children for validation and to
   <li>Linux: <code>$XDG_CONFIG_HOME/code-trace-tree</code> or <code>~/.config/code-trace-tree</code></li>
 </ul>
 <p>
-  Each project uses <code>&lt;projectId&gt;.xml</code> in that folder
-  (legacy <code>&lt;FolderName&gt;.xml</code> files from older releases are still resolved and
-  renamed when found). The project id is stored in
-  <code>.vscode/code-trace-tree.project.id</code>
-  (falls back to <code>.idea/code-trace-tree.project.id</code>).
+  Each workspace binds to a global XML in that folder by matching the workspace path
+  (<code>&lt;path&gt;</code> in the XML). New projects allocate
+  <code>&lt;ProjectFolderName&gt;.xml</code> (or <code>Name1.xml</code>, …) with a UUID
+  <code>&lt;projectId&gt;</code> on first use. Legacy <code>&lt;projectId&gt;.xml</code> and
+  folder-named files from older releases are still resolved by scanning XML contents.
+  If the tree is empty (no nodes; only the default <code>main</code> profile or no profiles),
+  an empty-state message explains rename/move risks and offers browsing stored global data to import.
 </p>
 <!-- Plugin description end -->
 

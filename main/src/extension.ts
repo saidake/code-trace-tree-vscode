@@ -17,7 +17,7 @@ import { registerExpandSelected } from './commands/expandSelected'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
 import { registerExportTracePoints } from './commands/exportTracePoints'
-import { registerImportTracePoints } from './commands/importTracePoints'
+import { registerImportTracePoints, registerBrowseStoredProjects } from './commands/importTracePoints'
 import { registerGoToTracePoint } from './commands/goToTracePoint'
 import {
   registerGoToTracePointInTree,
@@ -97,6 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerToggleNamePrompt(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
+  registerBrowseStoredProjects(context, service)
   registerGoToTracePoint(context, service, treeView)
   registerGoToTracePointInTree(context, service, treeView)
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
