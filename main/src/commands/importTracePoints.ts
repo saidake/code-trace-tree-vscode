@@ -60,14 +60,13 @@ export function registerBrowseStoredProjects(
 
       const stored = service.listStoredProjects()
       if (stored.length === 0) {
-        vscode.window.showInformationMessage('No stored Code Trace Tree projects found.')
+        vscode.window.showInformationMessage('No stored Code Trace Tree projects with trace points found.')
         return
       }
 
       const items = stored.map((entry) => ({
         label: entry.path || '(no path)',
         description: formatUpdatedAt(entry.updatedAt),
-        detail: entry.storageFile,
         entry
       }))
 

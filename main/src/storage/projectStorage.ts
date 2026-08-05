@@ -183,7 +183,7 @@ export class ProjectStorage {
     return undefined
   }
 
-  /** List every global project XML with path metadata. */
+  /** List global project XMLs that contain at least one trace point (any profile). */
   static listStoredProjects(): StoredProjectSummary[] {
     const dir = resolveAppDir()
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return []
@@ -195,6 +195,7 @@ export class ProjectStorage {
       if (!fs.statSync(file).isFile()) continue
       try {
         const doc = parseProjectFile(file)
+        if (!documentHasTracePoints(doc)) continue
         summaries.push({
           storageFile: file,
           projectId: doc.projectId,
@@ -279,4 +280,8 @@ export class ProjectStorage {
       return process.platform === 'win32' ? p.toLowerCase() : p
     }
   }
+}
+
+function documentHasTracePoints(doc: ProjectDocument): boolean {
+  return doc.profiles.some((profile) => profile.tracePointNodes.length > 0)
 }

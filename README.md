@@ -150,7 +150,8 @@ Add a root trace point at the login handler, then children for validation and to
   <code>&lt;projectId&gt;</code> on first use. Legacy <code>&lt;projectId&gt;.xml</code> and
   folder-named files from older releases are still resolved by scanning XML contents.
   If the tree is empty (no nodes; only the default <code>main</code> profile or no profiles),
-  an empty-state message explains rename/move risks and offers browsing stored global data to import.
+  an empty-state webview explains how to create a root trace point and provides a grey
+  <b>Import stored data</b> button if data is lost after moving or renaming the project.
 </p>
 <!-- Plugin description end -->
 

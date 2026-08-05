@@ -29,6 +29,7 @@ import { registerCopyTracePointText } from './commands/copyTracePointText'
 import { registerShowLineContent } from './commands/showLineContent'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
 import { ProfileViewProvider } from './ProfileViewProvider'
+import { EmptyTracePointsViewProvider } from './EmptyTracePointsViewProvider'
 import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
 import { StorageReadyWatcher } from './storage/StorageReadyWatcher'
 
@@ -56,6 +57,11 @@ export function activate(context: vscode.ExtensionContext) {
   const descProvider = new DescriptionViewProvider(context.extensionUri, service)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
+  )
+
+  const emptyProvider = new EmptyTracePointsViewProvider('codeTraceTree.browseStoredProjects')
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('codeTraceTree.empty', emptyProvider)
   )
 
   context.subscriptions.push(

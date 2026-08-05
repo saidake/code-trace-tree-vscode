@@ -60,7 +60,7 @@ Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.
 | Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
-**Empty tree (VS Code):** when there are no trace nodes and only the default `main` profile (or no profiles), the extension shows an empty-state tip about rename/move unbinding and a button to list stored global XML paths for import.
+**Empty tree (VS Code):** when there are no trace nodes and only the default `main` profile (or no profiles), a custom empty-state webview replaces the Trace Points tree: tip to create a root trace point from the editor/Command Palette; note that lost data after move/rename can be imported; grey **Import stored data** button (lists only stored projects that have at least one trace point).
 
 **OS Config Dir:**
 
