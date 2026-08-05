@@ -10,26 +10,26 @@ import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/consta
 import { ProjectDocument, TraceProfile } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import {
-  cloneProfiles,
   parseProjectFile,
   writeProjectDocumentAtomic
 } from './projectDataXml'
-import * as ProjectIdFiles from './projectIdFiles'
+
+export interface StoredProjectSummary {
+  storageFile: string
+  projectId: string
+  path: string
+  updatedAt: number
+}
 
 /**
- * Resolves and persists hybrid project storage (local project id + global XML).
- *
- * Global file naming: `<projectId>.xml`.
- * Legacy `FolderName.xml` files (previous releases) are still found by scanning
- * `<projectId>` inside XML and best-effort renamed to the canonical name.
+ * Resolves and persists global XML project storage bound by workspace path.
  *
  * Resolution on project open:
- * - Case A: match by project id → update path/updatedAt
- * - Case B: match by path (copy-on-write) → new id + new XML file
- * - Case C: no match → return undefined (do not create id/XML until first real use)
+ * - Case B: match global XML `<path>` to workspace → bind in place (reuse `<projectId>`)
+ * - Case C: no match → return undefined (lazy; no disk writes until first real use)
  *
- * Call {@link ensureCreated} before the first persist that should bind storage
- * (create trace point, add profile, import, or toolbar toggle).
+ * Lazy create ({@link ensureCreated}): `<ProjectFolderName>.xml` (or `Name1.xml`, …)
+ * with a new UUID `<projectId>`.
  */
 export class ProjectStorage {
   private boundFile: string | undefined
@@ -48,6 +48,10 @@ export class ProjectStorage {
     return this.boundProjectId
   }
 
+  getProjectBase(): string {
+    return this.projectBase
+  }
+
   /** Re-read the bound XML without rebinding project id. */
   reloadBoundDocument(): ProjectDocument | undefined {
     const file = this.boundFile
@@ -62,67 +66,63 @@ export class ProjectStorage {
     }
   }
 
+  /** Load a global XML file without binding. */
+  loadDocumentFromFile(file: string): ProjectDocument | undefined {
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return undefined
+    try {
+      const doc = parseProjectFile(file)
+      return { ...doc, storageFile: file }
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Bind in memory before import/persist (e.g. browse stored projects). */
+  prepareBind(storageFile: string, projectId: string): void {
+    this.boundFile = storageFile
+    this.boundProjectId = projectId
+  }
+
+  /** Clear an in-memory bind when the user cancels stored-project import. */
+  clearInMemoryBind(): void {
+    this.boundFile = undefined
+    this.boundProjectId = undefined
+  }
+
   /**
-   * Resolve existing storage (Case A / B). Returns undefined when nothing exists yet
+   * Resolve existing storage (Case B). Returns undefined when nothing exists yet
    * (lazy Case C — no disk writes).
    */
   resolveAndLoad(): ProjectDocument | undefined {
     fs.mkdirSync(resolveAppDir(), { recursive: true })
 
-    const existingId = ProjectIdFiles.readProjectId(this.projectBase)
+    const matches = this.findDocumentsByPath(this.projectBase)
+    if (matches.length === 0) return undefined
 
-    // Case A: match by id
-    if (existingId) {
-      const byId = this.findDocumentByProjectId(existingId)
-      if (byId) {
-        // Ensure VS Code has its own id file when we only found the JetBrains one
-        const vscodeIdPath = ProjectIdFiles.vscodeIdPath(this.projectBase)
-        if (!fs.existsSync(vscodeIdPath)) {
-          ProjectIdFiles.writeProjectId(this.projectBase, existingId)
-        }
-        const updated: ProjectDocument = {
-          ...byId,
-          path: this.projectBase,
-          updatedAt: Date.now(),
-          storageFile: byId.storageFile
-        }
-        this.bind(updated)
-        this.saveDocument(updated)
-        return updated
-      }
+    const chosen =
+      matches.length === 1
+        ? matches[0]
+        : matches.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b))
+
+    return this.bindExistingDocument(chosen)
+  }
+
+  /** Bind an existing global XML to this workspace; refresh `<path>` / `<updatedAt>`. */
+  bindExistingDocument(doc: ProjectDocument): ProjectDocument {
+    const updated: ProjectDocument = {
+      ...doc,
+      path: this.projectBase,
+      updatedAt: Date.now(),
+      storageFile: doc.storageFile
     }
-
-    // Case B: match by path (copy-on-write)
-    const byPath = this.findDocumentByPath(this.projectBase)
-    if (byPath) {
-      const newId = uuidv4()
-      const newFile = this.allocateStorageFile(newId)
-      const copied: ProjectDocument = {
-        version: PROJECT_DOCUMENT_VERSION,
-        projectId: newId,
-        path: this.projectBase,
-        updatedAt: Date.now(),
-        profiles: cloneProfiles(byPath.profiles),
-        activeProfileName: byPath.activeProfileName || DEFAULT_PROFILE_NAME,
-        descriptionAreaOpened: byPath.descriptionAreaOpened,
-        highlightingEnabled: byPath.highlightingEnabled,
-        namePromptEnabled: byPath.namePromptEnabled,
-        storageFile: newFile
-      }
-      ProjectIdFiles.writeProjectId(this.projectBase, newId)
-      this.bind(copied)
-      this.saveDocument(copied)
-      return copied
-    }
-
-    // Case C: deferred — no project id / XML until ensureCreated()
-    return undefined
+    this.bind(updated)
+    this.saveDocument(updated)
+    return updated
   }
 
   /**
    * Bind storage for a new project (Case C) if not already bound.
-   * Writes the local project id file and allocates the global XML path;
-   * the first {@link save} writes the XML from in-memory state.
+   * Allocates a folder-named global XML path; first {@link save} writes content.
    * @returns true when this call newly bound storage
    */
   ensureCreated(): boolean {
@@ -132,8 +132,7 @@ export class ProjectStorage {
     if (this.resolveAndLoad()) return true
 
     const newId = uuidv4()
-    const newFile = this.allocateStorageFile(newId)
-    ProjectIdFiles.writeProjectId(this.projectBase, newId)
+    const newFile = this.allocateFolderNameStorageFile()
     this.boundProjectId = newId
     this.boundFile = newFile
     return true
@@ -169,6 +168,51 @@ export class ProjectStorage {
     this.saveDocument(doc)
   }
 
+  /** Find global XML by `<projectId>` (scan all `*.xml`; no rename/migrate). */
+  findDocumentByProjectId(projectId: string): ProjectDocument | undefined {
+    for (const file of this.listProjectXmlFiles()) {
+      try {
+        const doc = parseProjectFile(file)
+        if (doc.projectId === projectId) {
+          return { ...doc, storageFile: file }
+        }
+      } catch {
+        // Skip unreadable storage files
+      }
+    }
+    return undefined
+  }
+
+  /** List every global project XML with path metadata. */
+  static listStoredProjects(): StoredProjectSummary[] {
+    const dir = resolveAppDir()
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return []
+
+    const summaries: StoredProjectSummary[] = []
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.endsWith('.xml') || name.endsWith('.tmp')) continue
+      const file = path.join(dir, name)
+      if (!fs.statSync(file).isFile()) continue
+      try {
+        const doc = parseProjectFile(file)
+        summaries.push({
+          storageFile: file,
+          projectId: doc.projectId,
+          path: doc.path,
+          updatedAt: doc.updatedAt
+        })
+      } catch {
+        // Skip unreadable storage files
+      }
+    }
+    return summaries.sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  pathsMatch(storedPath: string, workspacePath?: string): boolean {
+    const target = workspacePath ?? this.projectBase
+    return this.normalizePath(storedPath) === this.normalizePath(target)
+  }
+
   private saveDocument(doc: ProjectDocument): void {
     const file = doc.storageFile || this.boundFile
     if (!file) return
@@ -181,11 +225,23 @@ export class ProjectStorage {
     this.boundProjectId = doc.projectId
   }
 
-  /** Canonical global storage path: `<appDir>/<projectId>.xml`. */
-  private allocateStorageFile(projectId: string): string {
+  private allocateFolderNameStorageFile(): string {
     const dir = resolveAppDir()
     fs.mkdirSync(dir, { recursive: true })
-    return path.join(dir, `${projectId}.xml`)
+    const baseName = this.sanitizeFolderName(path.basename(this.projectBase))
+    let candidate = path.join(dir, `${baseName}.xml`)
+    if (!fs.existsSync(candidate)) return candidate
+
+    let i = 1
+    while (fs.existsSync(path.join(dir, `${baseName}${i}.xml`))) {
+      i++
+    }
+    return path.join(dir, `${baseName}${i}.xml`)
+  }
+
+  private sanitizeFolderName(name: string): string {
+    const sanitized = name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim()
+    return sanitized || 'project'
   }
 
   private listProjectXmlFiles(): string[] {
@@ -198,65 +254,20 @@ export class ProjectStorage {
       .filter((file) => fs.statSync(file).isFile())
   }
 
-  /**
-   * Case A lookup:
-   * 1. Fast path — open `<projectId>.xml` when present
-   * 2. Legacy fallback — scan other `*.xml` for matching `<projectId>`
-   * 3. Best-effort rename legacy file → `<projectId>.xml`
-   */
-  private findDocumentByProjectId(projectId: string): ProjectDocument | undefined {
-    const canonical = this.allocateStorageFile(projectId)
-
-    if (fs.existsSync(canonical) && fs.statSync(canonical).isFile()) {
-      try {
-        const doc = parseProjectFile(canonical)
-        if (doc.projectId === projectId) {
-          return { ...doc, storageFile: canonical }
-        }
-      } catch {
-        // Fall through to legacy scan
-      }
-    }
-
-    for (const file of this.listProjectXmlFiles()) {
-      if (path.resolve(file) === path.resolve(canonical)) continue
-      try {
-        const doc = parseProjectFile(file)
-        if (doc.projectId !== projectId) continue
-        const migrated = this.migrateLegacyStorageFile(file, canonical)
-        return { ...doc, storageFile: migrated }
-      } catch {
-        // Skip unreadable storage files
-      }
-    }
-    return undefined
-  }
-
-  /** Rename legacy FolderName.xml → projectId.xml when the target is free. */
-  private migrateLegacyStorageFile(legacyFile: string, canonicalFile: string): string {
-    if (path.resolve(legacyFile) === path.resolve(canonicalFile)) return legacyFile
-    if (fs.existsSync(canonicalFile)) return legacyFile
-    try {
-      fs.renameSync(legacyFile, canonicalFile)
-      return canonicalFile
-    } catch {
-      return legacyFile
-    }
-  }
-
-  private findDocumentByPath(absolutePath: string): ProjectDocument | undefined {
+  private findDocumentsByPath(absolutePath: string): ProjectDocument[] {
     const normalized = this.normalizePath(absolutePath)
+    const matches: ProjectDocument[] = []
     for (const file of this.listProjectXmlFiles()) {
       try {
         const doc = parseProjectFile(file)
         if (this.normalizePath(doc.path) === normalized) {
-          return { ...doc, storageFile: file }
+          matches.push({ ...doc, storageFile: file })
         }
       } catch {
         // Skip unreadable storage files
       }
     }
-    return undefined
+    return matches
   }
 
   private normalizePath(p: string): string {

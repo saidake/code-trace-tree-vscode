@@ -20,7 +20,7 @@ import {
 } from './domain/types'
 import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
-import { ProjectStorage } from './storage/projectStorage'
+import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -314,6 +314,56 @@ export class TracePointService {
       'codeTraceTree.namePromptEnabled',
       this._namePromptEnabled
     )
+    await this.syncEmptyStateContextKey()
+  }
+
+  private isTreeEmptyForEmptyState(): boolean {
+    const hasNodes = this.profiles.some((p) => p.tracePointNodes.length > 0)
+    if (hasNodes) return false
+    if (this.profiles.length === 0) return true
+    return (
+      this.profiles.length === 1 && this.profiles[0].name === DEFAULT_PROFILE_NAME
+    )
+  }
+
+  async syncEmptyStateContextKey(): Promise<void> {
+    await vscode.commands.executeCommand(
+      'setContext',
+      'codeTraceTree.showEmptyState',
+      this.isTreeEmptyForEmptyState()
+    )
+  }
+
+  listStoredProjects(): StoredProjectSummary[] {
+    return ProjectStorage.listStoredProjects()
+  }
+
+  /**
+   * Prepare binding to a stored global XML, then persist after profile import.
+   * Caller runs import UI and mutates profiles before {@link finalizeStoredProjectBind}.
+   */
+  prepareBindStoredProject(storageFile: string, projectId: string): void {
+    const workspaceRoot =
+      this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!workspaceRoot) return
+    this.workspaceRoot = workspaceRoot
+    if (!this.storage) {
+      this.storage = new ProjectStorage(workspaceRoot)
+    }
+    this.storage.prepareBind(storageFile, projectId)
+  }
+
+  /** After importing profiles from a stored XML, update path and persist. */
+  finalizeStoredProjectBind(notifyBound = false): void {
+    this.persistNow()
+    if (notifyBound) {
+      this.onStorageBound?.()
+    }
+    void this.syncEmptyStateContextKey()
+  }
+
+  clearPreparedStoredProjectBind(): void {
+    this.storage?.clearInMemoryBind()
   }
 
   getActiveProfileName(): string {
@@ -330,6 +380,7 @@ export class TracePointService {
 
   private notifyProfileListeners() {
     this.profileListeners.forEach((listener) => listener())
+    void this.syncEmptyStateContextKey()
   }
 
   /** Copy working tree + expand ids back into the active TraceProfile. */
@@ -607,6 +658,7 @@ export class TracePointService {
     nodes: Set<TracePointNode | null> | null = null
   ) {
     this.listenersMap.get(eventType)?.forEach((listener) => listener(nodes))
+    void this.syncEmptyStateContextKey()
   }
 
   async addTracePoint(
@@ -1060,8 +1112,35 @@ export class TracePointService {
     return changed
   }
 
-  async reloadFromExternalStorage(_reason = 'manual'): Promise<boolean> {
-    if (this.shouldIgnoreExternalChanges()) return false
+  /**
+   * Agent wrote `signals/<projectId>.storage-ready` after creating global XML (Case C).
+   * Bind when that XML's `<path>` matches the workspace.
+   */
+  async handleStorageReadySignal(signalProjectId: string): Promise<boolean> {
+    if (this.getBoundProjectId()) return true
+    const workspaceRoot =
+      this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!workspaceRoot) return false
+    this.workspaceRoot = workspaceRoot
+
+    const storage = this.storage ?? new ProjectStorage(workspaceRoot)
+    this.storage = storage
+    const doc = storage.findDocumentByProjectId(signalProjectId)
+    if (!doc || !storage.pathsMatch(doc.path, workspaceRoot)) return false
+
+    const bound = storage.bindExistingDocument(doc)
+    this.suppressPersist = true
+    try {
+      await this.applyDocument(bound)
+      this.notifyProfileListeners()
+    } finally {
+      this.suppressPersist = false
+    }
+    return true
+  }
+
+  async reloadFromExternalStorage(_reason = 'manual', bypassIgnoreWindow = false): Promise<boolean> {
+    if (!bypassIgnoreWindow && this.shouldIgnoreExternalChanges()) return false
     const doc = this.storage?.reloadBoundDocument()
     if (!doc) return false
     this.suppressPersist = true
@@ -1080,8 +1159,11 @@ export class TracePointService {
    * Does not change activeProfileName or project toolbar flags.
    * @param profileName empty/undefined → active profile
    */
-  async reloadProfileFromExternalStorage(profileName?: string): Promise<boolean> {
-    if (this.shouldIgnoreExternalChanges()) return false
+  async reloadProfileFromExternalStorage(
+    profileName?: string,
+    bypassIgnoreWindow = false
+  ): Promise<boolean> {
+    if (!bypassIgnoreWindow && this.shouldIgnoreExternalChanges()) return false
     const doc = this.storage?.reloadBoundDocument()
     if (!doc) return false
     const name = (profileName || '').trim() || this.activeProfileName
@@ -1120,7 +1202,7 @@ export class TracePointService {
     const requestPath = AgentSignalFiles.refreshProfilePath(projectId)
     if (!AgentSignalFiles.isFresh(requestPath)) return
     const name = AgentSignalFiles.readProfileRefreshName(requestPath)
-    await this.reloadProfileFromExternalStorage(name || undefined)
+    await this.reloadProfileFromExternalStorage(name || undefined, true)
   }
 
   /**

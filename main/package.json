@@ -2,7 +2,7 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Manage code trace points in a hierarchical tree for workflow tracing.",
-  "version": "1.1.11",
+  "version": "1.2.0",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
@@ -151,6 +151,10 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "codeTraceTree.browseStoredProjects",
+        "title": "Browse Stored Projects"
+      },
+      {
         "command": "codeTraceTree.goToTracePoint",
         "title": "Go to Trace Point",
         "icon": "$(go-to-file)"
@@ -257,6 +261,13 @@
         "key": "ctrl+c",
         "mac": "cmd+c",
         "when": "view == codeTraceTree.view && focusedView == codeTraceTree.view"
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "codeTraceTree.view",
+        "contents": "There are currently no trace points.\n\nRenaming or moving the project directory may cause Code Trace Tree data to be lost.\n\n[Browse stored projects](command:codeTraceTree.browseStoredProjects)",
+        "when": "codeTraceTree.showEmptyState"
       }
     ]
   },

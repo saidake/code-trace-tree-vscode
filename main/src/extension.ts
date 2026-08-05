@@ -17,7 +17,7 @@ import { registerExpandSelected } from './commands/expandSelected'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
 import { registerExportTracePoints } from './commands/exportTracePoints'
-import { registerImportTracePoints } from './commands/importTracePoints'
+import { registerImportTracePoints, registerBrowseStoredProjects } from './commands/importTracePoints'
 import { registerGoToTracePoint } from './commands/goToTracePoint'
 import {
   registerGoToTracePointInTree,
@@ -30,11 +30,13 @@ import { registerShowLineContent } from './commands/showLineContent'
 import { DescriptionViewProvider } from './DescriptionViewProvider'
 import { ProfileViewProvider } from './ProfileViewProvider'
 import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
+import { StorageReadyWatcher } from './storage/StorageReadyWatcher'
 
 let service: TracePointService
 let treeDataProvider: TracePointTreeDataProvider
 let treeView: vscode.TreeView<vscode.TreeItem>
 let externalWatcher: ExternalStorageWatcher | undefined
+let storageReadyWatcher: StorageReadyWatcher | undefined
 
 export function activate(context: vscode.ExtensionContext) {
   service = TracePointService.getInstance(context)
@@ -95,6 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerToggleNamePrompt(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
+  registerBrowseStoredProjects(context, service)
   registerGoToTracePoint(context, service, treeView)
   registerGoToTracePointInTree(context, service, treeView)
   registerRenameTracePoint(context, service, treeView, treeDataProvider)
@@ -128,15 +131,41 @@ export function activate(context: vscode.ExtensionContext) {
   )
 }
 
-function startExternalWatcher(context: vscode.ExtensionContext) {
+function startExternalWatcher(
+  context: vscode.ExtensionContext,
+  options?: { replayExistingRefresh?: boolean }
+) {
+  const replayExistingRefresh = options?.replayExistingRefresh !== false
+  const workspaceRoot =
+    service.getWorkspaceRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+  if (!workspaceRoot) return
+
   const projectId = service.getBoundProjectId()
-  if (!projectId) return
+  if (!projectId) {
+    externalWatcher?.dispose()
+    externalWatcher = undefined
+    if (!storageReadyWatcher) {
+      storageReadyWatcher = new StorageReadyWatcher((signalProjectId) => {
+        void service.handleStorageReadySignal(signalProjectId).then((bound) => {
+          if (bound) {
+            // Data already loaded via storage-ready; skip replaying request_refresh.
+            startExternalWatcher(context, { replayExistingRefresh: false })
+          }
+        })
+      })
+      storageReadyWatcher.start()
+      context.subscriptions.push(storageReadyWatcher)
+    }
+    return
+  }
+
+  storageReadyWatcher?.dispose()
+  storageReadyWatcher = undefined
   externalWatcher?.dispose()
   externalWatcher = new ExternalStorageWatcher(
     projectId,
-    () => service.shouldIgnoreExternalChanges(),
     (reason) => {
-      void service.reloadFromExternalStorage(reason)
+      void service.reloadFromExternalStorage(reason, true)
     },
     () => {
       void service.handleExternalProfileRefreshRequest()
@@ -145,7 +174,7 @@ function startExternalWatcher(context: vscode.ExtensionContext) {
       void service.handleExternalSelectRequest(treeView)
     }
   )
-  externalWatcher.start()
+  externalWatcher.start(replayExistingRefresh)
   context.subscriptions.push(externalWatcher)
 }
 
@@ -153,4 +182,6 @@ export function deactivate() {
   service?.persistNow()
   externalWatcher?.dispose()
   externalWatcher = undefined
+  storageReadyWatcher?.dispose()
+  storageReadyWatcher = undefined
 }

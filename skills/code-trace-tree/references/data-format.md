@@ -1,7 +1,8 @@
 # Code Trace Tree data format
 
-Root document (`version="4"`) stored as `<OS Config Dir>/code-trace-tree/<projectId>.xml`.
-Legacy `<FolderName>.xml` files are still resolved by scanning `<projectId>` inside XML.
+Root document (`version="4"`) stored under `<OS Config Dir>/code-trace-tree/`.
+New projects use `<ProjectFolderName>.xml` (UUID `<projectId>` inside). Legacy `<projectId>.xml`
+and other folder-named files are resolved by scanning XML contents.
 
 `<!-- … -->` comments below are for documentation only; prefer omitting them in real storage files.
 Prefer `trace_tree` scripts over hand-editing. Never persist `isValid`.

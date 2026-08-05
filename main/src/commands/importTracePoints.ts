@@ -7,6 +7,7 @@ import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointNode, TraceProfile } from '../domain/types'
 import { isParsedSingle, parseExportXml } from '../utils/traceProfileXml'
+import { ProjectStorage } from '../storage/projectStorage'
 
 /**
  * Import single-profile (`<traceProfile>`) or multi-profile (`<traceProfiles>`) files.
@@ -34,13 +35,80 @@ export function registerImportTracePoints(
         if (isParsedSingle(parsed)) {
           await importSingle(service, parsed.profileName, parsed.nodes, parsed.expandedIds)
         } else {
-          await importMulti(service, parsed.activeProfileName, parsed.profiles)
+          await promptImportMulti(service, parsed.activeProfileName, parsed.profiles)
         }
       } catch (e) {
         vscode.window.showErrorMessage(`Failed to import: ${e}`)
       }
     })
   )
+}
+
+export function registerBrowseStoredProjects(
+  context: vscode.ExtensionContext,
+  service: TracePointService
+) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codeTraceTree.browseStoredProjects', async () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+      if (!workspaceRoot) {
+        vscode.window.showWarningMessage(
+          'Code Trace Tree: open a workspace folder to import stored data.'
+        )
+        return
+      }
+
+      const stored = service.listStoredProjects()
+      if (stored.length === 0) {
+        vscode.window.showInformationMessage('No stored Code Trace Tree projects found.')
+        return
+      }
+
+      const items = stored.map((entry) => ({
+        label: entry.path || '(no path)',
+        description: formatUpdatedAt(entry.updatedAt),
+        detail: entry.storageFile,
+        entry
+      }))
+
+      const picked = await vscode.window.showQuickPick(items, {
+        title: 'Stored Code Trace Tree Projects',
+        placeHolder: 'Select a project to import its profiles into this workspace'
+      })
+      if (!picked) return
+
+      const storage = new ProjectStorage(workspaceRoot)
+      const doc = storage.loadDocumentFromFile(picked.entry.storageFile)
+      if (!doc) {
+        vscode.window.showErrorMessage('Failed to read the selected storage file.')
+        return
+      }
+
+      const wasUnbound = !service.getBoundProjectId()
+      service.prepareBindStoredProject(picked.entry.storageFile, doc.projectId)
+      const imported = await promptImportMulti(service, doc.activeProfileName, doc.profiles)
+      if (!imported) {
+        if (wasUnbound) {
+          service.clearPreparedStoredProjectBind()
+        }
+        return
+      }
+
+      service.finalizeStoredProjectBind(wasUnbound)
+      vscode.window.showInformationMessage(
+        `Imported profiles from stored project and bound storage to this workspace.`
+      )
+    })
+  )
+}
+
+function formatUpdatedAt(epochMs: number): string {
+  if (!epochMs) return 'Unknown date'
+  try {
+    return new Date(epochMs).toLocaleString()
+  } catch {
+    return String(epochMs)
+  }
 }
 
 async function importSingle(
@@ -82,11 +150,12 @@ async function importSingle(
   vscode.window.showInformationMessage(`Imported as new profile "${name}".`)
 }
 
-async function importMulti(
+/** Multi-profile import choices; returns false when the user cancels. */
+export async function promptImportMulti(
   service: TracePointService,
   activeProfileName: string | undefined,
   profiles: TraceProfile[]
-) {
+): Promise<boolean> {
   const names = profiles.map((p) => `"${p.name}"`).join(', ')
   const choice = await vscode.window.showQuickPick(
     [
@@ -111,14 +180,14 @@ async function importMulti(
       placeHolder: `This file contains ${profiles.length} profile(s): ${names}`
     }
   )
-  if (!choice) return
+  if (!choice) return false
 
   if (choice.value === 'new') {
     const created = await service.importAsNewProfiles(profiles)
     vscode.window.showInformationMessage(
       `Imported ${created.length} profile(s): ${created.map((n) => `"${n}"`).join(', ')}.`
     )
-    return
+    return true
   }
 
   if (choice.value === 'merge') {
@@ -126,7 +195,7 @@ async function importMulti(
     vscode.window.showInformationMessage(
       `Merged ${profiles.length} profile(s) into the project.`
     )
-    return
+    return true
   }
 
   const confirm = await vscode.window.showWarningMessage(
@@ -134,10 +203,11 @@ async function importMulti(
     { modal: true },
     'Replace'
   )
-  if (confirm !== 'Replace') return
+  if (confirm !== 'Replace') return false
 
   await service.replaceAllProfiles(profiles, activeProfileName)
   vscode.window.showInformationMessage(
     `Replaced all profiles with ${profiles.length} profile(s) from the file.`
   )
+  return true
 }
