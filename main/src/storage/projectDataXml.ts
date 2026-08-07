@@ -9,7 +9,7 @@ import {
   DEFAULT_PROFILE_NAME,
   PROJECT_DOCUMENT_VERSION
 } from '../domain/constants'
-import { ProjectDocument, TraceProfile } from '../domain/types'
+import { ProjectDocument, TraceProfile, advancedSettingsFromXml, isDefaultAdvancedSettings } from '../domain/types'
 import {
   nodeFromXml,
   nodeToXml,
@@ -56,6 +56,10 @@ export function parseProjectDocument(xml: string, storageFile?: string): Project
       root.highlightingEnabled == null ? true : String(root.highlightingEnabled) === 'true',
     namePromptEnabled:
       root.namePromptEnabled == null ? true : String(root.namePromptEnabled) === 'true',
+    advancedSettings: advancedSettingsFromXml(
+      root.advancedSettings?.highlightLineBackground?.light,
+      root.advancedSettings?.highlightLineBackground?.dark
+    ),
     storageFile
   }
 }
@@ -67,21 +71,30 @@ export function parseProjectFile(filePath: string): ProjectDocument {
 
 /** Serialize project document to XML string. */
 export function projectDocumentToXml(doc: ProjectDocument): string {
+  const project: Record<string, unknown> = {
+    '@_version': String(doc.version || PROJECT_DOCUMENT_VERSION),
+    projectId: doc.projectId,
+    path: doc.path,
+    updatedAt: String(doc.updatedAt),
+    activeProfileName: doc.activeProfileName,
+    highlightingEnabled: String(doc.highlightingEnabled),
+    namePromptEnabled: String(doc.namePromptEnabled)
+  }
+  if (!isDefaultAdvancedSettings(doc.advancedSettings)) {
+    project.advancedSettings = {
+      highlightLineBackground: {
+        light: doc.advancedSettings.highlightLineBackgroundLight,
+        dark: doc.advancedSettings.highlightLineBackgroundDark
+      }
+    }
+  }
+  project.traceProfiles = {
+    traceProfile: doc.profiles.map((p) => profileToXmlShape(p))
+  }
+  project.descriptionAreaOpened = String(doc.descriptionAreaOpened)
   const obj = {
     '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
-    project: {
-      '@_version': String(doc.version || PROJECT_DOCUMENT_VERSION),
-      projectId: doc.projectId,
-      path: doc.path,
-      updatedAt: String(doc.updatedAt),
-      activeProfileName: doc.activeProfileName,
-      highlightingEnabled: String(doc.highlightingEnabled),
-      namePromptEnabled: String(doc.namePromptEnabled),
-      traceProfiles: {
-        traceProfile: doc.profiles.map((p) => profileToXmlShape(p))
-      },
-      descriptionAreaOpened: String(doc.descriptionAreaOpened)
-    }
+    project
   }
   return serializeXml(obj)
 }

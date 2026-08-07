@@ -46,6 +46,46 @@ export interface TraceProfile {
   expandedTracePointIds: string[]
 }
 
+export interface AdvancedSettings {
+  highlightLineBackgroundLight: string
+  highlightLineBackgroundDark: string
+}
+
+export const DEFAULT_HIGHLIGHT_LIGHT = '#FFFFC8'
+export const DEFAULT_HIGHLIGHT_DARK = '#646400'
+
+export function defaultAdvancedSettings(): AdvancedSettings {
+  return {
+    highlightLineBackgroundLight: DEFAULT_HIGHLIGHT_LIGHT,
+    highlightLineBackgroundDark: DEFAULT_HIGHLIGHT_DARK
+  }
+}
+
+export function isDefaultAdvancedSettings(settings: AdvancedSettings): boolean {
+  return (
+    normalizeHighlightHex(settings.highlightLineBackgroundLight) === DEFAULT_HIGHLIGHT_LIGHT &&
+    normalizeHighlightHex(settings.highlightLineBackgroundDark) === DEFAULT_HIGHLIGHT_DARK
+  )
+}
+
+export function normalizeHighlightHex(raw: string | undefined | null): string | undefined {
+  if (raw == null) return undefined
+  const t = String(raw).trim().toUpperCase()
+  const withHash = t.startsWith('#') ? t : `#${t}`
+  return /^#[0-9A-F]{6}$/.test(withHash) ? withHash : undefined
+}
+
+export function advancedSettingsFromXml(
+  lightRaw: string | undefined | null,
+  darkRaw: string | undefined | null
+): AdvancedSettings {
+  return {
+    highlightLineBackgroundLight:
+      normalizeHighlightHex(lightRaw) ?? DEFAULT_HIGHLIGHT_LIGHT,
+    highlightLineBackgroundDark: normalizeHighlightHex(darkRaw) ?? DEFAULT_HIGHLIGHT_DARK
+  }
+}
+
 export interface ProjectDocument {
   version: number
   projectId: string
@@ -56,6 +96,7 @@ export interface ProjectDocument {
   descriptionAreaOpened: boolean
   highlightingEnabled: boolean
   namePromptEnabled: boolean
+  advancedSettings: AdvancedSettings
   /** Absolute path of the XML file this document is bound to. */
   storageFile?: string
 }

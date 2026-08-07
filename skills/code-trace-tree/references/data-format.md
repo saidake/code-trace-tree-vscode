@@ -27,6 +27,13 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
+  <!-- Optional; omit when colors are still defaults (#FFFFC8 / #646400) -->
+  <advancedSettings>
+    <highlightLineBackground>
+      <light>#FFFFC8</light>
+      <dark>#646400</dark>
+    </highlightLineBackground>
+  </advancedSettings>
 
   <traceProfiles>
     <!-- Profile 1: user / default tree -->
@@ -171,6 +178,7 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
+  <!-- Optional advancedSettings / highlightLineBackground (#RRGGBB light+dark) -->
   <traceProfiles>
     <traceProfile>
       <name>main</name>

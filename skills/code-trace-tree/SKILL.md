@@ -212,7 +212,7 @@ The IDE watches **signal files** (not the XML path). After agent edits, always w
 
 | Signal | Effect |
 |--------|--------|
-| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
+| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`, `advancedSettings`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
 | `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. |
 | `<projectId>.storage-ready` | Case C bind handshake (no TTL). VS Code binds when that projectId’s XML `<path>` matches the current workspace. Does not create storage. |
 

@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/constants'
-import { ProjectDocument, TraceProfile } from '../domain/types'
+import { ProjectDocument, TraceProfile, AdvancedSettings, defaultAdvancedSettings } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import {
   parseProjectFile,
@@ -143,7 +143,8 @@ export class ProjectStorage {
     activeProfileName: string,
     descriptionAreaOpened: boolean,
     highlightingEnabled: boolean,
-    namePromptEnabled: boolean
+    namePromptEnabled: boolean,
+    advancedSettings: AdvancedSettings = defaultAdvancedSettings()
   ): void {
     const file = this.boundFile
     const projectId = this.boundProjectId
@@ -163,6 +164,7 @@ export class ProjectStorage {
       descriptionAreaOpened,
       highlightingEnabled,
       namePromptEnabled,
+      advancedSettings,
       storageFile: file
     }
     this.saveDocument(doc)
