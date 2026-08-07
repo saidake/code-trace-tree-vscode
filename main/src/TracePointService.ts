@@ -18,7 +18,10 @@ import {
   TracePointNode,
   TraceProfile,
   AdvancedSettings,
-  defaultAdvancedSettings
+  defaultAdvancedSettings,
+  normalizeHighlightHex,
+  DEFAULT_HIGHLIGHT_LIGHT,
+  DEFAULT_HIGHLIGHT_DARK
 } from './domain/types'
 import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
@@ -293,6 +296,32 @@ export class TracePointService {
     this._highlightingEnabled = enabled
     this.applyHighlightsToAllEditors()
     this.schedulePersist()
+  }
+
+  getAdvancedSettings(): AdvancedSettings {
+    return { ...this._advancedSettings }
+  }
+
+  setAdvancedSettings(settings: AdvancedSettings) {
+    this.ensureStorage()
+    this._advancedSettings = {
+      highlightLineBackgroundLight:
+        normalizeHighlightHex(settings.highlightLineBackgroundLight) ?? DEFAULT_HIGHLIGHT_LIGHT,
+      highlightLineBackgroundDark:
+        normalizeHighlightHex(settings.highlightLineBackgroundDark) ?? DEFAULT_HIGHLIGHT_DARK
+    }
+    this.applyHighlightsToAllEditors()
+    this.schedulePersist()
+  }
+
+  /** Theme-aware highlight fill from advanced settings. */
+  private currentHighlightBackground(): string {
+    const kind = vscode.window.activeColorTheme.kind
+    const dark =
+      kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast
+    return dark
+      ? this._advancedSettings.highlightLineBackgroundDark
+      : this._advancedSettings.highlightLineBackgroundLight
   }
 
   isDescriptionAreaOpened(): boolean {
@@ -853,7 +882,7 @@ export class TracePointService {
     this.removeHighlights(document.uri.fsPath)
 
     const decorationType = vscode.window.createTextEditorDecorationType({
-      backgroundColor: new vscode.ThemeColor('editor.findMatchBackground'),
+      backgroundColor: this.currentHighlightBackground(),
       isWholeLine: true
     })
 

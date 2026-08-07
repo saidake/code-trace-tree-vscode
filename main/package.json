@@ -135,6 +135,16 @@
         "icon": "$(expand-all)"
       },
       {
+        "command": "codeTraceTree.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeTraceTree.openAdvancedSettings",
+        "title": "Advanced Settings",
+        "icon": "$(kebab-vertical)"
+      },
+      {
         "command": "codeTraceTree.toggleHighlights",
         "title": "Toggle the visibility of trace point highlights in files",
         "shortTitle": "Toggle Highlights",
@@ -207,6 +217,16 @@
         {
           "command": "codeTraceTree.expandSelected",
           "group": "navigation@600",
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
+        },
+        {
+          "command": "codeTraceTree.collapseAll",
+          "group": "navigation@650",
+          "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
+        },
+        {
+          "command": "codeTraceTree.openAdvancedSettings",
+          "group": "navigation@700",
           "when": "view == codeTraceTree.view || view == codeTraceTree.empty"
         }
       ],

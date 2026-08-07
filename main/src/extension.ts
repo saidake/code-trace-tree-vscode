@@ -14,7 +14,9 @@ import { registerUpdateTracePoint } from './commands/updateTracePoint'
 import { registerMoveUp } from './commands/moveUp'
 import { registerMoveDown } from './commands/moveDown'
 import { registerExpandSelected } from './commands/expandSelected'
+import { registerCollapseAll } from './commands/collapseAll'
 import { registerToggleHighlights } from './commands/toggleHighlights'
+import { registerOpenAdvancedSettings } from './commands/openAdvancedSettings'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints, registerBrowseStoredProjects } from './commands/importTracePoints'
@@ -45,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
   treeView = vscode.window.createTreeView('codeTraceTree.view', {
     treeDataProvider,
     canSelectMany: true,
-    showCollapseAll: true,
+    showCollapseAll: false,
     dragAndDropController: treeDataProvider
   })
   treeDataProvider.bindTreeView(treeView)
@@ -103,7 +105,9 @@ export function activate(context: vscode.ExtensionContext) {
   registerMoveUp(context, service, treeView, treeDataProvider)
   registerMoveDown(context, service, treeView, treeDataProvider)
   registerExpandSelected(context, treeView, treeDataProvider)
+  registerCollapseAll(context, treeDataProvider)
   registerToggleHighlights(context, service)
+  registerOpenAdvancedSettings(context, service)
   registerToggleNamePrompt(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
@@ -125,6 +129,9 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => updateTracePointAtCaretContext(service)),
     vscode.window.onDidChangeVisibleTextEditors(() => {
+      service.applyHighlightsToAllEditors()
+    }),
+    vscode.window.onDidChangeActiveColorTheme(() => {
       service.applyHighlightsToAllEditors()
     }),
     vscode.window.onDidChangeTextEditorSelection(() => updateTracePointAtCaretContext(service))
