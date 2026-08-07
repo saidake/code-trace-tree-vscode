@@ -8,26 +8,71 @@ import * as vscode from 'vscode'
 /**
  * Empty Trace Points panel (shown when {@code codeTraceTree.showEmptyState}).
  * Custom webview so the Import button can use secondary/grey styling.
+ * Import affordances appear only when {@link hasImportableStoredData} is true.
  */
 export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider {
+  private view?: vscode.WebviewView
   private readonly importCommand: string
+  private readonly hasImportableStoredData: () => boolean
 
-  constructor(importCommand: string) {
+  constructor(importCommand: string, hasImportableStoredData: () => boolean) {
     this.importCommand = importCommand
+    this.hasImportableStoredData = hasImportableStoredData
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
+    this.view = webviewView
     webviewView.webview.options = { enableScripts: true }
-    webviewView.webview.html = this.getHtml()
+
+    webviewView.onDidDispose(() => {
+      if (this.view === webviewView) this.view = undefined
+    })
+
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) this.refresh()
+    })
 
     webviewView.webview.onDidReceiveMessage(async (msg) => {
       if (msg?.command === 'importStoredData') {
         await vscode.commands.executeCommand(this.importCommand)
       }
     })
+
+    this.render()
   }
 
-  private getHtml(): string {
+  /** Re-read importable stored projects and update the empty-state HTML. */
+  refresh() {
+    if (!this.view?.visible) return
+    this.render()
+  }
+
+  private render() {
+    const view = this.view
+    if (!view) return
+    try {
+      view.webview.html = this.getHtml(this.hasImportableStoredData())
+    } catch {
+      // View can be disposed between checks and the html write.
+      if (this.view === view) this.view = undefined
+    }
+  }
+
+  private getHtml(canImport: boolean): string {
+    const importSection = canImport
+      ? `
+  <p class="hint">If your project data is lost after moving or renaming the project, you can import previously stored data.</p>
+  <div class="actions">
+    <button class="import" type="button" id="importBtn">Import stored data</button>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    document.getElementById('importBtn').addEventListener('click', () => {
+      vscode.postMessage({ command: 'importStoredData' });
+    });
+  </script>`
+      : ''
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -78,16 +123,7 @@ export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider 
 <body>
   <p><strong>No trace points yet.</strong></p>
   <p class="hint">Put the caret on a line in the editor, then create a root trace point to start a workflow map (editor context menu or Command Palette).</p>
-  <p class="hint">If your project data is lost after moving or renaming the project, you can import previously stored data.</p>
-  <div class="actions">
-    <button class="import" type="button" id="importBtn">Import stored data</button>
-  </div>
-  <script>
-    const vscode = acquireVsCodeApi();
-    document.getElementById('importBtn').addEventListener('click', () => {
-      vscode.postMessage({ command: 'importStoredData' });
-    });
-  </script>
+  ${importSection}
 </body>
 </html>`
   }

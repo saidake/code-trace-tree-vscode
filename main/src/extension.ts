@@ -59,7 +59,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider('codeTraceTree.description', descProvider)
   )
 
-  const emptyProvider = new EmptyTracePointsViewProvider('codeTraceTree.browseStoredProjects')
+  const emptyProvider = new EmptyTracePointsViewProvider(
+    'codeTraceTree.browseStoredProjects',
+    () => service.listStoredProjects().length > 0
+  )
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeTraceTree.empty', emptyProvider)
   )
@@ -113,6 +116,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   service.loadState().then(() => {
     updateTracePointAtCaretContext(service)
+    emptyProvider.refresh()
     startExternalWatcher(context)
   })
   service.setOnStorageBound(() => startExternalWatcher(context))
@@ -125,6 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.onDidChangeTextEditorSelection(() => updateTracePointAtCaretContext(service))
   )
   service.addNodeListener('refresh', () => updateTracePointAtCaretContext(service))
+  service.addProfileListener(() => emptyProvider.refresh())
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e)),

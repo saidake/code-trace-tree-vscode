@@ -334,8 +334,20 @@ export class TracePointService {
     )
   }
 
+  /**
+   * Global XMLs with at least one trace point.
+   * While this workspace is in empty-tree state, exclude the currently bound file so a
+   * just-cleared tree (disk persist still pending) does not look importable.
+   */
   listStoredProjects(): StoredProjectSummary[] {
-    return ProjectStorage.listStoredProjects()
+    const stored = ProjectStorage.listStoredProjects()
+    if (!this.isTreeEmptyForEmptyState()) return stored
+    const bound = this.getBoundStorageFile()
+    if (!bound) return stored
+    const boundKey = normalizeStoragePath(bound)
+    return stored.filter(
+      (entry) => normalizeStoragePath(entry.storageFile) !== boundKey
+    )
   }
 
   /**
@@ -1436,5 +1448,14 @@ export class TracePointService {
       return true
     }
     return false
+  }
+}
+
+function normalizeStoragePath(p: string): string {
+  try {
+    const normalized = path.resolve(p)
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+  } catch {
+    return process.platform === 'win32' ? p.toLowerCase() : p
   }
 }

@@ -150,8 +150,10 @@ Add a root trace point at the login handler, then children for validation and to
   <code>&lt;projectId&gt;</code> on first use. Legacy <code>&lt;projectId&gt;.xml</code> and
   folder-named files from older releases are still resolved by scanning XML contents.
   If the tree is empty (no nodes; only the default <code>main</code> profile or no profiles),
-  an empty-state webview explains how to create a root trace point and provides a grey
-  <b>Import stored data</b> button if data is lost after moving or renaming the project.
+  an empty-state webview explains how to create a root trace point. Recover UI (grey
+  <b>Import stored data</b> after move/rename) appears only when another stored global
+  project still has a trace point. Clearing this workspace’s tree (including delete-all)
+  does not keep recover UI visible for the bound file while it is empty.
 </p>
 <!-- Plugin description end -->
 
