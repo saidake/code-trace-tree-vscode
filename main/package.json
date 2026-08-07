@@ -2,7 +2,7 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Trace code in a tree structure—build and display code workflows as nested, navigable trace points",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
@@ -178,7 +178,7 @@
       },
       {
         "command": "codeTraceTree.goToTracePointInTree",
-        "title": "Go to the Trace Point in the tree panel"
+        "title": "Go to the Trace Point in the tree panel (Only matching)"
       }
     ],
     "menus": {
@@ -277,8 +277,7 @@
         },
         {
           "command": "codeTraceTree.goToTracePointInTree",
-          "group": "codeTraceTree@4",
-          "when": "codeTraceTree.hasTracePointAtCaret"
+          "group": "codeTraceTree@4"
         }
       ]
     },

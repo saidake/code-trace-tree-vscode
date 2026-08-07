@@ -38,7 +38,7 @@
       <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree</li>
       <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree (parent expands automatically)</li>
       <li><b>Update Selected Trace Points</b> — move the selected tree node(s) to the current line</li>
-      <li><b>Go to the Trace Point in the tree panel</b> — shown when the current line is a highlighted trace point; selects and reveals that node in the tree</li>
+      <li><b>Go to the Trace Point in the tree panel (Only matching)</b> — selects and reveals matching node(s) for the current line; does nothing when none match</li>
     </ul>
   </li>
   <li>In the <b>Explorer</b>, right-click a file or directory and choose:
@@ -89,7 +89,7 @@
 
 <h2>Install skill — extract locations</h2>
 <p>
-  Download <code>code-trace-tree-skill-1.2.3.zip</code> from the GitHub Release
+  Download <code>code-trace-tree-skill-1.2.4.zip</code> from the GitHub Release
   (one zip for all agents).
   Remove any existing <code>code-trace-tree</code> skill folder first, then extract into the
   skills directory for your agent:
@@ -108,20 +108,20 @@
 </table>
 
 <h2>Install example (Claude Code, Linux &amp; macOS)</h2>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.3/code-trace-tree-skill-1.2.3.zip -o code-trace-tree-skill-1.2.3.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.4/code-trace-tree-skill-1.2.4.zip -o code-trace-tree-skill-1.2.4.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.2.3.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.2.3.zip</code>
+<code>unzip code-trace-tree-skill-1.2.4.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.2.4.zip</code>
 </pre>
 <p>Project-local: extract into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and extract into that agent’s folder from the table above.</p>
 
 <h2>Install example (Claude Code, Windows PowerShell)</h2>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.3/code-trace-tree-skill-1.2.3.zip" -OutFile "code-trace-tree-skill-1.2.3.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.4/code-trace-tree-skill-1.2.4.zip" -OutFile "code-trace-tree-skill-1.2.4.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.2.3.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.2.3.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.2.4.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.2.4.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code>. For Cursor / Copilot / Codex / Gemini, use the same zip and change the destination path using the table above.</p>
 

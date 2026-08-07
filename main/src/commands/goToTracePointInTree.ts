@@ -16,7 +16,7 @@ function isSingleLineSelection(editor: vscode.TextEditor): boolean {
 
 /**
  * Reveal matching trace point(s) for the caret line in the Trace Points tree.
- * Visible in the editor context menu only when a valid match exists.
+ * Always available in the editor context menu; no-ops when nothing matches.
  */
 export function registerGoToTracePointInTree(
   context: vscode.ExtensionContext,
@@ -51,16 +51,4 @@ export function registerGoToTracePointInTree(
       service.selectTracePoints(ids)
     })
   )
-}
-
-/** Update `codeTraceTree.hasTracePointAtCaret` for the editor context menu when clause. */
-export function updateTracePointAtCaretContext(service: TracePointService) {
-  const editor = vscode.window.activeTextEditor
-  let hasMatch = false
-  if (editor && isSingleLineSelection(editor)) {
-    const filePath = vscode.workspace.asRelativePath(editor.document.uri)
-    const lineNumber = editor.selection.active.line + 1
-    hasMatch = service.findValidTracePointsAt(filePath, lineNumber).length > 0
-  }
-  void vscode.commands.executeCommand('setContext', 'codeTraceTree.hasTracePointAtCaret', hasMatch)
 }
