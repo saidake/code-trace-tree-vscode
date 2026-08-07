@@ -1356,15 +1356,33 @@ export class TracePointService {
 
   expandTreeItem(tracePointNode: TracePointNode | null) {
     if (!tracePointNode) return
-    const treeNode = this.getTreeNodeById(tracePointNode.id)
-    if (!treeNode) return
-    let collapsibleState = vscode.TreeItemCollapsibleState.None
     const hasChildren = tracePointNode.children.length > 0
     if (hasChildren) {
-      collapsibleState = vscode.TreeItemCollapsibleState.Expanded
       this.expandedTracePointIds.add(tracePointNode.id)
     }
-    treeNode.collapsibleState = collapsibleState
+    const treeNode = this.getTreeNodeById(tracePointNode.id)
+    if (!treeNode) return
+    treeNode.collapsibleState = hasChildren
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.None
+  }
+
+  /** Expand parent row(s) in the Trace Points tree so new children are visible. */
+  async expandParentsInTree(
+    treeView: vscode.TreeView<vscode.TreeItem>,
+    parents: Iterable<TracePointNode | null>
+  ): Promise<void> {
+    for (const parent of parents) {
+      if (!parent) continue
+      this.expandTreeItem(parent)
+      const item = this.getTreeNodeById(parent.id)
+      if (!item) continue
+      try {
+        await treeView.reveal(item, { expand: true, select: false, focus: false })
+      } catch {
+        // Tree view may be hidden or disposed
+      }
+    }
   }
 
   updateInFileNodesMap(prevFilePath: string, node: TracePointNode) {

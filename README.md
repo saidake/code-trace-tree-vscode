@@ -34,7 +34,7 @@
   <li>In the editor, right-click a line and choose:
     <ul>
       <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree</li>
-      <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree</li>
+      <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree (parent expands automatically)</li>
       <li><b>Update Selected Trace Points</b> — move the selected tree node(s) to the current line</li>
       <li><b>Go to the Trace Point in the tree panel</b> — shown when the current line is a highlighted trace point; selects and reveals that node in the tree</li>
     </ul>
@@ -42,13 +42,13 @@
   <li>In the <b>Explorer</b>, right-click a file or directory and choose:
     <ul>
       <li><b>Create a Root File/Directory Trace Point</b> — add a file or directory node at the root</li>
-      <li><b>Create File/Directory Trace Point (Under selected)</b> — add that file/directory under the selected tree node(s)</li>
+      <li><b>Create File/Directory Trace Point (Under selected)</b> — add that file/directory under the selected tree node(s) (parent expands automatically)</li>
     </ul>
   </li>
   <li>Double-click a node in the tree to jump to that location (line, file, or Explorer for directories).</li>
   <li>Right-click a node and choose <b>Copy Trace Point Text</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
   <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
-  <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions.</li>
+  <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions. Drag a node onto another to reparent it (the target expands automatically).</li>
 </ol>
 <p>
   <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),

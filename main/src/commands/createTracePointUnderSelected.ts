@@ -48,6 +48,7 @@ export function registerCreateTracePointUnderSelected(
       service.highlightTracePointsInFile(editor.document)
       service.notifyListeners('refresh', affectedParentNodes)
       service.saveState()
+      await service.expandParentsInTree(treeView, affectedParentNodes)
     })
   )
 }

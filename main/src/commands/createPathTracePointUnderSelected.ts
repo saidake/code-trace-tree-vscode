@@ -48,6 +48,7 @@ export function registerCreatePathTracePointUnderSelected(
         }
         service.notifyListeners('refresh', affected)
         service.saveState()
+        await service.expandParentsInTree(treeView, affected)
       }
     )
   )

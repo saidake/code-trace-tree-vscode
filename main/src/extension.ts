@@ -48,6 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
     showCollapseAll: true,
     dragAndDropController: treeDataProvider
   })
+  treeDataProvider.bindTreeView(treeView)
 
   const profileProvider = new ProfileViewProvider(context.extensionUri, service)
   context.subscriptions.push(

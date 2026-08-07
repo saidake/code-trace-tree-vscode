@@ -16,9 +16,15 @@ export class TracePointTreeDataProvider
   onDidChangeTreeData = this._onDidChangeTreeData.event
   dropMimeTypes = ['application/vnd.code.tree.codetracetree']
   dragMimeTypes = ['application/vnd.code.tree.codetracetree']
+  private treeView?: vscode.TreeView<vscode.TreeItem>
 
   constructor(private service: TracePointService) {
     this.service.addNodeListener('refresh', (nodes) => this.refresh(nodes))
+  }
+
+  /** Bind after {@link vscode.window.createTreeView} so drop can expand targets in the UI. */
+  bindTreeView(treeView: vscode.TreeView<vscode.TreeItem>) {
+    this.treeView = treeView
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -86,7 +92,8 @@ export class TracePointTreeDataProvider
       | undefined
     if (!transferred) return
     const draggedIds = transferred
-    let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
+    const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
+    const dropTargets = new Set<TracePointNode>()
     console.log('handleDrop - draggedIds: ', draggedIds)
 
     for (const tracePointId of draggedIds) {
@@ -159,11 +166,15 @@ export class TracePointTreeDataProvider
       this.service.expandTreeItem(oldDraggedParentTracePointNode)
       affectedParentNodes.add(dropTracePointNode)
       this.service.expandTreeItem(dropTracePointNode)
+      dropTargets.add(dropTracePointNode)
     }
     // if (validate) await this.validateTracePointsOnLoad();
     this.service.applyHighlightsToAllEditors()
     this.service.notifyListeners('refresh', affectedParentNodes)
     this.service.saveState()
+    if (this.treeView && dropTargets.size > 0) {
+      await this.service.expandParentsInTree(this.treeView, dropTargets)
+    }
   }
 
   // Add these methods to the TracePointTreeDataProvider class (at the end, before the closing brace)
