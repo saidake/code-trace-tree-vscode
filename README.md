@@ -12,6 +12,8 @@
 <!-- Plugin description -->
 <p>
   Trace code in a tree structure.
+  Build and display code workflows as nested trace points
+  (lines, files, and directories) so you can follow the flow and jump back to source anytime.
   Double-click any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>

@@ -13,7 +13,8 @@ description: >
 
 # Code Trace Tree
 
-Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
+Build and display code workflows as nested trees of line, file, and directory
+trace points. Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
 
 Only edit or sync traces when the user explicitly asks (for example: generate topic-related
 nodes, add a tip at a line, rebind after edits). Do not auto-sync every turn.
