@@ -33,21 +33,21 @@
 <ol>
   <li>Open the <b>Code Trace Tree</b> activity bar view.</li>
   <li>Use the <b>Profile</b> webview above the tree to switch trees, add a profile, or delete one.</li>
-  <li>In the editor, right-click a line and choose:
+  <li>In the editor, right-click a line in a <b>workspace file</b> and choose:
     <ul>
-      <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree</li>
-      <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree (parent expands automatically)</li>
+      <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree (selects the new node; does not jump)</li>
+      <li><b>Create Code Trace Points (Under selected)</b> — add a child under the selected node(s) in the tree (parent expands; new node is selected)</li>
       <li><b>Update Selected Trace Points</b> — move the selected tree node(s) to the current line</li>
       <li><b>Go to the Trace Point in the tree panel (Only matching)</b> — selects and reveals matching node(s) for the current line; does nothing when none match</li>
     </ul>
   </li>
-  <li>In the <b>Explorer</b>, right-click a file or directory and choose:
+  <li>In the <b>Explorer</b>, right-click a file or directory <b>inside the workspace</b> and choose:
     <ul>
       <li><b>Create a Root File/Directory Trace Point</b> — add a file or directory node at the root</li>
       <li><b>Create File/Directory Trace Point (Under selected)</b> — add that file/directory under the selected tree node(s) (parent expands automatically)</li>
     </ul>
   </li>
-  <li>Double-click a node in the tree to jump to that location (line, file, or Explorer for directories).</li>
+  <li>Single-click a node to select it; double-click to jump to that location (line, file, or Explorer for directories).</li>
   <li>Right-click a node and choose <b>Copy Trace Point Text</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
   <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
   <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions. Drag a node onto another to reparent it (the target expands automatically).</li>
@@ -89,7 +89,7 @@
 
 <h2>Install skill — extract locations</h2>
 <p>
-  Download <code>code-trace-tree-skill-1.2.4.zip</code> from the GitHub Release
+  Download <code>code-trace-tree-skill-1.2.5.zip</code> from the GitHub Release
   (one zip for all agents).
   Remove any existing <code>code-trace-tree</code> skill folder first, then extract into the
   skills directory for your agent:
@@ -108,20 +108,20 @@
 </table>
 
 <h2>Install example (Claude Code, Linux &amp; macOS)</h2>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.4/code-trace-tree-skill-1.2.4.zip -o code-trace-tree-skill-1.2.4.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.5/code-trace-tree-skill-1.2.5.zip -o code-trace-tree-skill-1.2.5.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.2.4.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.2.4.zip</code>
+<code>unzip code-trace-tree-skill-1.2.5.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.2.5.zip</code>
 </pre>
 <p>Project-local: extract into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and extract into that agent’s folder from the table above.</p>
 
 <h2>Install example (Claude Code, Windows PowerShell)</h2>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.4/code-trace-tree-skill-1.2.4.zip" -OutFile "code-trace-tree-skill-1.2.4.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.5/code-trace-tree-skill-1.2.5.zip" -OutFile "code-trace-tree-skill-1.2.5.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.2.4.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.2.4.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.2.5.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.2.5.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code>. For Cursor / Copilot / Codex / Gemini, use the same zip and change the destination path using the table above.</p>
 
@@ -147,15 +147,17 @@ Add a root trace point at the login handler, then children for validation and to
 </ul>
 <p>
   Each workspace binds to a global XML in that folder by matching the workspace path
-  (<code>&lt;path&gt;</code> in the XML). New projects allocate
+  (<code>&lt;path&gt;</code> in the XML) — path mode. Agents Case C create that global XML
+  without <code>.idea/code-trace-tree.project.id</code> (IDE-agnostic). New projects allocate
   <code>&lt;ProjectFolderName&gt;.xml</code> (or <code>Name1.xml</code>, …) with a UUID
   <code>&lt;projectId&gt;</code> on first use. Legacy <code>&lt;projectId&gt;.xml</code> and
   folder-named files from older releases are still resolved by scanning XML contents.
-  If the tree is empty (no nodes; only the default <code>main</code> profile or no profiles),
-  an empty-state webview explains how to create a root trace point. Recover UI (grey
-  <b>Import stored data</b> after move/rename) appears only when another stored global
-  project still has a trace point. Clearing this workspace’s tree (including delete-all)
-  does not keep recover UI visible for the bound file while it is empty.
+  Without a workspace folder, the empty panel asks you to open one (Profile / Description /
+  toolbar stay hidden). If the tree is empty (no nodes; only the default <code>main</code>
+  profile or no profiles), an empty-state webview explains how to create a root trace point.
+  Recover UI (grey <b>Import stored data</b> after move/rename) appears only when another
+  stored global project still has a trace point. Clearing this workspace’s tree (including
+  delete-all) does not keep recover UI visible for the bound file while it is empty.
 </p>
 <!-- Plugin description end -->
 

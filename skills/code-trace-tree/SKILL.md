@@ -54,7 +54,7 @@ Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.
 
 | Piece | Location |
 |-------|----------|
-| Project id | Bound via workspace path match to global XML `<path>` / `<projectId>` |
+| Project id | Prefer `.idea/code-trace-tree.project.id` when present; else path match to global XML `<path>` / `<projectId>` (agents never write the `.idea` file) |
 | Global XML | `<OS Config Dir>/code-trace-tree/` — `<ProjectFolderName>.xml` on lazy create; legacy `<projectId>.xml` and folder-named files resolved by scanning XML |
 | Storage-ready (Case C bind) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.storage-ready` (no TTL; written by refresh scripts) |
 | Refresh signal (full) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
@@ -78,12 +78,19 @@ python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" /path/to/
 ```
 
 If the project has never used Code Trace Tree, there is no project id / XML yet.
-Initialize storage before writing traces (or let `trace_tree add` / `move` / `delete` / `rebind` create it automatically):
+Initialize storage before writing traces (or let `trace_tree add` / `move` / `delete` / `rebind` create it automatically).
+
+**Resolve / init:** If `.idea/code-trace-tree.project.id` already exists, use that id and
+its global XML (do not create a second project). If the id exists but XML is missing,
+recreate XML with **that same** projectId (do not mint a new id). Else bind by XML
+`<path>`. **Case C** (nothing found): create initial global XML with `<path>` only —
+never create/write the `.idea` id file. Pass / resolve the project root so `<path>` is
+correct; IDE binds via path match + `storage-ready`.
 
 ```text
-python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py"
-# optional:
 python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py" /path/to/project
+# or, when CWD is already inside the IDE project:
+python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py"
 ```
 
 ## Preferred code workflow format
@@ -215,7 +222,7 @@ The IDE watches **signal files** (not the XML path). After agent edits, always w
 |--------|--------|
 | `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`, `advancedSettings`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
 | `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. |
-| `<projectId>.storage-ready` | Case C bind handshake (no TTL). VS Code binds when that projectId’s XML `<path>` matches the current workspace. Does not create storage. |
+| `<projectId>.storage-ready` | Case C bind handshake (no TTL). Body = absolute project path (same as XML `<path>`). IDE filters on the body first; empty/legacy body falls back to XML `<path>`. Does not create storage. |
 
 ```text
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
@@ -238,7 +245,7 @@ All under `<Agent Skill Path>/code-trace-tree/scripts/` (see Skill scripts locat
 
 ## Edit plugin data action
 
-1. **Resolve** the project id + global XML (`resolve_storage.py`). If missing, run `init_storage.py` (mutating `trace_tree` commands also auto-init).
+1. **Resolve** the project id + global XML (`resolve_storage.py`: prefer `.idea` id, else path). If missing, run `init_storage.py` (mutating `trace_tree` also auto-init). Do not create `.idea/code-trace-tree.project.id`.
 2. **Read** the XML. Schema: [references/data-format.md](references/data-format.md).
 3. **Edit** carefully (see rules below). Prefer atomic write: write `*.xml.tmp` then replace.
 4. **Refresh IDE** (required — the plugin does not watch the XML file):
@@ -254,6 +261,7 @@ Always write a refresh signal after agent edits so reload is explicit.
 ## Edit rules
 
 - Keep `<project version="4">`, `<projectId>`, and `<path>` unless you intentionally rebind storage.
+- Prefer existing `.idea/code-trace-tree.project.id` when resolving; never create/overwrite it. If that id exists but XML is gone, recreate XML with the same projectId (Case C otherwise = new global XML + `<path>` only).
 - Bump `<updatedAt>` to the current epoch milliseconds when you change content.
 - Every `<tracePoint>` needs `<traceType>`: `LINE`, `FILE`, or `DIRECTORY`.
 - `traceName` is the user label; `baseName` is the last path segment; `tracePath` is **relative to the project root** (forward slashes preferred).

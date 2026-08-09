@@ -15,8 +15,8 @@ const DEBOUNCE_MS = 400
  * `<projectId>.storage-ready` (no TTL).
  *
  * On each signal, [onStorageReady] receives the projectId from the filename.
- * The service compares that id to `.idea`/`.vscode` `code-trace-tree.project.id`
- * and binds only when they match.
+ * The service filters by the signal body path (or XML `<path>` for legacy bodies)
+ * against the workspace, then binds.
  *
  * Once storage is bound, dispose this watcher and start [ExternalStorageWatcher].
  */

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Create Code Trace Tree project id + empty global XML when none exist yet (Case C).
+Ensure Code Trace Tree storage exists for a project.
+
+Resolves existing storage first (prefer `.idea/code-trace-tree.project.id`, else path).
+Only when missing: Case C create XML with <path> + <projectId>.
+If `.idea` id exists but XML is gone, recreates with that same projectId (not a new UUID).
+Does **not** create/overwrite `.idea/code-trace-tree.project.id`.
 
 Use before writing traces when the project has never used the plugin.
 Mutating `trace_tree` commands (add / move / delete / rebind) also call this

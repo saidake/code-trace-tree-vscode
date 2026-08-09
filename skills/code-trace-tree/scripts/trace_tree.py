@@ -49,15 +49,12 @@ def global_app_dir() -> Path:
     return Path(base) / "code-trace-tree"
 
 
-def read_project_id(project_root: Path) -> str:
-    """Infer projectId from global XML(s) whose <path> matches the workspace."""
-    matches = find_path_matched_xmls(project_root)
-    if not matches:
-        return ""
-    if len(matches) == 1:
-        return xml_tag_text(matches[0], "projectId")
-    latest = max(matches, key=lambda x: int(xml_tag_text(x, "updatedAt") or "0"))
-    return xml_tag_text(latest, "projectId")
+def read_local_project_id_file(project_root: Path) -> str:
+    """Read IDE-local `.idea/code-trace-tree.project.id` when present. Agents never write it."""
+    p = project_root / ".idea" / "code-trace-tree.project.id"
+    if p.is_file():
+        return p.read_text(encoding="utf-8").strip()
+    return ""
 
 
 def find_path_matched_xmls(project_root: Path) -> list[Path]:
@@ -71,6 +68,37 @@ def find_path_matched_xmls(project_root: Path) -> list[Path]:
         if stored and normalize_path_key(stored) == target:
             matched.append(xml)
     return matched
+
+
+def find_xml_by_project_id(project_id: str) -> Optional[Path]:
+    if not project_id:
+        return None
+    app_dir = global_app_dir()
+    if not app_dir.is_dir():
+        return None
+    canonical = app_dir / f"{project_id}.xml"
+    if canonical.is_file() and xml_tag_text(canonical, "projectId") == project_id:
+        return canonical
+    for xml in sorted(app_dir.glob("*.xml")):
+        if xml_tag_text(xml, "projectId") == project_id:
+            return xml
+    return None
+
+
+def read_project_id(project_root: Path) -> str:
+    """
+    Prefer IDE-local `.idea/code-trace-tree.project.id` when present; else path-matched XML.
+    """
+    local = read_local_project_id_file(project_root)
+    if local:
+        return local
+    matches = find_path_matched_xmls(project_root)
+    if not matches:
+        return ""
+    if len(matches) == 1:
+        return xml_tag_text(matches[0], "projectId")
+    latest = max(matches, key=lambda x: int(xml_tag_text(x, "updatedAt") or "0"))
+    return xml_tag_text(latest, "projectId")
 
 
 def xml_tag_text(path: Path, tag: str) -> str:
@@ -90,16 +118,28 @@ def normalize_path_key(p: str) -> str:
 
 
 def resolve_storage(project_root: Path) -> Path:
+    """
+    1. `.idea/code-trace-tree.project.id` → that project's XML (reuse existing bind)
+    2. Else XML whose `<path>` matches the project root
+    3. Else missing (caller may Case C create)
+    """
+    local_id = read_local_project_id_file(project_root)
+    if local_id:
+        by_id = find_xml_by_project_id(local_id)
+        if by_id is not None:
+            return by_id
+
     matches = find_path_matched_xmls(project_root)
-    if not matches:
-        raise SystemExit(
-            "ERROR: no Code Trace Tree storage XML found. "
-            "Run init_storage.py, or create a trace point / profile in the IDE, "
-            "or import plugin data first."
-        )
     if len(matches) == 1:
         return matches[0]
-    return max(matches, key=lambda x: int(xml_tag_text(x, "updatedAt") or "0"))
+    if len(matches) > 1:
+        return max(matches, key=lambda x: int(xml_tag_text(x, "updatedAt") or "0"))
+
+    raise SystemExit(
+        "ERROR: no Code Trace Tree storage XML found. "
+        "Run init_storage.py, or create a trace point / profile in the IDE, "
+        "or import plugin data first."
+    )
 
 
 def sanitize_folder_name(name: str) -> str:
@@ -121,13 +161,19 @@ def allocate_folder_name_xml(app_dir: Path, project_root: Path) -> Path:
 
 
 def write_project_id_files(project_root: Path, project_id: str) -> list[Path]:
-    """ProjectId is kept in the global XML; binding uses workspace path match."""
+    """
+    Path mode: agents never write `.idea/code-trace-tree.project.id`.
+    The IDE may create that cache itself after binding by path.
+    """
     return []
 
 
 def create_fresh_storage(project_root: Path) -> Path:
     """
-    Case C: allocate a new project id and create empty global XML with profile `main`.
+    Case C (path mode): create empty global XML (`main`) when storage is missing.
+    If `.idea/code-trace-tree.project.id` exists but XML is gone, recreate with that same id
+    at `<projectId>.xml`. Otherwise allocate a new id + folder-named XML.
+    Sets XML <path> to the project root. Does not write `.idea/code-trace-tree.project.id`.
     Idempotent if storage already resolves.
     """
     try:
@@ -135,10 +181,16 @@ def create_fresh_storage(project_root: Path) -> Path:
     except SystemExit:
         pass
 
-    project_id = str(uuid.uuid4())
+    local_id = read_local_project_id_file(project_root)
+    project_id = local_id or str(uuid.uuid4())
     app_dir = global_app_dir()
     app_dir.mkdir(parents=True, exist_ok=True)
-    storage_xml = allocate_folder_name_xml(app_dir, project_root)
+    # Prefer canonical id-named file when recovering an existing local bind.
+    storage_xml = (
+        app_dir / f"{project_id}.xml"
+        if local_id
+        else allocate_folder_name_xml(app_dir, project_root)
+    )
     write_project_id_files(project_root, project_id)
 
     root = ET.Element("project", {"version": "4"})
@@ -160,7 +212,7 @@ def create_fresh_storage(project_root: Path) -> Path:
 
 
 def ensure_storage(project_root: Path) -> Path:
-    """Return existing storage XML, or create Case C storage when missing."""
+    """Return existing storage (local id or path), or create Case C when missing."""
     try:
         return resolve_storage(project_root)
     except SystemExit:
@@ -1034,7 +1086,8 @@ def signals_dir() -> Path:
 def write_storage_ready(project_root: Path) -> Optional[Path]:
     """
     Case C bind handshake: `signals/<projectId>.storage-ready` (no TTL).
-    VS Code binds when that projectId’s XML `<path>` matches the current workspace.
+    Body = absolute project path (same as XML `<path>`) so IDEs can filter without
+    opening XML; empty/legacy body falls back to reading XML `<path>`.
     """
     project_id = read_project_id(project_root)
     if not project_id:
@@ -1042,7 +1095,7 @@ def write_storage_ready(project_root: Path) -> Optional[Path]:
     dest = signals_dir()
     dest.mkdir(parents=True, exist_ok=True)
     req = dest / f"{project_id}.storage-ready"
-    req.write_text("1\n", encoding="utf-8")
+    req.write_text(str(project_root.resolve()) + "\n", encoding="utf-8")
     return req
 
 

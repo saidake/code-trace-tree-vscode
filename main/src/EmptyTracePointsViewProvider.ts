@@ -8,16 +8,24 @@ import * as vscode from 'vscode'
 /**
  * Empty Trace Points panel (shown when {@code codeTraceTree.showEmptyState}).
  * Custom webview so the Import button can use secondary/grey styling.
- * Import affordances appear only when {@link hasImportableStoredData} is true.
+ * Import affordances appear only when a workspace is open and
+ * {@link hasImportableStoredData} is true.
  */
 export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView
   private readonly importCommand: string
   private readonly hasImportableStoredData: () => boolean
+  private readonly hasWorkspaceFolder: () => boolean
 
-  constructor(importCommand: string, hasImportableStoredData: () => boolean) {
+  constructor(
+    importCommand: string,
+    hasImportableStoredData: () => boolean,
+    hasWorkspaceFolder: () => boolean = () =>
+      !!vscode.workspace.workspaceFolders?.[0]
+  ) {
     this.importCommand = importCommand
     this.hasImportableStoredData = hasImportableStoredData
+    this.hasWorkspaceFolder = hasWorkspaceFolder
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -51,14 +59,24 @@ export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider 
     const view = this.view
     if (!view) return
     try {
-      view.webview.html = this.getHtml(this.hasImportableStoredData())
+      const hasWorkspace = this.hasWorkspaceFolder()
+      view.webview.html = this.getHtml(
+        hasWorkspace,
+        hasWorkspace && this.hasImportableStoredData()
+      )
     } catch {
       // View can be disposed between checks and the html write.
       if (this.view === view) this.view = undefined
     }
   }
 
-  private getHtml(canImport: boolean): string {
+  private getHtml(hasWorkspace: boolean, canImport: boolean): string {
+    if (!hasWorkspace) {
+      return this.shellHtml(`
+  <p><strong>Open a workspace folder to persist Code Trace Tree data.</strong></p>
+  <p class="hint">Code Trace Tree needs a folder workspace so trace points can be saved and reloaded.</p>`)
+    }
+
     const importSection = canImport
       ? `
   <p class="hint">If your project data is lost after moving or renaming the project, you can import previously stored data.</p>
@@ -73,6 +91,13 @@ export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider 
   </script>`
       : ''
 
+    return this.shellHtml(`
+  <p><strong>No trace points yet.</strong></p>
+  <p class="hint">Put the caret on a line in the editor, then create a root trace point to start a workflow map (editor context menu or Command Palette).</p>
+  ${importSection}`)
+  }
+
+  private shellHtml(body: string): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,9 +146,7 @@ export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider 
   </style>
 </head>
 <body>
-  <p><strong>No trace points yet.</strong></p>
-  <p class="hint">Put the caret on a line in the editor, then create a root trace point to start a workflow map (editor context menu or Command Palette).</p>
-  ${importSection}
+  ${body}
 </body>
 </html>`
   }

@@ -7,6 +7,7 @@ import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { TracePointNode } from '../domain/types'
+import { isTraceEditorUri } from '../utils/editorEligibility'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateTracePointUnderSelected(
@@ -23,6 +24,7 @@ export function registerCreateTracePointUnderSelected(
         vscode.window.showWarningMessage('No active editor.')
         return
       }
+      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
       if (selected.length === 0) {
         vscode.window.showWarningMessage('No trace points selected.')
         return
@@ -38,10 +40,17 @@ export function registerCreateTracePointUnderSelected(
       )
       if (name === undefined) return
       const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
+      const createdIds: string[] = []
       for (const item of selected) {
         const parentId = service.resolveNodeId(item.id)
         if (!parentId) continue
-        await service.addTracePoint(name, editor.document.uri, lineNumber, parentId)
+        const id = await service.addTracePoint(
+          name,
+          editor.document.uri,
+          lineNumber,
+          parentId
+        )
+        if (id) createdIds.push(id)
         const parentNode = service.getTracePointNodeById(parentId)
         affectedParentNodes.add(parentNode)
       }
@@ -49,6 +58,9 @@ export function registerCreateTracePointUnderSelected(
       service.notifyListeners('refresh', affectedParentNodes)
       service.saveState()
       await service.expandParentsInTree(treeView, affectedParentNodes)
+      if (createdIds.length > 0) {
+        await service.selectTracePointsInTree(treeView, createdIds)
+      }
     })
   )
 }

@@ -5,6 +5,7 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
+import { isTraceEditorUri } from '../utils/editorEligibility'
 
 /** True when the editor selection spans at most one line (caret-only counts). */
 function isSingleLineSelection(editor: vscode.TextEditor): boolean {
@@ -16,7 +17,7 @@ function isSingleLineSelection(editor: vscode.TextEditor): boolean {
 
 /**
  * Reveal matching trace point(s) for the caret line in the Trace Points tree.
- * Always available in the editor context menu; no-ops when nothing matches.
+ * Available in the editor context menu for project files; no-ops when nothing matches.
  */
 export function registerGoToTracePointInTree(
   context: vscode.ExtensionContext,
@@ -27,6 +28,7 @@ export function registerGoToTracePointInTree(
     vscode.commands.registerCommand('codeTraceTree.goToTracePointInTree', async () => {
       const editor = vscode.window.activeTextEditor
       if (!editor || !isSingleLineSelection(editor)) return
+      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
 
       const filePath = vscode.workspace.asRelativePath(editor.document.uri)
       const lineNumber = editor.selection.active.line + 1

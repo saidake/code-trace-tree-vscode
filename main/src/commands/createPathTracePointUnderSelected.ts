@@ -40,15 +40,20 @@ export function registerCreatePathTracePointUnderSelected(
         if (name === undefined) return
 
         const affected = new Set<TracePointNode | null>()
+        const createdIds: string[] = []
         for (const item of selected) {
           const parentId = service.resolveNodeId(item.id)
           if (!parentId) continue
-          await service.addPathTracePoint(name, target, parentId)
+          const id = await service.addPathTracePoint(name, target, parentId)
+          if (id) createdIds.push(id)
           affected.add(service.getTracePointNodeById(parentId))
         }
         service.notifyListeners('refresh', affected)
         service.saveState()
         await service.expandParentsInTree(treeView, affected)
+        if (createdIds.length > 0) {
+          await service.selectTracePointsInTree(treeView, createdIds)
+        }
       }
     )
   )

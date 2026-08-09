@@ -31,6 +31,7 @@ import { ProfileViewProvider } from './ProfileViewProvider'
 import { EmptyTracePointsViewProvider } from './EmptyTracePointsViewProvider'
 import { ExternalStorageWatcher } from './storage/ExternalStorageWatcher'
 import { StorageReadyWatcher } from './storage/StorageReadyWatcher'
+import { setEditorEligibleContext } from './utils/editorEligibility'
 
 let service: TracePointService
 let treeDataProvider: TracePointTreeDataProvider
@@ -94,9 +95,9 @@ export function activate(context: vscode.ExtensionContext) {
     })
   )
 
-  registerCreateRootTracePoint(context, service, treeDataProvider)
+  registerCreateRootTracePoint(context, service, treeDataProvider, treeView)
   registerCreateTracePointUnderSelected(context, service, treeDataProvider, treeView)
-  registerCreateRootPathTracePoint(context, service)
+  registerCreateRootPathTracePoint(context, service, treeView)
   registerCreatePathTracePointUnderSelected(context, service, treeView)
   registerUpdateTracePoint(context, service, treeView)
   registerMoveUp(context, service, treeView, treeDataProvider)
@@ -116,11 +117,31 @@ export function activate(context: vscode.ExtensionContext) {
   registerCopyTracePointText(context, service, treeView)
   registerShowLineContent(context, service, treeView)
 
-  service.loadState().then(() => {
+  const refreshEditorEligibleContext = () => {
+    void setEditorEligibleContext(
+      vscode.window.activeTextEditor,
+      service.getWorkspaceRoot()
+    )
+  }
+  const afterLoadState = () => {
     emptyProvider.refresh()
     startExternalWatcher(context)
+    refreshEditorEligibleContext()
+  }
+
+  refreshEditorEligibleContext()
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => refreshEditorEligibleContext()),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void service.loadState().then(afterLoadState)
+    })
+  )
+
+  service.loadState().then(afterLoadState)
+  service.setOnStorageBound(() => {
+    startExternalWatcher(context)
+    refreshEditorEligibleContext()
   })
-  service.setOnStorageBound(() => startExternalWatcher(context))
 
   context.subscriptions.push(
     vscode.window.onDidChangeVisibleTextEditors(() => {

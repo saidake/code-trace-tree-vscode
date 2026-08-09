@@ -22,7 +22,8 @@ import { resolveAppDir } from './globalStoragePaths'
  * - `<projectId>.request_refresh_profile` — one profile; body = profile name
  *   (empty / missing name → active profile). Does not change activeProfileName or flags.
  * - `<projectId>.select_trace_points`
- * - `<projectId>.storage-ready` — Case C bind handshake (no TTL; agent overwrites)
+ * - `<projectId>.storage-ready` — Case C bind handshake (no TTL; agent overwrites).
+ *   Body = absolute project path (first non-empty line); empty/legacy → IDE reads XML `<path>`.
  *
  * Refresh/select files older than SIGNAL_TTL_MS are ignored and deleted so a late
  * IDE open does not replay a stale select/refresh. Fresh refresh/select signals are
@@ -92,6 +93,19 @@ export function readProfileRefreshName(filePath: string): string {
   } catch {
     return ''
   }
+}
+
+/**
+ * Absolute project path from a storage-ready signal body (first non-empty line).
+ * Empty when missing/unreadable or legacy unused body (e.g. `1`) — then IDE falls
+ * back to reading XML `<path>`.
+ */
+export function readStorageReadyProjectPath(projectId: string): string {
+  const line = readProfileRefreshName(storageReadyPath(projectId))
+  if (!line || line === '1') return ''
+  if (path.isAbsolute(line)) return line
+  if (line.includes('/') || line.includes('\\')) return line
+  return ''
 }
 
 export function deleteQuietly(filePath: string): void {

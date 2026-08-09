@@ -10,7 +10,8 @@ import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateRootPathTracePoint(
   context: vscode.ExtensionContext,
-  service: TracePointService
+  service: TracePointService,
+  treeView: vscode.TreeView<vscode.TreeItem>
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -31,9 +32,10 @@ export function registerCreateRootPathTracePoint(
           path.basename(target.fsPath)
         )
         if (name === undefined) return
-        await service.addPathTracePoint(name, target)
+        const id = await service.addPathTracePoint(name, target)
         service.notifyListeners()
         service.saveState()
+        if (id) await service.selectTracePointsInTree(treeView, [id])
       }
     )
   )
