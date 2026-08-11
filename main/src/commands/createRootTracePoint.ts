@@ -5,15 +5,12 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { isTraceEditorUri } from '../utils/editorEligibility'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateRootTracePoint(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  _treeDataProvider: TracePointTreeDataProvider,
-  treeView: vscode.TreeView<vscode.TreeItem>
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.createRootTracePoint', async () => {
@@ -37,7 +34,7 @@ export function registerCreateRootTracePoint(
       service.highlightTracePointsInFile(editor.document)
       service.notifyListeners()
       service.saveState()
-      if (id) await service.selectTracePointsInTree(treeView, [id])
+      if (id) await service.selectTracePointsInTree([id])
     })
   )
 }

@@ -2,7 +2,7 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Trace code in a tree structure—build and display code workflows as nested, navigable trace points",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
@@ -68,6 +68,7 @@
         {
           "id": "codeTraceTree.view",
           "name": "Trace Points",
+          "type": "webview",
           "when": "!codeTraceTree.showEmptyState"
         },
         {
@@ -230,28 +231,6 @@
           "command": "codeTraceTree.openAdvancedSettings",
           "group": "navigation@700",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "codeTraceTree.copyTracePointText",
-          "group": "navigation@50",
-          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
-        },
-        {
-          "command": "codeTraceTree.renameTracePoint",
-          "group": "navigation@100",
-          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
-        },
-        {
-          "command": "codeTraceTree.deleteTracePoints",
-          "group": "navigation@200",
-          "when": "view == codeTraceTree.view && (viewItem == traceableLine || viewItem == traceablePath)"
-        },
-        {
-          "command": "codeTraceTree.showLineContent",
-          "group": "navigation@900",
-          "when": "view == codeTraceTree.view && viewItem == traceableLine"
         }
       ],
       "explorer/context": [

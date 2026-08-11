@@ -5,24 +5,18 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { TracePointNode } from '../domain/types'
 
 export function registerMoveDown(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  treeView: vscode.TreeView<vscode.TreeItem>,
-  treeDataProvider: TracePointTreeDataProvider
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.moveDown', async () => {
-      const selected = await treeView.selection
-      if (selected.length === 0) return
-      const selectedIds = new Set(
-        selected.map((item) => service.resolveNodeId(item.id)).filter((id): id is string => !!id)
-      )
+      const selectedIds = new Set(service.getSelectedTracePointIds())
+      if (selectedIds.size === 0) return
 
-      let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
+      const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
       const groupedByParent = new Map<string | undefined, TracePointNode[]>()
       for (const id of selectedIds) {
         const node = service.getTracePointNodeById(id)
@@ -57,7 +51,6 @@ export function registerMoveDown(
         }
       }
 
-      // Save updated order back to the service
       service.notifyListeners('refresh', affectedParentNodes)
       service.saveState()
     })

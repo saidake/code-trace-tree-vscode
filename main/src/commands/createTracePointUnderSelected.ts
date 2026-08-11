@@ -5,27 +5,24 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { TracePointNode } from '../domain/types'
 import { isTraceEditorUri } from '../utils/editorEligibility'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateTracePointUnderSelected(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  _treeDataProvider: TracePointTreeDataProvider,
-  treeView: vscode.TreeView<vscode.TreeItem>
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.createTracePointUnderSelected', async () => {
-      const selected = treeView.selection
+      const selectedIds = service.getSelectedTracePointIds()
       const editor = vscode.window.activeTextEditor
       if (!editor) {
         vscode.window.showWarningMessage('No active editor.')
         return
       }
       if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
-      if (selected.length === 0) {
+      if (selectedIds.length === 0) {
         vscode.window.showWarningMessage('No trace points selected.')
         return
       }
@@ -41,9 +38,7 @@ export function registerCreateTracePointUnderSelected(
       if (name === undefined) return
       const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
       const createdIds: string[] = []
-      for (const item of selected) {
-        const parentId = service.resolveNodeId(item.id)
-        if (!parentId) continue
+      for (const parentId of selectedIds) {
         const id = await service.addTracePoint(
           name,
           editor.document.uri,
@@ -57,9 +52,9 @@ export function registerCreateTracePointUnderSelected(
       service.highlightTracePointsInFile(editor.document)
       service.notifyListeners('refresh', affectedParentNodes)
       service.saveState()
-      await service.expandParentsInTree(treeView, affectedParentNodes)
+      await service.expandParentsInTree(affectedParentNodes)
       if (createdIds.length > 0) {
-        await service.selectTracePointsInTree(treeView, createdIds)
+        await service.selectTracePointsInTree(createdIds)
       }
     })
   )

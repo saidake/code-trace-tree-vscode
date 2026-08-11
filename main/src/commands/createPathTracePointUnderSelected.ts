@@ -11,8 +11,7 @@ import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreatePathTracePointUnderSelected(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  treeView: vscode.TreeView<vscode.TreeItem>
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -23,8 +22,8 @@ export function registerCreatePathTracePointUnderSelected(
           vscode.window.showWarningMessage('Select a file or folder in the Explorer.')
           return
         }
-        const selected = treeView.selection
-        if (selected.length === 0) {
+        const selectedIds = service.getSelectedTracePointIds()
+        if (selectedIds.length === 0) {
           vscode.window.showWarningMessage('No trace points selected.')
           return
         }
@@ -41,18 +40,16 @@ export function registerCreatePathTracePointUnderSelected(
 
         const affected = new Set<TracePointNode | null>()
         const createdIds: string[] = []
-        for (const item of selected) {
-          const parentId = service.resolveNodeId(item.id)
-          if (!parentId) continue
+        for (const parentId of selectedIds) {
           const id = await service.addPathTracePoint(name, target, parentId)
           if (id) createdIds.push(id)
           affected.add(service.getTracePointNodeById(parentId))
         }
         service.notifyListeners('refresh', affected)
         service.saveState()
-        await service.expandParentsInTree(treeView, affected)
+        await service.expandParentsInTree(affected)
         if (createdIds.length > 0) {
-          await service.selectTracePointsInTree(treeView, createdIds)
+          await service.selectTracePointsInTree(createdIds)
         }
       }
     )

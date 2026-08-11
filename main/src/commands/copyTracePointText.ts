@@ -6,22 +6,21 @@
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { formatDisplayText } from '../utils/displayText'
+import { resolveTracePointCommandIds } from './commandArgs'
 
 export function registerCopyTracePointText(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  treeView: vscode.TreeView<vscode.TreeItem>
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'codeTraceTree.copyTracePointText',
-      async (item?: vscode.TreeItem) => {
-        const selected = item ? [item] : treeView.selection
-        if (selected.length === 0) return
+      async (arg?: string | vscode.TreeItem) => {
+        const ids = resolveTracePointCommandIds(service, arg)
+        if (ids.length === 0) return
         const lines: string[] = []
-        for (const treeItem of selected) {
-          const id = service.resolveNodeId(treeItem.id)
-          const node = id ? service.getTracePointNodeById(id) : null
+        for (const id of ids) {
+          const node = service.getTracePointNodeById(id)
           if (node) lines.push(formatDisplayText(node.tracePoint))
         }
         if (lines.length === 0) return

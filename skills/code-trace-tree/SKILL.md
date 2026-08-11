@@ -81,6 +81,8 @@ not UTF-8, so JSON status output cannot fail the process after a successful writ
 | Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
+**Trace Points panel (VS Code / Cursor):** custom webview list — twistie expands/collapses; single-click selects; double-click jumps without collapsing; hover shows the full title when truncated.
+
 **Empty tree (VS Code):** when there are no trace nodes and only the default `main` profile (or no profiles), a custom empty-state webview replaces the Trace Points tree with a tip to create a root trace point from the editor/Command Palette. Recover UI (move/rename note + grey **Import stored data**) appears only when another stored global project still has a trace point. After clearing this workspace’s tree (including delete-all), the bound file is not treated as importable while empty, so recover UI stays hidden unless other projects have data.
 
 **OS Config Dir:**

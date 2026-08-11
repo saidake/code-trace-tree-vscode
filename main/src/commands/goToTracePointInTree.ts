@@ -16,13 +16,12 @@ function isSingleLineSelection(editor: vscode.TextEditor): boolean {
 }
 
 /**
- * Reveal matching trace point(s) for the caret line in the Trace Points tree.
+ * Reveal matching trace point(s) for the caret line in the Trace Points list.
  * Available in the editor context menu for project files; no-ops when nothing matches.
  */
 export function registerGoToTracePointInTree(
   context: vscode.ExtensionContext,
-  service: TracePointService,
-  treeView: vscode.TreeView<vscode.TreeItem>
+  service: TracePointService
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.goToTracePointInTree', async () => {
@@ -35,22 +34,8 @@ export function registerGoToTracePointInTree(
       const matches = service.findValidTracePointsAt(filePath, lineNumber)
       if (matches.length === 0) return
 
-      // Focus the Trace Points view, then expand ancestors and select matches
-      await vscode.commands.executeCommand('codeTraceTree.view.focus')
-
       const ids = matches.map((m) => m.id)
-      for (const id of ids) {
-        const item = service.getTreeNodeById(id)
-        if (!item) continue
-        await treeView.reveal(item, { expand: true, select: false, focus: false })
-      }
-
-      const first = service.getTreeNodeById(ids[0])
-      if (first) {
-        await treeView.reveal(first, { expand: true, select: true, focus: true })
-      }
-      // Keep service selection in sync (covers multi-match when tree UI selects one)
-      service.selectTracePoints(ids)
+      await service.selectTracePointsInTree(ids, { focus: true })
     })
   )
 }
