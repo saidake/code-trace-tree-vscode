@@ -5,31 +5,30 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { resolveTracePointCommandIds } from './commandArgs'
 
 export function registerShowLineContent(
   context: vscode.ExtensionContext,
-  service: TracePointService
+  service: TracePointService,
+  treeView: vscode.TreeView<vscode.TreeItem>
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'codeTraceTree.showLineContent',
-      async (arg?: string | vscode.TreeItem) => {
-        const ids = resolveTracePointCommandIds(service, arg)
-        if (ids.length === 0) return
+      async (item?: vscode.TreeItem) => {
+        const selected = item ? [item] : treeView.selection
+        if (selected.length === 0) return
 
         const lines: string[] = []
-        for (const id of ids) {
-          const node = service.getTracePointNodeById(id)
+        for (const treeItem of selected) {
+          const id = service.resolveNodeId(treeItem.id)
+          const node = id ? service.getTracePointNodeById(id) : null
           if (!node || node.tracePoint.traceType !== 'LINE') continue
           const content = node.tracePoint.lineContent?.trim() ?? ''
           lines.push(content)
         }
 
         if (lines.length === 0) {
-          vscode.window.showWarningMessage(
-            'Select a line trace point to show its saved line content.'
-          )
+          vscode.window.showWarningMessage('Select a line trace point to show its saved line content.')
           return
         }
 

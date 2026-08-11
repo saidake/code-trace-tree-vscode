@@ -11,12 +11,13 @@ import { isTraceEditorUri } from '../utils/editorEligibility'
 
 export function registerUpdateTracePoint(
   context: vscode.ExtensionContext,
-  service: TracePointService
+  service: TracePointService,
+  treeView: vscode.TreeView<vscode.TreeItem>
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.updateTracePoint', async () => {
-      const selectedIds = service.getSelectedTracePointIds()
-      if (selectedIds.length === 0) {
+      const selected = await treeView.selection
+      if (selected.length === 0) {
         vscode.window.showWarningMessage('No trace points selected.')
         return
       }
@@ -41,9 +42,9 @@ export function registerUpdateTracePoint(
       )
       const occurrenceIndex = matchingLines.indexOf(lineNumber) + 1
 
-      const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
-      for (const id of selectedIds) {
-        const tp = service.getTracePointNodeById(id)
+      let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
+      for (const treeItem of selected) {
+        const tp = service.getTracePointNodeById(service.resolveNodeId(treeItem.id))
         if (!tp) continue
         affectedParentNodes.add(service.getTracePointNodeById(tp.parentId))
         const prevPath = tp.tracePoint.tracePath

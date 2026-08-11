@@ -26,7 +26,6 @@ import {
 import { formatLocationSuffix } from './utils/displayText'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
-import { TracePointsListApi } from './TracePointsListApi'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -56,14 +55,7 @@ export class TracePointService {
   private profileListeners: ProfileListener[] = []
   private storage: ProjectStorage | undefined
   private persistTimer: ReturnType<typeof setTimeout> | undefined
-  private listView?: TracePointsListApi
-
-  /** Bind the Trace Points webview list (selection / expand / reveal). */
-  setListView(listView: TracePointsListApi) {
-    this.listView = listView
-  }
-
-  /** Ignore expand/collapse while rebuilding after a profile switch. */
+  /** Ignore TreeView expand/collapse while rebuilding after a profile switch. */
   private ignoreExpandEvents = false
   private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -1286,7 +1278,9 @@ export class TracePointService {
    * TTL-stale files are ignored; fresh signals are left for other windows.
    * When exactly one id resolves in the current profile, also navigates to its source.
    */
-  async handleExternalSelectRequest(): Promise<void> {
+  async handleExternalSelectRequest(
+    treeView: vscode.TreeView<vscode.TreeItem>
+  ): Promise<void> {
     const projectId = this.getBoundProjectId()
     if (!projectId) return
     const requestPath = AgentSignalFiles.selectPath(projectId)
@@ -1314,23 +1308,30 @@ export class TracePointService {
       .filter((n): n is TracePointNode => !!n)
     if (resolved.length === 0) return
 
+    await vscode.commands.executeCommand('codeTraceTree.view.focus')
     const ids = resolved.map((n) => n.id)
-    await this.selectTracePointsInTree(ids, { focus: true })
+    for (const id of ids) {
+      const item = this.getTreeNodeById(id)
+      if (item) await treeView.reveal(item, { expand: true, select: false, focus: false })
+    }
+    const firstItem = this.getTreeNodeById(ids[0])
+    if (firstItem) {
+      await treeView.reveal(firstItem, { expand: true, select: true, focus: true })
+    }
+    this.selectTracePoints(ids)
     if (resolved.length === 1) {
-      await this.navigateToTracePoint(resolved[0])
+      await this.navigateToTracePoint(resolved[0], treeView)
     }
   }
 
-  async navigateToTracePoint(tracePointNode: TracePointNode) {
+  async navigateToTracePoint(
+    tracePointNode: TracePointNode,
+    treeView: vscode.TreeView<vscode.TreeItem>
+  ) {
     const tp = tracePointNode.tracePoint
     const targetUri = vscode.Uri.file(path.join(tp.projectPath, tp.tracePath))
     if (tp.traceType === 'DIRECTORY') {
       await vscode.commands.executeCommand('revealInExplorer', targetUri)
-      this.selectTracePoints([tracePointNode.id])
-      await this.listView?.selectAndReveal([tracePointNode.id], {
-        expand: false,
-        focus: false
-      })
       return
     }
     const doc = await vscode.workspace.openTextDocument(targetUri)
@@ -1340,86 +1341,10 @@ export class TracePointService {
       editor.selection = new vscode.Selection(range.start, range.end)
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
     }
-    this.selectTracePoints([tracePointNode.id])
-    await this.listView?.selectAndReveal([tracePointNode.id], {
-      expand: false,
-      focus: false
-    })
-  }
-
-  /**
-   * Reparent dragged nodes onto target (or promote to root when target is null).
-   * Returns drop targets that should be expanded in the UI.
-   */
-  reparentTracePoints(draggedIds: string[], targetId: string | null): Set<TracePointNode> {
-    const affectedParentNodes = new Set<TracePointNode | null>()
-    const dropTargets = new Set<TracePointNode>()
-
-    for (const tracePointId of draggedIds) {
-      const draggedTracePointNode = this.getTracePointNodeById(tracePointId)
-      if (!draggedTracePointNode) continue
-      const oldDraggedParentTracePointNode = draggedTracePointNode.parentId
-        ? this.getTracePointNodeById(draggedTracePointNode.parentId)
-        : null
-
-      if (!targetId) {
-        if (!draggedTracePointNode.parentId) continue
-        if (oldDraggedParentTracePointNode?.children) {
-          oldDraggedParentTracePointNode.children = oldDraggedParentTracePointNode.children.filter(
-            (child) => child !== draggedTracePointNode
-          )
-        }
-        const rootParentId = this.findRootParentId(draggedTracePointNode)
-        draggedTracePointNode.parentId = undefined
-        if (rootParentId != null) {
-          this.addRootTracePointNextTo(draggedTracePointNode, rootParentId)
-        }
-        affectedParentNodes.add(oldDraggedParentTracePointNode)
-        this.expandTreeItem(oldDraggedParentTracePointNode)
-        affectedParentNodes.add(null)
-        continue
-      }
-
-      const dropTracePointNode = this.getTracePointNodeById(targetId)
-      if (!dropTracePointNode) continue
-      if (dropTracePointNode.id === draggedTracePointNode.id) continue
-      if (draggedTracePointNode.parentId === dropTracePointNode.id) continue
-
-      let ancestorTracePoint: TracePointNode | null = dropTracePointNode
-      let invalid = false
-      while (ancestorTracePoint) {
-        if (ancestorTracePoint.id === draggedTracePointNode.id) {
-          invalid = true
-          break
-        }
-        ancestorTracePoint = ancestorTracePoint.parentId
-          ? this.getTracePointNodeById(ancestorTracePoint.parentId)
-          : null
-      }
-      if (invalid) continue
-
-      if (oldDraggedParentTracePointNode?.children) {
-        oldDraggedParentTracePointNode.children = oldDraggedParentTracePointNode.children.filter(
-          (child) => child !== draggedTracePointNode
-        )
-      }
-      if (!oldDraggedParentTracePointNode) {
-        this.removeRootTracePoint(draggedTracePointNode)
-      }
-      dropTracePointNode.children.push(draggedTracePointNode)
-      draggedTracePointNode.parentId = dropTracePointNode.id
-
-      affectedParentNodes.add(oldDraggedParentTracePointNode)
-      this.expandTreeItem(oldDraggedParentTracePointNode)
-      affectedParentNodes.add(dropTracePointNode)
-      this.expandTreeItem(dropTracePointNode)
-      dropTargets.add(dropTracePointNode)
+    const selected = treeView.selection
+    if (selected.length == 1) {
+      treeView.reveal(selected[0], { select: true, focus: true })
     }
-
-    this.applyHighlightsToAllEditors()
-    this.notifyListeners('refresh', affectedParentNodes)
-    this.saveState()
-    return dropTargets
   }
 
   getSelectedTracePointIds(): string[] {
@@ -1497,25 +1422,53 @@ export class TracePointService {
       : vscode.TreeItemCollapsibleState.None
   }
 
-  /** Expand parent row(s) in the Trace Points list so new children are visible. */
-  async expandParentsInTree(parents: Iterable<TracePointNode | null>): Promise<void> {
-    await this.listView?.expandParents(parents)
+  /** Expand parent row(s) in the Trace Points tree so new children are visible. */
+  async expandParentsInTree(
+    treeView: vscode.TreeView<vscode.TreeItem>,
+    parents: Iterable<TracePointNode | null>
+  ): Promise<void> {
+    for (const parent of parents) {
+      if (!parent) continue
+      this.expandTreeItem(parent)
+      const item = this.getTreeNodeById(parent.id)
+      if (!item) continue
+      try {
+        await treeView.reveal(item, { expand: true, select: false, focus: false })
+      } catch {
+        // Tree view may be hidden or disposed
+      }
+    }
   }
 
   /**
-   * Select and reveal nodes in the Trace Points list without navigating to source.
+   * Select and reveal nodes in the Trace Points tree without navigating to source.
    * Keeps editor focus by default ({@code focus: false}).
    */
   async selectTracePointsInTree(
+    treeView: vscode.TreeView<vscode.TreeItem>,
     ids: string[],
     options?: { focus?: boolean }
   ): Promise<void> {
     if (ids.length === 0) return
+    const focus = options?.focus ?? false
     await this.syncEmptyStateContextKey()
-    await this.listView?.selectAndReveal(ids, {
-      expand: true,
-      focus: options?.focus ?? false
-    })
+    this.selectTracePoints(ids)
+    for (const id of ids) {
+      const item = this.getTreeNodeById(id)
+      if (!item) continue
+      try {
+        await treeView.reveal(item, { expand: true, select: false, focus: false })
+      } catch {
+        // Tree view may be hidden or disposed
+      }
+    }
+    const first = this.getTreeNodeById(ids[0])
+    if (!first) return
+    try {
+      await treeView.reveal(first, { expand: true, select: true, focus })
+    } catch {
+      // Tree view may be hidden or disposed
+    }
   }
 
   updateInFileNodesMap(prevFilePath: string, node: TracePointNode) {
@@ -1555,9 +1508,14 @@ export class TracePointService {
     // Profile-scoped id prevents cross-profile expand/selection restore
     item.id = this.toTreeItemId(tracePointNode.id)
     item.contextValue = tracePoint.traceType === 'LINE' ? 'traceableLine' : 'traceablePath'
-    // VS Code TreeItem description (kept for any leftover TreeItem consumers)
+    // VS Code renders description after the label with a space
     item.description = location
-    item.command = undefined
+    // Activation uses double-click to jump; single-click only selects (see activateTracePoint).
+    item.command = {
+      command: 'codeTraceTree.activateTracePoint',
+      title: 'Go to Trace Point',
+      arguments: [item]
+    }
 
     if (!tracePoint.isValid) {
       item.iconPath = new vscode.ThemeIcon(

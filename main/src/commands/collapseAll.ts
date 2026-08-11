@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: MIT
  */
 import * as vscode from 'vscode'
-import { TracePointsListApi } from '../TracePointsListApi'
+import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 
 export function registerCollapseAll(
   context: vscode.ExtensionContext,
-  listView: TracePointsListApi
+  treeDataProvider: TracePointTreeDataProvider
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.collapseAll', async () => {
-      await listView.collapseAll()
+      await treeDataProvider.collapseAll()
     })
   )
 }
