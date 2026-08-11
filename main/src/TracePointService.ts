@@ -58,6 +58,11 @@ export class TracePointService {
   /** Ignore TreeView expand/collapse while rebuilding after a profile switch. */
   private ignoreExpandEvents = false
   private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
+  /**
+   * While set, ignore TreeView expand/collapse persistence (double-click host toggle).
+   * Model {@link expandedTracePointIds} still holds the pre-toggle state during this window.
+   */
+  private suppressExpandEventPersistUntilMs = 0
 
   private constructor(private context: vscode.ExtensionContext) {}
 
@@ -487,6 +492,15 @@ export class TracePointService {
 
   shouldPersistExpandEvents(): boolean {
     return !this.ignoreExpandEvents
+  }
+
+  /** Arm ignore of host expand/collapse persist after label double-click. */
+  armExpandEventSuppress(ms = 400): void {
+    this.suppressExpandEventPersistUntilMs = Date.now() + ms
+  }
+
+  shouldSuppressExpandEventPersist(): boolean {
+    return Date.now() < this.suppressExpandEventPersistUntilMs
   }
 
   private beginIgnoreExpandEvents() {
@@ -1328,6 +1342,13 @@ export class TracePointService {
     tracePointNode: TracePointNode,
     treeView: vscode.TreeView<vscode.TreeItem>
   ) {
+    // Double-click toggles expand before this command runs — restore prior state first.
+    this.armExpandEventSuppress()
+    const treeItem = this.getTreeNodeById(tracePointNode.id) ?? treeView.selection[0]
+    if (treeItem) {
+      await this.restoreExpandStateAfterDoubleClick(treeView, treeItem)
+    }
+
     const tp = tracePointNode.tracePoint
     const targetUri = vscode.Uri.file(path.join(tp.projectPath, tp.tracePath))
     if (tp.traceType === 'DIRECTORY') {
@@ -1341,9 +1362,53 @@ export class TracePointService {
       editor.selection = new vscode.Selection(range.start, range.end)
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
     }
-    const selected = treeView.selection
-    if (selected.length == 1) {
-      treeView.reveal(selected[0], { select: true, focus: true })
+  }
+
+  /**
+   * VS Code TreeView toggles collapse on label double-click (not disableable via API).
+   * {@link expandedTracePointIds} still has the pre-toggle value when deferred persist is used;
+   * put the UI back to that state (brief flicker possible).
+   */
+  async restoreExpandStateAfterDoubleClick(
+    treeView: vscode.TreeView<vscode.TreeItem>,
+    item: vscode.TreeItem
+  ): Promise<void> {
+    const nodeId = this.resolveNodeId(item.id)
+    if (!nodeId) return
+    const node = this.getTracePointNodeById(nodeId)
+    if (!node || node.children.length === 0) {
+      try {
+        await treeView.reveal(item, { expand: false, select: true, focus: false })
+      } catch {
+        // Tree view may be hidden or disposed
+      }
+      return
+    }
+
+    this.armExpandEventSuppress()
+    const wantExpanded = this.expandedTracePointIds.has(nodeId)
+    const treeItem = this.getTreeNodeById(nodeId) ?? item
+
+    if (wantExpanded) {
+      this.expandTreeItem(node)
+      try {
+        await treeView.reveal(treeItem, { expand: true, select: true, focus: false })
+      } catch {
+        // Tree view may be hidden or disposed
+      }
+      return
+    }
+
+    // Was collapsed: host expanded on double-click — collapse again while tree can take focus.
+    this.expandedTracePointIds.delete(nodeId)
+    treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed
+    try {
+      await treeView.reveal(treeItem, { expand: false, select: true, focus: true })
+      await vscode.commands.executeCommand('list.collapse')
+    } catch {
+      // Tree view may be hidden or disposed; refresh parent as fallback
+      const parent = this.getTracePointParentById(nodeId)
+      this.notifyListeners('refresh', new Set<TracePointNode | null>([parent]))
     }
   }
 

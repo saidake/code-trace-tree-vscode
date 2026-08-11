@@ -23,6 +23,8 @@ export function registerGoToTracePoint(
       vscode.window.showWarningMessage('Select exactly one trace point.')
       return
     }
+    // Arm before awaits — host already toggled expand on this double-click.
+    service.armExpandEventSuppress()
     const nodeId = service.resolveNodeId(selected[0].id)
     const tp = nodeId ? service.getTracePointNodeById(nodeId) : null
     if (tp) {

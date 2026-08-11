@@ -81,17 +81,25 @@ export function activate(context: vscode.ExtensionContext) {
       if (!service.shouldPersistExpandEvents()) return
       const id = service.resolveNodeId(e.element.id)
       if (!id) return
-      const expanded = service.getExpandedTracePointIds()
-      expanded.add(id)
-      service.setExpandedTracePointIds(expanded)
+      // Defer so double-click jump can restore pre-toggle state and suppress this persist.
+      setTimeout(() => {
+        if (service.shouldSuppressExpandEventPersist()) return
+        const expanded = service.getExpandedTracePointIds()
+        expanded.add(id)
+        service.setExpandedTracePointIds(expanded)
+      }, 50)
     }),
     treeView.onDidCollapseElement((e) => {
       if (!service.shouldPersistExpandEvents()) return
       const id = service.resolveNodeId(e.element.id)
       if (!id) return
-      const expanded = service.getExpandedTracePointIds()
-      expanded.delete(id)
-      service.setExpandedTracePointIds(expanded)
+      setTimeout(() => {
+        if (service.shouldSuppressExpandEventPersist()) return
+        const expanded = service.getExpandedTracePointIds()
+        if (!expanded.has(id)) return
+        expanded.delete(id)
+        service.setExpandedTracePointIds(expanded)
+      }, 50)
     })
   )
 
