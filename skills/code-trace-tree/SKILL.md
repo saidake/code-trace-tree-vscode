@@ -40,15 +40,35 @@ On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per sessio
 python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh.py"
 ```
 
-### Windows PowerShell quoting
+### Windows PowerShell
 
-If the agent shell is **PowerShell**, inner `"` in `--content` (and similar flags) are often stripped — e.g. `@PostMapping("/testPost")` arrives as `@PostMapping(/testPost)`, so LINE matching fails even with a correct `--line`. Insert `--%` (stop-parsing) after the script path and before those flags. `--%` is PowerShell-only (not cmd.exe / bash / Git Bash).
+Prefer invoking `python …/trace_tree.py` **directly** (or via `cmd /c`). Do **not** wrap
+calls in a PowerShell helper that uses a parameter named `$Args` — that overwrites
+PowerShell’s automatic `$Args`, so real CLI args never reach the script and every call
+fails with `the following arguments are required: command`.
+
+**Quoting:** inner `"` in `--content` (and similar flags) are often stripped — e.g.
+`@PostMapping("/testPost")` arrives as `@PostMapping(/testPost)`, so LINE matching fails
+even with a correct `--line`. Insert `--%` (stop-parsing) after the script path and before
+those flags. `--%` is PowerShell-only (not cmd.exe / bash / Git Bash).
 
 ```text
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" --% add --file src/A.java --line 38 --content "@PostMapping(\"/testPost\")" --name testPost
 ```
 
-Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.g. `--content "@PostMapping(" --line 38`).
+Fallback when quotes are still awkward: distinctive substring tip + `--line` (e.g.
+`--content "@PostMapping(" --line 38`).
+
+**Deep nests:** prefer repeated `--parent-id` on each `add` (rootward → parent). For many
+adds, use `--no-refresh` on each mutating call, then one `request_refresh.py` at the end.
+If PowerShell quoting remains fragile, a short **Python** driver that imports/calls the same
+`trace_tree.py` CLI (or subprocess) is clearer than a PowerShell splat wrapper — delete any
+temporary driver when done; do not replace the skill scripts.
+
+**Console encoding:** `trace_tree.py` reconfigures stdout/stderr to UTF-8. If the console is
+still legacy (cp1252) or a wrapper interferes, set `$env:PYTHONIOENCODING = "utf-8"` for the
+session. Prefer **ASCII** (or simple Latin) for `--name` / descriptions when the console is
+not UTF-8, so JSON status output cannot fail the process after a successful write.
 
 ## Storage layout
 
@@ -126,7 +146,7 @@ Use the skill’s `scripts/trace_tree.py` to search, add, move, delete, and rebi
 
 ### LINE locators (forgiving)
 
-Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell quoting](#windows-powershell-quoting)) or use a substring tip plus `--line`.
+Stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. **Never pass occurrence fields** — the script sets them. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell](#windows-powershell)) or use a substring tip plus `--line`. Never wrap the CLI in a helper that uses a parameter named `$Args`.
 
 | Tip | Result |
 |-----|--------|

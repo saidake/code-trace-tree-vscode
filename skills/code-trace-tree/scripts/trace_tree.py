@@ -22,6 +22,18 @@ from pathlib import Path
 from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 
+def configure_stdio_utf8() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles (often cp1252) when printing JSON."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Resolve project + storage
 # ---------------------------------------------------------------------------
@@ -1772,6 +1784,7 @@ def normalize_add_args(args: argparse.Namespace) -> None:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    configure_stdio_utf8()
     parser = build_parser()
     args = parser.parse_args(argv)
     apply_shared_defaults(args)

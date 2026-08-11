@@ -130,6 +130,12 @@
   After the skill is installed and <b>loaded</b> in your agent session, ask the agent in natural language.
   Mention the skill name when your agent needs an explicit skill reference:
 </p>
+<p>
+  <b>Windows PowerShell:</b> call <code>python …/trace_tree.py</code> directly (or
+  <code>cmd /c</code>); never name a helper parameter <code>$Args</code>. Use
+  <code>--%</code> when <code>--content</code> has quotes. Prefer ASCII names if the
+  console is not UTF-8; set <code>$env:PYTHONIOENCODING = "utf-8"</code> if needed.
+</p>
 <pre><code>Skill: code-trace-tree
 Help me generate some trace point nodes related to the current topic.
 </code></pre>
