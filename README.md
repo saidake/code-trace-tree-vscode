@@ -7,6 +7,12 @@
 
 <img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 
+<p>
+  <a href="https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode">
+    <img src="https://img.shields.io/badge/Plugin_home_page-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Plugin home page">
+  </a>
+</p>
+
 ----
 
 <!-- Plugin description -->
@@ -17,8 +23,8 @@
   Double-click any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
-  Pair it with the Agent Skill so Claude Code, Cursor, GitHub Copilot, Codex, or Gemini CLI can search,
-  add, move, and rebind traces, and refresh the IDE when you ask.<br/>
+  Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
+  refresh the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
   install and load the Code Trace Tree skill.
 </p>
@@ -60,11 +66,11 @@
 
 <h1>Agent Skill</h1>
 <p>
-  This extension does <b>not</b> ship an AI agent. Install one of the supported agents first, then install
+  This extension does <b>not</b> ship an AI agent. Install your preferred coding agent, then install
   the Code Trace Tree skill and ensure it is <b>loaded</b> in the agent session so the agent can talk
-  to the extension.
+  to the extension. The skill is general — any agent that can load skill folders can use it.
 </p>
-<p>Supported agents:</p>
+<p>Example agents:</p>
 <ul>
   <li><a href="https://claude.com/claude-code">Claude Code</a></li>
   <li><a href="https://cursor.com">Cursor</a></li>
@@ -90,13 +96,13 @@
 <h2>Install skill — extract locations</h2>
 <p>
   Download <code>code-trace-tree-skill-1.2.7.zip</code> from the GitHub Release
-  (one zip for all agents).
-  Remove any existing <code>code-trace-tree</code> skill folder first, then extract into the
-  skills directory for your agent:
+  (one zip works across agents).
+  Remove any existing <code>code-trace-tree</code> skill folder first, then extract into your
+  agent’s skills directory. Known paths for some agents:
 </p>
 <table>
   <thead>
-    <tr><th>Agent</th><th>Global</th><th>Project-local</th></tr>
+    <tr><th>Agent (examples)</th><th>Global</th><th>Project-local</th></tr>
   </thead>
   <tbody>
     <tr><td>Claude Code</td><td><code>~/.claude/skills/</code></td><td><code>.claude/skills/</code></td></tr>
@@ -123,7 +129,7 @@
 <code>Expand-Archive -Path "code-trace-tree-skill-1.2.7.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
 <code>Remove-Item "code-trace-tree-skill-1.2.7.zip"</code>
 </pre>
-<p>Project-local: extract into <code>.claude\skills\</code>. For Cursor / Copilot / Codex / Gemini, use the same zip and change the destination path using the table above.</p>
+<p>Project-local: extract into <code>.claude\skills\</code>. For other agents, use the same zip and change the destination to that agent’s skills path (see the table above for examples).</p>
 
 <h2>How to use the skill</h2>
 <p>
@@ -151,20 +157,22 @@ Add a root trace point at the login handler, then children for validation and to
   <li>macOS: <code>~/Library/Application Support/code-trace-tree</code></li>
   <li>Linux: <code>$XDG_CONFIG_HOME/code-trace-tree</code> or <code>~/.config/code-trace-tree</code></li>
 </ul>
-<p>
-  Each workspace binds to a global XML in that folder by matching the workspace path
-  (<code>&lt;path&gt;</code> in the XML) — path mode. Agents Case C create that global XML
-  without <code>.idea/code-trace-tree.project.id</code> (IDE-agnostic). New projects allocate
-  <code>&lt;ProjectFolderName&gt;.xml</code> (or <code>Name1.xml</code>, …) with a UUID
-  <code>&lt;projectId&gt;</code> on first use. Legacy <code>&lt;projectId&gt;.xml</code> and
-  folder-named files from older releases are still resolved by scanning XML contents.
-  Without a workspace folder, the empty panel asks you to open one (Profile / Description /
-  toolbar stay hidden). If the tree is empty (no nodes; only the default <code>main</code>
-  profile or no profiles), an empty-state webview explains how to create a root trace point.
-  Recover UI (grey <b>Import stored data</b> after move/rename) appears only when another
-  stored global project still has a trace point. Clearing this workspace’s tree (including
-  delete-all) does not keep recover UI visible for the bound file while it is empty.
-</p>
+<ul>
+  <li><b>Binding:</b> each workspace matches a global XML by <code>&lt;path&gt;</code> (path mode).</li>
+  <li><b>New projects:</b> allocate <code>&lt;ProjectFolderName&gt;.xml</code> (or <code>Name1.xml</code>, …)
+    with a UUID <code>&lt;projectId&gt;</code> on first use.</li>
+  <li><b>Agents (Case C):</b> create that global XML without
+    <code>.idea/code-trace-tree.project.id</code> (IDE-agnostic).</li>
+  <li><b>Legacy:</b> <code>&lt;projectId&gt;.xml</code> and folder-named files from older releases
+    are still resolved by scanning XML contents.</li>
+  <li><b>No workspace:</b> the empty panel asks you to open one
+    (Profile / Description / toolbar stay hidden).</li>
+  <li><b>Empty tree:</b> an empty-state webview explains how to create a root trace point
+    (no nodes; only the default <code>main</code> profile or no profiles).</li>
+  <li><b>Recover UI:</b> grey <b>Import stored data</b> after move/rename appears only when another
+    stored global project still has a trace point. Clearing this workspace’s tree (including
+    delete-all) does not keep recover UI visible for the bound file while it is empty.</li>
+</ul>
 <!-- Plugin description end -->
 
 # Development
