@@ -95,7 +95,7 @@
 
 <h2>Install skill — extract locations</h2>
 <p>
-  Download <code>code-trace-tree-skill-1.2.7.zip</code> from the GitHub Release
+  Download <code>code-trace-tree-skill-1.2.8.zip</code> from the GitHub Release
   (one zip works across agents).
   Remove any existing <code>code-trace-tree</code> skill folder first, then extract into your
   agent’s skills directory. Known paths for some agents:
@@ -114,20 +114,20 @@
 </table>
 
 <h2>Install example (Claude Code, Linux &amp; macOS)</h2>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.7/code-trace-tree-skill-1.2.7.zip -o code-trace-tree-skill-1.2.7.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.8/code-trace-tree-skill-1.2.8.zip -o code-trace-tree-skill-1.2.8.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.2.7.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.2.7.zip</code>
+<code>unzip code-trace-tree-skill-1.2.8.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.2.8.zip</code>
 </pre>
 <p>Project-local: extract into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and extract into that agent’s folder from the table above.</p>
 
 <h2>Install example (Claude Code, Windows PowerShell)</h2>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.7/code-trace-tree-skill-1.2.7.zip" -OutFile "code-trace-tree-skill-1.2.7.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.2.8/code-trace-tree-skill-1.2.8.zip" -OutFile "code-trace-tree-skill-1.2.8.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.2.7.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.2.7.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.2.8.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.2.8.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code>. For other agents, use the same zip and change the destination to that agent’s skills path (see the table above for examples).</p>
 
