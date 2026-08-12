@@ -26,7 +26,7 @@
   Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
   refresh the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
-  install and load the Code Trace Tree skill.
+  install the Code Trace Tree skill — once installed, the agent can <b>auto-load</b> it when relevant.
 </p>
 <!-- Plugin description end -->
 
@@ -67,8 +67,8 @@
 <h1>Agent Skill</h1>
 <p>
   This extension does <b>not</b> ship an AI agent. Install your preferred coding agent, then install
-  the Code Trace Tree skill and ensure it is <b>loaded</b> in the agent session so the agent can talk
-  to the extension. The skill is general — any agent that can load skill folders can use it.
+  the Code Trace Tree skill. Once installed, the agent can <b>auto-load</b> it when your request is
+  relevant. The skill is general — any agent that can load skill folders can use it.
 </p>
 <p>Example agents:</p>
 <ul>
@@ -133,21 +133,20 @@
 
 <h2>How to use the skill</h2>
 <p>
-  After the skill is installed and <b>loaded</b> in your agent session, ask the agent in natural language.
-  Mention the skill name when your agent needs an explicit skill reference:
+  Installing the skill makes it available to the agent:
 </p>
+<ul>
+  <li><b>Project-local</b> — available in agent sessions for that project</li>
+  <li><b>Global</b> — available across projects for that agent</li>
+</ul>
 <p>
-  <b>Windows PowerShell:</b> call <code>python …/trace_tree.py</code> directly (or
-  <code>cmd /c</code>); never name a helper parameter <code>$Args</code>. Use
-  <code>--%</code> when <code>--content</code> has quotes. Prefer ASCII names if the
-  console is not UTF-8; set <code>$env:PYTHONIOENCODING = "utf-8"</code> if needed.
+  In <b>VS Code</b>, keep the extension open for the same project: it loads the agent’s
+  trace point changes in real time (no manual reload).
 </p>
-<pre><code>Skill: code-trace-tree
-Help me generate some trace point nodes related to the current topic.
+<p>Examples:</p>
+<pre><code>Help me generate some trace point nodes related to the current topic.
 </code></pre>
-<p>Other examples:</p>
-<pre><code>Skill: code-trace-tree
-Add a root trace point at the login handler, then children for validation and token issue.
+<pre><code>Add a root trace point at the login handler, then children for validation and token issue.
 </code></pre>
 
 <h1>Storage</h1>
