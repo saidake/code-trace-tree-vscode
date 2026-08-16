@@ -49,7 +49,7 @@ export function registerCreatePathTracePointUnderSelected(
           affected.add(service.getTracePointNodeById(parentId))
         }
         service.notifyListeners('refresh', affected)
-        service.saveState()
+        service.saveStructureState()
         await service.expandParentsInTree(treeView, affected)
         if (createdIds.length > 0) {
           await service.selectTracePointsInTree(treeView, createdIds)

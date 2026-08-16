@@ -56,7 +56,7 @@ export function registerMoveUp(
 
       // Save updated order back to the service
       service.notifyListeners('refresh', affectedParentNodes)
-      service.saveState()
+      service.saveStructureState()
     })
   )
 }

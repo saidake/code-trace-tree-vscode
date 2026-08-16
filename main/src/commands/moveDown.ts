@@ -59,7 +59,7 @@ export function registerMoveDown(
 
       // Save updated order back to the service
       service.notifyListeners('refresh', affectedParentNodes)
-      service.saveState()
+      service.saveStructureState()
     })
   )
 }

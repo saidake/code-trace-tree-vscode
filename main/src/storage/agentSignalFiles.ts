@@ -7,6 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import {
   REFRESH_PROFILE_SUFFIX,
+  REFRESH_SETTINGS_SUFFIX,
   REFRESH_SUFFIX,
   SELECT_SUFFIX,
   SIGNAL_TTL_MS,
@@ -21,6 +22,7 @@ import { resolveAppDir } from './globalStoragePaths'
  * - `<projectId>.request_refresh` — full project reload (all profiles + toolbar flags)
  * - `<projectId>.request_refresh_profile` — one profile; body = profile name
  *   (empty / missing name → active profile). Does not change activeProfileName or flags.
+ * - `<projectId>.request_refresh_settings` — toolbar flags / advancedSettings / activeProfileName
  * - `<projectId>.select_trace_points`
  * - `<projectId>.storage-ready` — Case C bind handshake (no TTL; agent overwrites).
  *   Body = absolute project path (first non-empty line); empty/legacy → IDE reads XML `<path>`.
@@ -50,6 +52,10 @@ export function refreshProfileFileName(projectId: string): string {
   return `${projectId}${REFRESH_PROFILE_SUFFIX}`
 }
 
+export function refreshSettingsFileName(projectId: string): string {
+  return `${projectId}${REFRESH_SETTINGS_SUFFIX}`
+}
+
 export function selectFileName(projectId: string): string {
   return `${projectId}${SELECT_SUFFIX}`
 }
@@ -64,6 +70,10 @@ export function refreshPath(projectId: string): string {
 
 export function refreshProfilePath(projectId: string): string {
   return path.join(signalsDir(), refreshProfileFileName(projectId))
+}
+
+export function refreshSettingsPath(projectId: string): string {
+  return path.join(signalsDir(), refreshSettingsFileName(projectId))
 }
 
 export function selectPath(projectId: string): string {
@@ -142,4 +152,37 @@ export function isFresh(filePath: string): boolean {
     deleteQuietly(filePath)
     return false
   }
+}
+
+function writeStorageReady(projectId: string, projectRoot?: string): void {
+  ensureSignalsDir()
+  const body =
+    projectRoot && projectRoot.trim() ? `${path.resolve(projectRoot)}\n` : '1\n'
+  fs.writeFileSync(storageReadyPath(projectId), body, 'utf8')
+}
+
+/** Full project reload signal for peer IDEs / agents. */
+export function writeRequestRefresh(projectId: string, projectRoot?: string): void {
+  ensureSignalsDir()
+  fs.writeFileSync(refreshPath(projectId), '1\n', 'utf8')
+  writeStorageReady(projectId, projectRoot)
+}
+
+/** One-profile tree reload signal. */
+export function writeRequestRefreshProfile(
+  projectId: string,
+  profileName: string,
+  projectRoot?: string
+): void {
+  ensureSignalsDir()
+  const body = (profileName || '').trim()
+  fs.writeFileSync(refreshProfilePath(projectId), body ? `${body}\n` : '', 'utf8')
+  writeStorageReady(projectId, projectRoot)
+}
+
+/** Toolbar / advancedSettings / activeProfileName reload signal. */
+export function writeRequestRefreshSettings(projectId: string, projectRoot?: string): void {
+  ensureSignalsDir()
+  fs.writeFileSync(refreshSettingsPath(projectId), '1\n', 'utf8')
+  writeStorageReady(projectId, projectRoot)
 }

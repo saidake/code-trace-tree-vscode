@@ -171,7 +171,7 @@ export class TracePointTreeDataProvider
     // if (validate) await this.validateTracePointsOnLoad();
     this.service.applyHighlightsToAllEditors()
     this.service.notifyListeners('refresh', affectedParentNodes)
-    this.service.saveState()
+    this.service.saveStructureState()
     if (this.treeView && dropTargets.size > 0) {
       await this.service.expandParentsInTree(this.treeView, dropTargets)
     }

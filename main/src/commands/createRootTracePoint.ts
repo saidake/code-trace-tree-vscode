@@ -36,7 +36,7 @@ export function registerCreateRootTracePoint(
       const id = await service.addTracePoint(name, editor.document.uri, lineNumber)
       service.highlightTracePointsInFile(editor.document)
       service.notifyListeners()
-      service.saveState()
+      service.saveStructureState()
       if (id) await service.selectTracePointsInTree(treeView, [id])
     })
   )

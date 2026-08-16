@@ -16,6 +16,9 @@ export const REFRESH_SUFFIX = '.request_refresh'
 /** Reload one profile from XML; body = profile name (empty → active profile). */
 export const REFRESH_PROFILE_SUFFIX = '.request_refresh_profile'
 
+/** Reload project toolbar flags / advancedSettings / activeProfileName only. */
+export const REFRESH_SETTINGS_SUFFIX = '.request_refresh_settings'
+
 export const SELECT_SUFFIX = '.select_trace_points'
 
 /** Ignore / delete signal files older than this age. */

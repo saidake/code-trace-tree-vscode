@@ -34,7 +34,7 @@ export function registerCreateRootPathTracePoint(
         if (name === undefined) return
         const id = await service.addPathTracePoint(name, target)
         service.notifyListeners()
-        service.saveState()
+        service.saveStructureState()
         if (id) await service.selectTracePointsInTree(treeView, [id])
       }
     )

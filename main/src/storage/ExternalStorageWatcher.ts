@@ -18,6 +18,7 @@ const POLL_MS = 1000
  * Signals (no XML file watch — agents must write refresh signals after edits):
  * - `<projectId>.request_refresh`
  * - `<projectId>.request_refresh_profile`
+ * - `<projectId>.request_refresh_settings`
  * - `<projectId>.select_trace_points`
  *
  * FileSystemWatcher plus a periodic mtime poll so repeated overwrites of the same
@@ -30,6 +31,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = []
   private reloadTimer: ReturnType<typeof setTimeout> | undefined
   private profileReloadTimer: ReturnType<typeof setTimeout> | undefined
+  private settingsReloadTimer: ReturnType<typeof setTimeout> | undefined
   private selectTimer: ReturnType<typeof setTimeout> | undefined
   private pollTimer: ReturnType<typeof setInterval> | undefined
   private pendingReason: string | undefined
@@ -39,12 +41,13 @@ export class ExternalStorageWatcher implements vscode.Disposable {
     private readonly projectId: string,
     private readonly onFullRefresh: (reason: string) => void,
     private readonly onProfileRefresh: () => void,
+    private readonly onSettingsRefresh: () => void,
     private readonly onSelectRequest: () => void
   ) {}
 
   /**
-   * @param replayExistingRefresh when true, schedule fresh request_refresh / _profile
-   *   already on disk. Pass false after a Case C storage-ready bind (document just loaded).
+   * @param replayExistingRefresh when true, schedule fresh request_refresh / _profile /
+   *   _settings already on disk. Pass false after a Case C storage-ready bind.
    *   Fresh select signals are still replayed either way.
    */
   start(replayExistingRefresh = true) {
@@ -62,9 +65,15 @@ export class ExternalStorageWatcher implements vscode.Disposable {
         AgentSignalFiles.refreshProfileFileName(this.projectId),
         () => this.scheduleProfileReload()
       )
+      this.considerSignal(
+        AgentSignalFiles.refreshSettingsPath(this.projectId),
+        AgentSignalFiles.refreshSettingsFileName(this.projectId),
+        () => this.scheduleSettingsReload()
+      )
     } else {
       this.rememberMtime(AgentSignalFiles.refreshPath(this.projectId))
       this.rememberMtime(AgentSignalFiles.refreshProfilePath(this.projectId))
+      this.rememberMtime(AgentSignalFiles.refreshSettingsPath(this.projectId))
     }
     this.considerSignal(
       AgentSignalFiles.selectPath(this.projectId),
@@ -79,6 +88,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
     if (this.pollTimer) clearInterval(this.pollTimer)
     if (this.reloadTimer) clearTimeout(this.reloadTimer)
     if (this.profileReloadTimer) clearTimeout(this.profileReloadTimer)
+    if (this.settingsReloadTimer) clearTimeout(this.settingsReloadTimer)
     if (this.selectTimer) clearTimeout(this.selectTimer)
     for (const d of this.disposables) d.dispose()
     this.disposables.length = 0
@@ -95,6 +105,11 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       AgentSignalFiles.refreshProfilePath(this.projectId),
       AgentSignalFiles.refreshProfileFileName(this.projectId),
       () => this.scheduleProfileReload()
+    )
+    this.considerSignal(
+      AgentSignalFiles.refreshSettingsPath(this.projectId),
+      AgentSignalFiles.refreshSettingsFileName(this.projectId),
+      () => this.scheduleSettingsReload()
     )
     this.considerSignal(
       AgentSignalFiles.selectPath(this.projectId),
@@ -134,6 +149,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
     const names = [
       AgentSignalFiles.refreshFileName(this.projectId),
       AgentSignalFiles.refreshProfileFileName(this.projectId),
+      AgentSignalFiles.refreshSettingsFileName(this.projectId),
       AgentSignalFiles.selectFileName(this.projectId)
     ]
     for (const name of names) {
@@ -167,6 +183,12 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       this.considerSignal(AgentSignalFiles.refreshProfilePath(this.projectId), name, () =>
         this.scheduleProfileReload()
       )
+      return
+    }
+    if (name === AgentSignalFiles.refreshSettingsFileName(this.projectId)) {
+      this.considerSignal(AgentSignalFiles.refreshSettingsPath(this.projectId), name, () =>
+        this.scheduleSettingsReload()
+      )
     }
   }
 
@@ -192,6 +214,17 @@ export class ExternalStorageWatcher implements vscode.Disposable {
         this.onProfileRefresh()
       } catch {
         this.clearSeen(AgentSignalFiles.refreshProfileFileName(this.projectId))
+      }
+    }, DEBOUNCE_MS)
+  }
+
+  private scheduleSettingsReload() {
+    if (this.settingsReloadTimer) clearTimeout(this.settingsReloadTimer)
+    this.settingsReloadTimer = setTimeout(() => {
+      try {
+        this.onSettingsRefresh()
+      } catch {
+        this.clearSeen(AgentSignalFiles.refreshSettingsFileName(this.projectId))
       }
     }, DEBOUNCE_MS)
   }

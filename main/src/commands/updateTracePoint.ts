@@ -66,7 +66,7 @@ export function registerUpdateTracePoint(
       }
       service.applyHighlightsToAllEditors(editor)
       service.notifyListeners('refresh', affectedParentNodes)
-      service.saveState()
+      service.saveStructureState()
     })
   )
 }

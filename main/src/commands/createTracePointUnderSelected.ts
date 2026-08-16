@@ -56,7 +56,7 @@ export function registerCreateTracePointUnderSelected(
       }
       service.highlightTracePointsInFile(editor.document)
       service.notifyListeners('refresh', affectedParentNodes)
-      service.saveState()
+      service.saveStructureState()
       await service.expandParentsInTree(treeView, affectedParentNodes)
       if (createdIds.length > 0) {
         await service.selectTracePointsInTree(treeView, createdIds)

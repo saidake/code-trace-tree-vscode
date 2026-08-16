@@ -79,6 +79,7 @@ not UTF-8, so JSON status output cannot fail the process after a successful writ
 | Storage-ready (Case C bind) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.storage-ready` (no TTL; written by refresh scripts) |
 | Refresh signal (full) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
 | Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
+| Refresh signal (settings) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_settings` (TTL 60s) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
 **Trace Points tree (VS Code / Cursor):** built-in TreeView — twistie expands/collapses; single-click selects; double-click jumps and restores the prior expand/collapse state if the host toggled it (brief flicker possible).
@@ -247,7 +248,8 @@ The IDE watches **signal files** (not the XML path). After agent edits, always w
 | Signal | Effect |
 |--------|--------|
 | `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`, `advancedSettings`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
-| `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. |
+| `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. Structure ops (`add` / `move` / `delete` / `rebind`) emit this. |
+| `request_refresh_settings` | Reload project toolbar flags / `advancedSettings` / `activeProfileName` only (not profile trees). |
 | `<projectId>.storage-ready` | Case C bind handshake (no TTL). Body = absolute project path (same as XML `<path>`). IDE filters on the body first; empty/legacy body falls back to XML `<path>`. Does not create storage. |
 
 ```text
@@ -267,6 +269,7 @@ All under `<Agent Skill Path>/code-trace-tree/scripts/` (see Skill scripts locat
 - Trace tree ops: `trace_tree.py`
 - Request full IDE refresh: `request_refresh.py`
 - Request one-profile IDE refresh: `request_refresh_profile.py`
+- Request settings IDE refresh: `request_refresh_settings.py`
 - Select / navigate: `select_trace_points.py`
 
 ## Edit plugin data action
