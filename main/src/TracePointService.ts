@@ -1057,9 +1057,9 @@ export class TracePointService {
       this.getTraceNodesByFilePath(filePath)?.filter((n) => n.tracePoint.traceType === 'LINE') ?? []
     if (affectedTracePoints.length === 0) return
 
-    // External reload / select-all paste replaces the whole buffer. Offset math fails;
+    // External reload / large agent rewrite: offset math collapses tips to line 1.
     // JetBrains skips DocumentListener during VFS refresh and content-rebinds instead.
-    if (this.isFullDocumentReplace(event)) {
+    if (this.shouldContentRebindDocumentChange(event)) {
       this.rebindLineNodesForDocument(event.document)
       void this.highlightTracePointsInFile(event.document)
       return
@@ -1096,18 +1096,13 @@ export class TracePointService {
       // CASE 1: Press Enter at the beginning of the line (lineOffset !== 0)
       if (tp.lineNumber === changedLine && isEnter && lineOffset > 0 && isLineStart) {
         const newLineNumber = tp.lineNumber + lineOffset
-        const newLineContent = newLines[newLineNumber - 1]?.trim() ?? null
-        const [total, matches] = this.getLineOccurrences(event.document, newLineContent ?? '')
-        const occIdx =
-          newLineContent === tp.lineContent
-            ? tp.occurrenceIndex
-            : matches.indexOf(newLineNumber) + 1
+        const [total, matches] = this.getLineOccurrences(event.document, tp.lineContent ?? '')
+        const occIdx = matches.indexOf(newLineNumber) + 1
 
         node.tracePoint = {
           ...tp,
           lineNumber: newLineNumber,
-          lineContent: newLineContent ?? '',
-          isValid: newLineContent !== null,
+          isValid: occIdx > 0,
           totalOccurrences: total,
           occurrenceIndex: occIdx >= 0 ? occIdx : 0
         }
@@ -1131,23 +1126,25 @@ export class TracePointService {
         affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
       }
 
-      // CASE 3: Edit above the trace point line (shift line numbers)
+      // CASE 3: Edit above the trace point line (shift line numbers only)
       else if (tp.lineNumber > changedLine && lineOffset !== 0) {
-        const newLineNumber = Math.max(1, tp.lineNumber + lineOffset)
-        const newLineContent = newLines[newLineNumber - 1]?.trim() ?? null
-        const [total, matches] = this.getLineOccurrences(event.document, newLineContent ?? '')
-        const occIdx =
-          newLineContent === tp.lineContent
-            ? tp.occurrenceIndex
-            : matches.indexOf(newLineNumber) + 1
+        const newLineNumber = tp.lineNumber + lineOffset
+        if (newLineNumber < 1) {
+          // Shift cannot represent this (typical of bulk delete from file start) — rebind.
+          this.rebindLineNodesForDocument(event.document)
+          void this.highlightTracePointsInFile(event.document)
+          return
+        }
+        const [total, matches] = this.getLineOccurrences(event.document, tp.lineContent ?? '')
+        const occIdx = matches.indexOf(newLineNumber) + 1
+        const stillThere = occIdx > 0
 
         node.tracePoint = {
           ...tp,
-          lineNumber: newLineNumber,
-          lineContent: newLineContent ?? '',
-          isValid: newLineContent !== null,
+          lineNumber: stillThere ? newLineNumber : tp.lineNumber,
+          isValid: stillThere,
           totalOccurrences: total,
-          occurrenceIndex: occIdx >= 0 ? occIdx : 0
+          occurrenceIndex: stillThere ? occIdx : 0
         }
         updatedNodes.push(node)
         affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
@@ -1211,6 +1208,25 @@ export class TracePointService {
     const newLen = event.document.getText().length
     const oldLen = newLen - change.text.length + change.rangeLength
     return oldLen > 0 && change.rangeLength === oldLen
+  }
+
+  /**
+   * Bulk / agent-style rewrites must content-rebind. Incremental line-offset math treats a
+   * rewrite from the top of the file as "edit at line 1", then Math.max(1, line+offset)
+   * collapses every tip onto line 1 and overwrites lineContent.
+   */
+  private shouldContentRebindDocumentChange(event: vscode.TextDocumentChangeEvent): boolean {
+    if (this.isFullDocumentReplace(event)) return true
+    if (event.contentChanges.length !== 1) {
+      // Multi-span reloads are not typing; prefer content match.
+      return event.contentChanges.length > 1
+    }
+    const change = event.contentChanges[0]
+    if (change.rangeOffset !== 0) return false
+    const oldLineSpan = change.range.end.line - change.range.start.line
+    const newLineBreaks = (change.text.match(/\r?\n/g) ?? []).length
+    // Multi-line replace/insert from the start of the file (agent patch / rewrite).
+    return oldLineSpan >= 1 || newLineBreaks >= 2
   }
 
   /** Relative paths that have FILE or DIRECTORY trace points. */

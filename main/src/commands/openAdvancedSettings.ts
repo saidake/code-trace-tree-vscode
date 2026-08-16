@@ -49,6 +49,14 @@ function openAdvancedSettingsPanel(
         panel?.dispose()
         return
       }
+      if (msg?.command === 'export') {
+        void vscode.commands.executeCommand('codeTraceTree.exportTracePoints')
+        return
+      }
+      if (msg?.command === 'import') {
+        void vscode.commands.executeCommand('codeTraceTree.importTracePoints')
+        return
+      }
       if (msg?.command !== 'save') return
       const light =
         normalizeHighlightHex(msg.light) ?? DEFAULT_HIGHLIGHT_LIGHT
@@ -102,6 +110,11 @@ function getHtml(settings: AdvancedSettings): string {
       font-weight: 600;
       margin: 0 0 16px;
     }
+    h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 24px 0 10px;
+    }
     .row {
       display: flex;
       align-items: center;
@@ -136,6 +149,7 @@ function getHtml(settings: AdvancedSettings): string {
     .actions {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
     button {
       color: var(--vscode-button-foreground);
@@ -147,6 +161,11 @@ function getHtml(settings: AdvancedSettings): string {
     button.secondary {
       color: var(--vscode-button-secondaryForeground);
       background: var(--vscode-button-secondaryBackground);
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid var(--vscode-editorWidget-border);
+      margin: 8px 0 0;
     }
   </style>
 </head>
@@ -166,6 +185,13 @@ function getHtml(settings: AdvancedSettings): string {
   <div class="actions">
     <button id="save">Save</button>
     <button id="cancel" class="secondary">Cancel</button>
+  </div>
+  <hr class="divider" />
+  <h2>Data</h2>
+  <p class="hint">Export or import profile XML. Also available from the Command Palette.</p>
+  <div class="actions">
+    <button id="export" class="secondary">Export Trace Points</button>
+    <button id="import" class="secondary">Import Trace Points</button>
   </div>
   <script>
     const vscode = acquireVsCodeApi();
@@ -196,6 +222,12 @@ function getHtml(settings: AdvancedSettings): string {
     });
     document.getElementById('cancel').addEventListener('click', () => {
       vscode.postMessage({ command: 'cancel' });
+    });
+    document.getElementById('export').addEventListener('click', () => {
+      vscode.postMessage({ command: 'export' });
+    });
+    document.getElementById('import').addEventListener('click', () => {
+      vscode.postMessage({ command: 'import' });
     });
 
     window.addEventListener('message', (event) => {

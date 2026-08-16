@@ -239,16 +239,6 @@
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
         },
         {
-          "command": "codeTraceTree.exportTracePoints",
-          "group": "navigation@680",
-          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
-        },
-        {
-          "command": "codeTraceTree.importTracePoints",
-          "group": "navigation@690",
-          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
-        },
-        {
           "command": "codeTraceTree.openAdvancedSettings",
           "group": "navigation@700",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
