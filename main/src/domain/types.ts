@@ -25,7 +25,7 @@ export interface TracePoint {
 
   /** LINE only. */
   lineContent?: string | null
-  /** Runtime-only: recomputed on load; not persisted to XML. */
+  /** Runtime-only: recomputed on load and when the file is opened; not persisted to XML. */
   isValid: boolean
   totalOccurrences: number
   occurrenceIndex: number

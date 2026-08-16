@@ -17,6 +17,7 @@ import { registerExpandSelected } from './commands/expandSelected'
 import { registerCollapseAll } from './commands/collapseAll'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerOpenAdvancedSettings } from './commands/openAdvancedSettings'
+import { registerRecheckTracePoints } from './commands/recheckTracePoints'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints, registerBrowseStoredProjects } from './commands/importTracePoints'
@@ -112,6 +113,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerMoveDown(context, service, treeView, treeDataProvider)
   registerExpandSelected(context, treeView, treeDataProvider)
   registerCollapseAll(context, treeDataProvider)
+  registerRecheckTracePoints(context, service)
   registerToggleHighlights(context, service)
   registerOpenAdvancedSettings(context, service)
   registerToggleNamePrompt(context, service)
@@ -163,12 +165,22 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e)),
+    // Rebind LINE availability against the editor buffer, then highlight
     vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc)),
     // Rebind LINE anchors after disk saves (covers tools that write files outside the editor)
     vscode.workspace.onDidSaveTextDocument((doc) => {
       const rel = vscode.workspace.asRelativePath(doc.uri)
       void service.rebindLineNodesForPaths([rel])
     })
+  )
+
+  // External disk edits (Notepad / agents) — content rebind like JetBrains VFS refresh
+  const sourceWatcher = vscode.workspace.createFileSystemWatcher('**/*')
+  const onSourceDiskChange = (uri: vscode.Uri) => service.handleExternalSourceFileChange(uri)
+  context.subscriptions.push(
+    sourceWatcher,
+    sourceWatcher.onDidChange(onSourceDiskChange),
+    sourceWatcher.onDidCreate(onSourceDiskChange)
   )
 }
 

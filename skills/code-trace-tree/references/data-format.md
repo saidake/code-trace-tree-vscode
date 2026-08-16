@@ -262,9 +262,11 @@ Every `<tracePoint>` has `<traceType>`: `LINE` | `FILE` | `DIRECTORY`.
 | `lineContent` | Trimmed line text; **LINE only** |
 | `totalOccurrences` / `occurrenceIndex` | Disambiguate duplicate trimmed lines; **LINE only** |
 | `description` | Optional for all kinds (`LINE`, `FILE`, `DIRECTORY`); omit element when empty |
-| `isValid` | Never persist (runtime-only) |
+| `isValid` | Never persist (runtime-only; recompute on load, file open, and Recheck Trace Points) |
 
 ## `isValid` (runtime)
+
+Never persist. Recompute on load/reload, when a file is opened (LINE nodes in that file, against the editor document), and when the user clicks Recheck Trace Points (all LINE / FILE / DIRECTORY nodes). Persist `lineNumber` / occurrence fields only if rebind actually moved them.
 
 | Kind | Valid when |
 |------|------------|

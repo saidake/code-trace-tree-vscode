@@ -134,7 +134,7 @@ python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py"
 
 ## Content matching and `isValid`
 
-`isValid` is never stored. On load/reload:
+`isValid` is never stored. Recomputed on load/reload, when a file is opened (LINE nodes in that file, against the editor document), and when the user clicks **Recheck Trace Points** (all LINE / FILE / DIRECTORY nodes):
 
 | `traceType` | Valid when |
 |--------------|------------|

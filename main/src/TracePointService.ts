@@ -24,6 +24,7 @@ import {
   DEFAULT_HIGHLIGHT_DARK
 } from './domain/types'
 import { formatLocationSuffix } from './utils/displayText'
+import { isTraceEditorUri } from './utils/editorEligibility'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
 
@@ -55,6 +56,10 @@ export class TracePointService {
   private profileListeners: ProfileListener[] = []
   private storage: ProjectStorage | undefined
   private persistTimer: ReturnType<typeof setTimeout> | undefined
+  /** Debounced content rebind for external disk edits (Notepad / agents). */
+  private externalDiskRebindTimer: ReturnType<typeof setTimeout> | undefined
+  private pendingExternalDiskRebindPaths = new Set<string>()
+  private static readonly EXTERNAL_DISK_REBIND_DEBOUNCE_MS = 350
   /** Ignore TreeView expand/collapse while rebuilding after a profile switch. */
   private ignoreExpandEvents = false
   private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
@@ -891,9 +896,42 @@ export class TracePointService {
   }
 
   async attachListenersAndHighlight(document: vscode.TextDocument) {
+    this.rebindLineNodesForDocument(document)
     if (this.fileNodesMap.has(vscode.workspace.asRelativePath(document.uri))) {
       this.highlightTracePointsInFile(document)
     }
+  }
+
+  /**
+   * Rebind LINE nodes in this editor buffer (file open / external reload).
+   * Persist only if fields moved.
+   */
+  rebindLineNodesForDocument(document: vscode.TextDocument): boolean {
+    if (!isTraceEditorUri(document.uri, this.getWorkspaceRoot())) return false
+    const relativePath = vscode.workspace.asRelativePath(document.uri)
+    const nodes = this.fileNodesMap.get(relativePath)
+    if (!nodes?.some((n) => n.tracePoint.traceType === 'LINE')) return false
+    const lines = this.documentLines(document)
+    let changed = false
+    for (const node of nodes) {
+      if (node.tracePoint.traceType !== 'LINE') continue
+      const rebound = this.rebindLineTracePoint(node.tracePoint, lines)
+      if (
+        rebound.lineNumber !== node.tracePoint.lineNumber ||
+        rebound.isValid !== node.tracePoint.isValid ||
+        rebound.occurrenceIndex !== node.tracePoint.occurrenceIndex ||
+        rebound.totalOccurrences !== node.tracePoint.totalOccurrences
+      ) {
+        node.tracePoint = rebound
+        this.updateTreeItem(node)
+        changed = true
+      }
+    }
+    if (changed) {
+      this.notifyListeners()
+      this.schedulePersist()
+    }
+    return changed
   }
 
   async highlightTracePointsInFile(document: vscode.TextDocument) {
@@ -959,6 +997,14 @@ export class TracePointService {
     const affectedTracePoints =
       this.getTraceNodesByFilePath(filePath)?.filter((n) => n.tracePoint.traceType === 'LINE') ?? []
     if (affectedTracePoints.length === 0) return
+
+    // External reload / select-all paste replaces the whole buffer. Offset math fails;
+    // JetBrains skips DocumentListener during VFS refresh and content-rebinds instead.
+    if (this.isFullDocumentReplace(event)) {
+      this.rebindLineNodesForDocument(event.document)
+      void this.highlightTracePointsInFile(event.document)
+      return
+    }
 
     const newLines = event.document.getText().split(/\r?\n/)
 
@@ -1062,8 +1108,131 @@ export class TracePointService {
   }
 
   /**
-   * Update tracePoints and tracePointMap
+   * Recheck all LINE / FILE / DIRECTORY nodes against the project.
+   * Uses open editor documents when present. Does not reload XML.
+   * Persists only if LINE line/occurrence fields moved.
    */
+  async recheckAllTracePoints(): Promise<void> {
+    const before = this.persistedLineSnapshot()
+    await this.validateTracePointsOnLoad()
+    this.rebuildTreeNodeMap()
+    this.applyHighlightsToAllEditors()
+    this.notifyListeners()
+    if (this.persistedLineSnapshot() !== before) {
+      this.schedulePersist()
+    }
+  }
+
+  private persistedLineSnapshot(): string {
+    const rows: string[] = []
+    const walk = (node: TracePointNode) => {
+      const tp = node.tracePoint
+      if (tp.traceType === 'LINE') {
+        rows.push(`${node.id}:${tp.lineNumber}:${tp.totalOccurrences}:${tp.occurrenceIndex}`)
+      }
+      node.children.forEach(walk)
+    }
+    this.tracePointNodes.forEach(walk)
+    return rows.join('|')
+  }
+
+  private documentLines(document: vscode.TextDocument): string[] {
+    const lines: string[] = []
+    for (let i = 0; i < document.lineCount; i++) {
+      lines.push(document.lineAt(i).text)
+    }
+    return lines
+  }
+
+  /**
+   * True when the edit replaced the entire previous document (disk reload, select-all paste).
+   * After the event, `document` already has the new text.
+   */
+  private isFullDocumentReplace(event: vscode.TextDocumentChangeEvent): boolean {
+    if (event.contentChanges.length !== 1) return false
+    const change = event.contentChanges[0]
+    if (change.rangeOffset !== 0) return false
+    const newLen = event.document.getText().length
+    const oldLen = newLen - change.text.length + change.rangeLength
+    return oldLen > 0 && change.rangeLength === oldLen
+  }
+
+  /**
+   * Disk change for a workspace source file (Notepad / agent / git).
+   * Open clean buffers: content-rebind against the editor (after VS Code reloads).
+   * Closed files: content-rebind from disk. Dirty open buffers are left alone (conflict UI).
+   */
+  handleExternalSourceFileChange(uri: vscode.Uri): void {
+    if (!isTraceEditorUri(uri, this.getWorkspaceRoot())) return
+    const relativePath = vscode.workspace.asRelativePath(uri)
+    const altPath = relativePath.replace(/\\/g, '/')
+    const nodes =
+      this.fileNodesMap.get(relativePath) ??
+      this.fileNodesMap.get(altPath) ??
+      this.getTraceNodesByFilePath(relativePath)
+    if (!nodes?.some((n) => n.tracePoint.traceType === 'LINE')) return
+    // Prefer the key already present in fileNodesMap
+    const mapKey = this.fileNodesMap.has(relativePath)
+      ? relativePath
+      : this.fileNodesMap.has(altPath)
+        ? altPath
+        : relativePath
+    this.pendingExternalDiskRebindPaths.add(mapKey)
+    if (this.externalDiskRebindTimer) clearTimeout(this.externalDiskRebindTimer)
+    this.externalDiskRebindTimer = setTimeout(() => {
+      void this.flushExternalDiskRebind()
+    }, TracePointService.EXTERNAL_DISK_REBIND_DEBOUNCE_MS)
+  }
+
+  private async flushExternalDiskRebind(): Promise<void> {
+    const paths = [...this.pendingExternalDiskRebindPaths]
+    this.pendingExternalDiskRebindPaths.clear()
+    if (paths.length === 0) return
+
+    const root = this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!root) return
+
+    const closedPaths: string[] = []
+    for (const relativePath of paths) {
+      const abs = path.normalize(path.join(root, relativePath))
+      const doc = vscode.workspace.textDocuments.find(
+        (d) => d.uri.scheme === 'file' && path.normalize(d.uri.fsPath) === abs
+      )
+      if (doc) {
+        if (doc.isDirty) continue
+        this.rebindLineNodesForDocument(doc)
+        void this.highlightTracePointsInFile(doc)
+      } else {
+        closedPaths.push(relativePath)
+      }
+    }
+    if (closedPaths.length > 0) {
+      await this.rebindLineNodesForPaths(closedPaths)
+    }
+  }
+
+  /** Prefer an open editor buffer; otherwise read from disk. */
+  private linesForTracePath(relativePath: string, projectPath: string): string[] | undefined {
+    const abs = path.join(projectPath, relativePath)
+    const normalizedAbs = path.normalize(abs)
+    const storedRel = relativePath.replace(/\\/g, '/')
+    for (const doc of vscode.workspace.textDocuments) {
+      if (doc.uri.scheme !== 'file') continue
+      if (path.normalize(doc.uri.fsPath) === normalizedAbs) {
+        return this.documentLines(doc)
+      }
+      const rel = vscode.workspace.asRelativePath(doc.uri).replace(/\\/g, '/')
+      if (rel === storedRel) {
+        return this.documentLines(doc)
+      }
+    }
+    try {
+      return fs.readFileSync(abs, 'utf8').split(/\r?\n/)
+    } catch {
+      return undefined
+    }
+  }
+
   /**
    * Recursively validate tracePoints and update tracePointMap
    */
@@ -1083,15 +1252,11 @@ export class TracePointService {
           node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
         }
       } else {
-        const abs = path.join(tp.projectPath, tp.tracePath)
-        let lines: string[] | undefined
-        try {
-          lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/)
-        } catch {
-          node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
-        }
+        const lines = this.linesForTracePath(tp.tracePath, tp.projectPath)
         if (lines) {
           node.tracePoint = this.rebindLineTracePoint(tp, lines)
+        } else {
+          node.tracePoint = { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
         }
       }
 

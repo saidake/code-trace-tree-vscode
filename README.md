@@ -56,12 +56,14 @@
   <li>Single-click a node to select it; double-click to jump to that location (line, file, or Explorer for folders). Double-click restores the prior expand/collapse state if the host toggled it (brief flicker possible).</li>
   <li>Right-click a node and choose <b>Copy Trace Point Text</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
   <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
-  <li>Use the view title-bar actions to expand/collapse, reorder, highlight, prompt for name on create, import/export, or edit descriptions. Drag a node onto another to reparent it (the target expands automatically).</li>
+  <li>Use the view title-bar actions to expand/collapse, recheck traces, reorder, highlight, prompt for name on create, import/export, or edit descriptions. Drag a node onto another to reparent it (the target expands automatically).</li>
 </ol>
 <p>
   <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),
   not generic lines like <code>}</code> or <code>return;</code>. Empty lines are not allowed.
   The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
+  Opening a file re-checks line traces in that file so highlights and validity stay aligned.
+  Use <b>Recheck Trace Points</b> in the toolbar to recheck every line, file, and directory trace.
 </p>
 
 <h1>Agent Skill</h1>
