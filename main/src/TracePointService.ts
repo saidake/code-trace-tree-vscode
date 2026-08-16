@@ -40,7 +40,11 @@ export class TracePointService {
 
   private selectedTracePointIds: Set<string> = new Set()
   private expandedTracePointIds: Set<string> = new Set()
-  private highlighters: Map<string, vscode.TextEditorDecorationType> = new Map() // Key: fileUri
+  /** Shared whole-line highlight type (recreated only when color changes). */
+  private highlightDecorationType: vscode.TextEditorDecorationType | undefined
+  private highlightDecorationColor: string | undefined
+  /** Prevents dispose/setDecorations from re-entering via onDidChangeVisibleTextEditors. */
+  private applyingHighlights = false
   private _highlightingEnabled: boolean = true
   private _descriptionAreaOpened: boolean = false
   private _namePromptEnabled: boolean = true
@@ -360,6 +364,7 @@ export class TracePointService {
 
   setHighlightingEnabled(enabled: boolean) {
     this.ensureStorage()
+    if (this._highlightingEnabled === enabled) return
     this._highlightingEnabled = enabled
     this.applyHighlightsToAllEditors()
     this.scheduleSettingsPersist()
@@ -526,9 +531,36 @@ export class TracePointService {
   }
 
   private clearAllHighlights() {
-    for (const filePath of [...this.highlighters.keys()]) {
-      this.removeHighlights(filePath)
+    this.clearHighlightsOnVisibleEditors()
+  }
+
+  private clearHighlightsOnVisibleEditors() {
+    const type = this.highlightDecorationType
+    if (!type) return
+    for (const editor of vscode.window.visibleTextEditors) {
+      editor.setDecorations(type, [])
     }
+  }
+
+  private disposeHighlightDecorationType() {
+    this.clearHighlightsOnVisibleEditors()
+    this.highlightDecorationType?.dispose()
+    this.highlightDecorationType = undefined
+    this.highlightDecorationColor = undefined
+  }
+
+  private ensureHighlightDecorationType(): vscode.TextEditorDecorationType {
+    const color = this.currentHighlightBackground()
+    if (this.highlightDecorationType && this.highlightDecorationColor === color) {
+      return this.highlightDecorationType
+    }
+    this.disposeHighlightDecorationType()
+    this.highlightDecorationType = vscode.window.createTextEditorDecorationType({
+      backgroundColor: color,
+      isWholeLine: true
+    })
+    this.highlightDecorationColor = color
+    return this.highlightDecorationType
   }
 
   /**
@@ -993,21 +1025,18 @@ export class TracePointService {
     return changed
   }
 
-  async highlightTracePointsInFile(document: vscode.TextDocument) {
-    if (!this.isHighlightingEnabled()) return
+  highlightTracePointsInFile(document: vscode.TextDocument) {
+    if (!this.isHighlightingEnabled()) {
+      this.removeHighlights(document.uri.fsPath)
+      return
+    }
     const filePath = vscode.workspace.asRelativePath(document.uri)
     const relevantTracePoints =
       this.fileNodesMap
         .get(filePath)
         ?.filter((tp) => tp.tracePoint.traceType === 'LINE' && tp.tracePoint.isValid) ?? []
 
-    this.removeHighlights(document.uri.fsPath)
-
-    const decorationType = vscode.window.createTextEditorDecorationType({
-      backgroundColor: this.currentHighlightBackground(),
-      isWholeLine: true
-    })
-
+    const decorationType = this.ensureHighlightDecorationType()
     const ranges: vscode.Range[] = []
     relevantTracePoints.forEach((tp) => {
       if (tp.tracePoint.lineNumber <= document.lineCount) {
@@ -1018,37 +1047,39 @@ export class TracePointService {
     vscode.window.visibleTextEditors
       .filter((editor) => editor.document.uri.fsPath === document.uri.fsPath)
       .forEach((editor) => editor.setDecorations(decorationType, ranges))
-    this.highlighters.set(document.uri.fsPath, decorationType)
   }
 
   private removeHighlights(filePath: string) {
-    const decorationType = this.highlighters.get(filePath)
-    if (decorationType) {
-      vscode.window.visibleTextEditors.forEach((editor) =>
-        editor.setDecorations(decorationType, [])
-      )
-      decorationType.dispose()
-      this.highlighters.delete(filePath)
-    }
+    const decorationType = this.highlightDecorationType
+    if (!decorationType) return
+    vscode.window.visibleTextEditors
+      .filter((editor) => editor.document.uri.fsPath === filePath)
+      .forEach((editor) => editor.setDecorations(decorationType, []))
   }
 
   applyHighlightsToAllEditors(editor: vscode.TextEditor | null = null) {
-    console.log('applyHighlightsToAllEditors triggered')
-    if (editor) {
-      if (this.isHighlightingEnabled()) {
-        this.highlightTracePointsInFile(editor.document)
-      } else {
-        this.removeHighlights(editor.document.uri.fsPath)
+    if (this.applyingHighlights) return
+    this.applyingHighlights = true
+    try {
+      if (!this.isHighlightingEnabled()) {
+        this.clearAllHighlights()
+        return
       }
-      return
+      if (editor) {
+        this.highlightTracePointsInFile(editor.document)
+        return
+      }
+      // One decoration type for all editors; set ranges per visible document once.
+      const seen = new Set<string>()
+      for (const ed of vscode.window.visibleTextEditors) {
+        const key = ed.document.uri.fsPath
+        if (seen.has(key)) continue
+        seen.add(key)
+        this.highlightTracePointsInFile(ed.document)
+      }
+    } finally {
+      this.applyingHighlights = false
     }
-    vscode.window.visibleTextEditors.forEach((editor) => {
-      if (this.isHighlightingEnabled()) {
-        this.highlightTracePointsInFile(editor.document)
-      } else {
-        this.removeHighlights(editor.document.uri.fsPath)
-      }
-    })
   }
 
   async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {

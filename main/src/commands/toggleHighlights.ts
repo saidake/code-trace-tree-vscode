@@ -12,9 +12,7 @@ export function registerToggleHighlights(
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codeTraceTree.toggleHighlights', () => {
-      const enabled = !service.isHighlightingEnabled()
-      service.setHighlightingEnabled(enabled)
-      vscode.window.showInformationMessage(`Highlights ${enabled ? 'enabled' : 'disabled'}.`)
+      service.setHighlightingEnabled(!service.isHighlightingEnabled())
     })
   )
 }
