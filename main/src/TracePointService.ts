@@ -607,7 +607,7 @@ export class TracePointService {
   }
 
   /** Swap working memory to the active profile and refresh UI/highlights. */
-  private async loadActiveProfileFromStore() {
+  private async loadActiveProfileFromStore(preserveSelection = false) {
     let profile = this.profiles.find((p) => p.name === this.activeProfileName)
     if (!profile) {
       profile = this.profiles[0]
@@ -622,12 +622,18 @@ export class TracePointService {
     this.beginIgnoreExpandEvents()
     try {
       this.clearAllHighlights()
+      const keepIds = preserveSelection ? [...this.selectedTracePointIds] : []
       this.selectedTracePointIds.clear()
       this.tracePointNodes = profile.tracePointNodes
       this.expandedTracePointIds = new Set(profile.expandedTracePointIds)
       this.applyProjectPathToNodes(this.tracePointNodes)
 
       this.rebuildNodeMapAndFileNodesMap()
+      if (preserveSelection) {
+        for (const id of keepIds) {
+          if (this.nodeMap.has(id)) this.selectedTracePointIds.add(id)
+        }
+      }
       await this.validateTracePointsOnLoad()
       this.rebuildTreeNodeMap()
       this.applyHighlightsToAllEditors()
@@ -1614,7 +1620,7 @@ export class TracePointService {
         this.profiles.push(cloned)
       }
       if (cloned.name === this.activeProfileName) {
-        await this.loadActiveProfileFromStore()
+        await this.loadActiveProfileFromStore(true)
       }
       this.notifyProfileListeners()
     } finally {
@@ -1632,7 +1638,8 @@ export class TracePointService {
     const requestPath = AgentSignalFiles.refreshProfilePath(projectId)
     if (!AgentSignalFiles.isFresh(requestPath)) return
     const name = AgentSignalFiles.readProfileRefreshName(requestPath)
-    await this.reloadProfileFromExternalStorage(name || undefined, true)
+    // Respect self-write ignore window so our own structure persist does not wipe selection.
+    await this.reloadProfileFromExternalStorage(name || undefined, false)
   }
 
   /**
@@ -1673,7 +1680,7 @@ export class TracePointService {
     if (!projectId) return
     const requestPath = AgentSignalFiles.refreshSettingsPath(projectId)
     if (!AgentSignalFiles.isFresh(requestPath)) return
-    await this.reloadSettingsFromExternalStorage(true)
+    await this.reloadSettingsFromExternalStorage(false)
   }
 
   /**
