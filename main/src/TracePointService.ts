@@ -1699,9 +1699,14 @@ export class TracePointService {
       return
     }
     const doc = await vscode.workspace.openTextDocument(targetUri)
+    // Cached docs skip onDidOpenTextDocument; rebind like JetBrains fileOpened.
+    if (tp.traceType === 'LINE') {
+      this.rebindLineNodesForDocument(doc)
+    }
     const editor = await vscode.window.showTextDocument(doc)
-    if (tp.traceType === 'LINE' && tp.lineNumber > 0) {
-      const range = new vscode.Range(tp.lineNumber - 1, 0, tp.lineNumber - 1, 0)
+    const line = tracePointNode.tracePoint.lineNumber
+    if (tp.traceType === 'LINE' && line > 0) {
+      const range = new vscode.Range(line - 1, 0, line - 1, 0)
       editor.selection = new vscode.Selection(range.start, range.end)
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter)
     }

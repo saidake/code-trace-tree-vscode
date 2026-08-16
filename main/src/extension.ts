@@ -159,13 +159,18 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {
       service.applyHighlightsToAllEditors()
+    }),
+    // Editor show/refocus (onDidOpenTextDocument alone misses cached documents after tab close).
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) void service.attachListenersAndHighlight(editor.document)
     })
   )
   service.addProfileListener(() => emptyProvider.refresh())
 
   context.subscriptions.push(
+    // Typing: incremental offsets; external disk reload: full-buffer content rebind
     vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e)),
-    // Rebind LINE availability against the editor buffer, then highlight
+    // First load into the workspace model
     vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc)),
     { dispose: () => service.disposePathTraceWatchers() }
   )
