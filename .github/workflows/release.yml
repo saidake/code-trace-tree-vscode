@@ -2,6 +2,7 @@
 #
 # Builds the VSIX and shared agent skill ZIP, attaches them to the GitHub Release.
 # Triggered on push of a git tag matching v* (e.g. v1.0.0).
+# Release title format: "vX.Y.Z"
 # Attachments: plugin .vsix + code-trace-tree-skill-X.Y.Z.zip
 
 name: Build and Release
@@ -77,7 +78,7 @@ jobs:
           VERSION="${TAG#v}"
           VSIX="$(ls main/*.vsix | head -n1)"
           SKILL_ZIP="dist/skills/code-trace-tree-skill-${VERSION}.zip"
-          TITLE="Code Trace Tree for VS Code ${TAG}"
+          TITLE="${TAG}"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$VSIX" "$SKILL_ZIP" --clobber
