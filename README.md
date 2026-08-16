@@ -63,7 +63,7 @@
   not generic lines like <code>}</code> or <code>return;</code>. Empty lines are not allowed.
   The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
   Opening a file re-checks line traces in that file so highlights and validity stay aligned.
-  Use <b>Recheck Trace Points</b> in the toolbar to recheck every line, file, and directory trace.
+  Use <b>Recheck Trace Availability</b> in the toolbar to recheck every line, file, and directory trace.
 </p>
 
 <h1>Agent Skill</h1>

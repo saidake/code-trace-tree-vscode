@@ -1822,6 +1822,59 @@ export class TracePointService {
     await this.saveStructureState()
   }
 
+  /** Count invalid nodes in the active profile (current isValid flags). */
+  countInvalidTracePoints(): number {
+    let count = 0
+    const walk = (nodes: TracePointNode[]) => {
+      for (const node of nodes) {
+        if (!node.tracePoint.isValid) count++
+        walk(node.children)
+      }
+    }
+    walk(this.tracePointNodes)
+    return count
+  }
+
+  /**
+   * Remove invalid nodes from the active profile.
+   * Valid children of an invalid parent are reparented in place.
+   * @returns number of nodes removed
+   */
+  async removeInvalidTracePoints(): Promise<number> {
+    this.ensureStorage()
+    const removedIds: string[] = []
+
+    const prune = (nodes: TracePointNode[], parentId?: string): void => {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i]
+        prune(node.children, node.id)
+        if (!node.tracePoint.isValid) {
+          removedIds.push(node.id)
+          for (const child of node.children) {
+            child.parentId = parentId
+          }
+          nodes.splice(i, 1, ...node.children)
+          node.children = []
+        }
+      }
+    }
+
+    prune(this.tracePointNodes, undefined)
+    if (removedIds.length === 0) return 0
+
+    for (const id of removedIds) {
+      this.selectedTracePointIds.delete(id)
+      this.expandedTracePointIds.delete(id)
+    }
+    this.rebuildNodeMapAndFileNodesMap()
+    this.rebuildTreeNodeMap()
+    this.applyHighlightsToAllEditors()
+    this.notifyListeners()
+    this.notifyListeners('update-description', null)
+    await this.saveStructureState()
+    return removedIds.length
+  }
+
   expandTreeItem(tracePointNode: TracePointNode | null) {
     if (!tracePointNode) return
     const hasChildren = tracePointNode.children.length > 0

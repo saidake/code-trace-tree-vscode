@@ -18,6 +18,7 @@ import { registerCollapseAll } from './commands/collapseAll'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerOpenAdvancedSettings } from './commands/openAdvancedSettings'
 import { registerRecheckTracePoints } from './commands/recheckTracePoints'
+import { registerRemoveInvalidTracePoints } from './commands/removeInvalidTracePoints'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
 import { registerExportTracePoints } from './commands/exportTracePoints'
 import { registerImportTracePoints, registerBrowseStoredProjects } from './commands/importTracePoints'
@@ -114,6 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerExpandSelected(context, treeView, treeDataProvider)
   registerCollapseAll(context, treeDataProvider)
   registerRecheckTracePoints(context, service)
+  registerRemoveInvalidTracePoints(context, service)
   registerToggleHighlights(context, service)
   registerOpenAdvancedSettings(context, service)
   registerToggleNamePrompt(context, service)

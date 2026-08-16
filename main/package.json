@@ -115,7 +115,7 @@
       },
       {
         "command": "codeTraceTree.copyTracePointText",
-        "title": "Copy Trace Point Text"
+        "title": "Copy Label"
       },
       {
         "command": "codeTraceTree.showLineContent",
@@ -143,9 +143,15 @@
       },
       {
         "command": "codeTraceTree.recheckTracePoints",
-        "title": "Recheck line, file, and directory traces against the project",
-        "shortTitle": "Recheck Trace Points",
+        "title": "Recheck whether line, file, and directory traces are still available",
+        "shortTitle": "Recheck Trace Availability",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "codeTraceTree.removeInvalidTracePoints",
+        "title": "Remove invalid traces from the current profile",
+        "shortTitle": "Remove Invalid Trace Points",
+        "icon": "$(clear-all)"
       },
       {
         "command": "codeTraceTree.openAdvancedSettings",
@@ -192,6 +198,11 @@
     "menus": {
       "view/title": [
         {
+          "command": "codeTraceTree.recheckTracePoints",
+          "group": "navigation@50",
+          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
+        },
+        {
           "command": "codeTraceTree.moveUp",
           "group": "navigation@100",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
@@ -213,16 +224,6 @@
           "toggle": "codeTraceTree.namePromptEnabled"
         },
         {
-          "command": "codeTraceTree.exportTracePoints",
-          "group": "navigation@400",
-          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
-        },
-        {
-          "command": "codeTraceTree.importTracePoints",
-          "group": "navigation@500",
-          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
-        },
-        {
           "command": "codeTraceTree.expandSelected",
           "group": "navigation@600",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
@@ -233,8 +234,18 @@
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
         },
         {
-          "command": "codeTraceTree.recheckTracePoints",
+          "command": "codeTraceTree.removeInvalidTracePoints",
           "group": "navigation@675",
+          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
+        },
+        {
+          "command": "codeTraceTree.exportTracePoints",
+          "group": "navigation@680",
+          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
+        },
+        {
+          "command": "codeTraceTree.importTracePoints",
+          "group": "navigation@690",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
         },
         {
