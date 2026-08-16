@@ -167,21 +167,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e) => service.handleDocumentChange(e)),
     // Rebind LINE availability against the editor buffer, then highlight
     vscode.workspace.onDidOpenTextDocument((doc) => service.attachListenersAndHighlight(doc)),
-    // Rebind LINE anchors after disk saves (covers tools that write files outside the editor)
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-      const rel = vscode.workspace.asRelativePath(doc.uri)
-      void service.rebindLineNodesForPaths([rel])
-    })
+    { dispose: () => service.disposePathTraceWatchers() }
   )
-
-  // External disk edits (Notepad / agents) — content rebind like JetBrains VFS refresh
-  const sourceWatcher = vscode.workspace.createFileSystemWatcher('**/*')
-  const onSourceDiskChange = (uri: vscode.Uri) => service.handleExternalSourceFileChange(uri)
-  context.subscriptions.push(
-    sourceWatcher,
-    sourceWatcher.onDidChange(onSourceDiskChange),
-    sourceWatcher.onDidCreate(onSourceDiskChange)
-  )
+  // FILE/DIRECTORY tips: watchers created from fileNodesMap (not **/*)
+  service.refreshPathTraceWatchersIfNeeded()
 }
 
 function startExternalWatcher(

@@ -56,10 +56,12 @@ export class TracePointService {
   private profileListeners: ProfileListener[] = []
   private storage: ProjectStorage | undefined
   private persistTimer: ReturnType<typeof setTimeout> | undefined
-  /** Debounced content rebind for external disk edits (Notepad / agents). */
-  private externalDiskRebindTimer: ReturnType<typeof setTimeout> | undefined
-  private pendingExternalDiskRebindPaths = new Set<string>()
-  private static readonly EXTERNAL_DISK_REBIND_DEBOUNCE_MS = 350
+  /** Debounced FILE/DIRECTORY existence checks after disk events. */
+  private pathValidityTimer: ReturnType<typeof setTimeout> | undefined
+  private pendingPathValidityPaths = new Set<string>()
+  private static readonly PATH_VALIDITY_DEBOUNCE_MS = 350
+  private pathTraceWatchers: vscode.Disposable[] = []
+  private watchedPathTraceKey = ''
   /** Ignore TreeView expand/collapse while rebuilding after a profile switch. */
   private ignoreExpandEvents = false
   private ignoreExpandTimer: ReturnType<typeof setTimeout> | undefined
@@ -825,6 +827,12 @@ export class TracePointService {
       this.fileNodesMap.set(newNode.tracePoint.tracePath, [])
     }
     this.fileNodesMap.get(newNode.tracePoint.tracePath)!.push(newNode)
+    if (
+      newNode.tracePoint.traceType === 'FILE' ||
+      newNode.tracePoint.traceType === 'DIRECTORY'
+    ) {
+      this.refreshPathTraceWatchersIfNeeded()
+    }
   }
 
   getTracePointParentById(id?: string): TracePointNode | null {
@@ -878,6 +886,7 @@ export class TracePointService {
     for (const rootNode of this.tracePointNodes) {
       traverse(rootNode)
     }
+    this.refreshPathTraceWatchersIfNeeded()
   }
 
   async setTracePoints(newTracePoints: TracePointNode[]) {
@@ -1157,58 +1166,139 @@ export class TracePointService {
     return oldLen > 0 && change.rangeLength === oldLen
   }
 
+  /** Relative paths that have FILE or DIRECTORY trace points. */
+  private collectPathTraceRelativePaths(): string[] {
+    const out = new Set<string>()
+    for (const [rel, nodes] of this.fileNodesMap) {
+      if (
+        nodes.some(
+          (n) =>
+            n.tracePoint.traceType === 'FILE' || n.tracePoint.traceType === 'DIRECTORY'
+        )
+      ) {
+        out.add(rel.replace(/\\/g, '/'))
+      }
+    }
+    return [...out]
+  }
+
   /**
-   * Disk change for a workspace source file (Notepad / agent / git).
-   * Open clean buffers: content-rebind against the editor (after VS Code reloads).
-   * Closed files: content-rebind from disk. Dirty open buffers are left alone (conflict UI).
+   * Watch only FILE/DIRECTORY tip paths (existence). LINE tips use open-editor listeners.
    */
-  handleExternalSourceFileChange(uri: vscode.Uri): void {
-    if (!isTraceEditorUri(uri, this.getWorkspaceRoot())) return
+  refreshPathTraceWatchersIfNeeded(): void {
+    const key = this.collectPathTraceRelativePaths().sort().join('\0')
+    if (key === this.watchedPathTraceKey) return
+    this.watchedPathTraceKey = key
+    this.refreshPathTraceWatchers()
+  }
+
+  private refreshPathTraceWatchers(): void {
+    for (const d of this.pathTraceWatchers) d.dispose()
+    this.pathTraceWatchers = []
+    const root = this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!root) return
+    const rootUri = vscode.Uri.file(root)
+    for (const rel of this.collectPathTraceRelativePaths()) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(rootUri, rel)
+      )
+      const handle = (uri: vscode.Uri) => this.schedulePathTraceValidity(uri)
+      this.pathTraceWatchers.push(
+        watcher,
+        watcher.onDidChange(handle),
+        watcher.onDidCreate(handle),
+        watcher.onDidDelete(handle)
+      )
+    }
+  }
+
+  disposePathTraceWatchers(): void {
+    if (this.pathValidityTimer) clearTimeout(this.pathValidityTimer)
+    this.pathValidityTimer = undefined
+    this.pendingPathValidityPaths.clear()
+    for (const d of this.pathTraceWatchers) d.dispose()
+    this.pathTraceWatchers = []
+    this.watchedPathTraceKey = ''
+  }
+
+  private schedulePathTraceValidity(uri: vscode.Uri): void {
+    const root = this.getWorkspaceRoot()
+    if (!root || uri.scheme !== 'file') return
+    const relCheck = path.relative(root, uri.fsPath)
+    if (!relCheck || relCheck.startsWith('..') || path.isAbsolute(relCheck)) return
     const relativePath = vscode.workspace.asRelativePath(uri)
     const altPath = relativePath.replace(/\\/g, '/')
-    const nodes =
-      this.fileNodesMap.get(relativePath) ??
-      this.fileNodesMap.get(altPath) ??
-      this.getTraceNodesByFilePath(relativePath)
-    if (!nodes?.some((n) => n.tracePoint.traceType === 'LINE')) return
-    // Prefer the key already present in fileNodesMap
     const mapKey = this.fileNodesMap.has(relativePath)
       ? relativePath
       : this.fileNodesMap.has(altPath)
         ? altPath
         : relativePath
-    this.pendingExternalDiskRebindPaths.add(mapKey)
-    if (this.externalDiskRebindTimer) clearTimeout(this.externalDiskRebindTimer)
-    this.externalDiskRebindTimer = setTimeout(() => {
-      void this.flushExternalDiskRebind()
-    }, TracePointService.EXTERNAL_DISK_REBIND_DEBOUNCE_MS)
+    const nodes = this.fileNodesMap.get(mapKey)
+    if (
+      !nodes?.some(
+        (n) =>
+          n.tracePoint.traceType === 'FILE' || n.tracePoint.traceType === 'DIRECTORY'
+      )
+    ) {
+      return
+    }
+    this.pendingPathValidityPaths.add(mapKey)
+    if (this.pathValidityTimer) clearTimeout(this.pathValidityTimer)
+    this.pathValidityTimer = setTimeout(() => {
+      void this.flushPathTraceValidity()
+    }, TracePointService.PATH_VALIDITY_DEBOUNCE_MS)
   }
 
-  private async flushExternalDiskRebind(): Promise<void> {
-    const paths = [...this.pendingExternalDiskRebindPaths]
-    this.pendingExternalDiskRebindPaths.clear()
+  private async flushPathTraceValidity(): Promise<void> {
+    const paths = [...this.pendingPathValidityPaths]
+    this.pendingPathValidityPaths.clear()
     if (paths.length === 0) return
+    const changed = this.revalidatePathTracePoints(paths)
+    if (changed) {
+      this.notifyListeners()
+      this.schedulePersist()
+    }
+  }
 
+  /** Update isValid for FILE/DIRECTORY nodes at the given relative paths. */
+  revalidatePathTracePoints(relativePaths: string[]): boolean {
     const root = this.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-    if (!root) return
-
-    const closedPaths: string[] = []
-    for (const relativePath of paths) {
-      const abs = path.normalize(path.join(root, relativePath))
-      const doc = vscode.workspace.textDocuments.find(
-        (d) => d.uri.scheme === 'file' && path.normalize(d.uri.fsPath) === abs
-      )
-      if (doc) {
-        if (doc.isDirty) continue
-        this.rebindLineNodesForDocument(doc)
-        void this.highlightTracePointsInFile(doc)
-      } else {
-        closedPaths.push(relativePath)
+    if (!root) return false
+    let changed = false
+    for (const relativePath of relativePaths) {
+      const nodes = this.fileNodesMap.get(relativePath)
+      if (!nodes) continue
+      const abs = path.join(root, relativePath)
+      let isFile = false
+      let isDir = false
+      try {
+        const st = fs.statSync(abs)
+        isFile = st.isFile()
+        isDir = st.isDirectory()
+      } catch {
+        // missing
+      }
+      for (const node of nodes) {
+        const tp = node.tracePoint
+        let valid: boolean
+        if (tp.traceType === 'DIRECTORY') valid = isDir
+        else if (tp.traceType === 'FILE') valid = isFile
+        else continue
+        if (tp.isValid !== valid) {
+          node.tracePoint = {
+            ...tp,
+            isValid: valid,
+            totalOccurrences: 0,
+            occurrenceIndex: 0,
+            lineNumber: 0,
+            lineContent: null
+          }
+          this.updateTreeItem(node)
+          changed = true
+        }
       }
     }
-    if (closedPaths.length > 0) {
-      await this.rebindLineNodesForPaths(closedPaths)
-    }
+    return changed
   }
 
   /** Prefer an open editor buffer; otherwise read from disk. */
