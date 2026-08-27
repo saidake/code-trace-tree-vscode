@@ -42,7 +42,7 @@
     "workspace",
     "ui"
   ],
-  "icon": "assets/icons/logo.png",
+  "icon": "docs/assets/logo.png",
   "activationEvents": [
     "onStartupFinished"
   ],

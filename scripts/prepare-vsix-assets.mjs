@@ -33,7 +33,7 @@ fs.copyFileSync(path.join(root, 'LICENSE'), path.join(mainDir, 'LICENSE'))
 
 const previewDestDir = path.join(mainDir, 'docs', 'assets')
 fs.mkdirSync(previewDestDir, { recursive: true })
-for (const name of ['preview-1-vscode.png', 'preview-2-vscode.png']) {
+for (const name of ['logo.png', 'preview-1-vscode.png', 'preview-2-vscode.png']) {
   const src = path.join(root, 'docs', 'assets', name)
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, path.join(previewDestDir, name))
