@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from trace_tree import find_project_root, read_project_id, request_refresh
+from trace_tree import find_project_root, print_json, read_project_id, request_refresh
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,11 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    print(f"wrote={wrote}")
-    print(
-        "IDE should fully reload Code Trace Tree data if the project is open "
-        "with the plugin (signal TTL 60s)."
-    )
+    print_json({"ok": True})
     return 0
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code Trace Tree ops for Claude: search / add / move / delete / rebind.
+Code Trace Tree ops for Claude: search / add / ensure / move / delete / rebind.
 
 LINE nodes are stored as [file, line, full-trimmed-line-content].
 Callers may pass a stale line and/or a unique substring of the line; this script
@@ -32,6 +32,12 @@ def configure_stdio_utf8() -> None:
             reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
+
+
+def print_json(payload: dict) -> None:
+    configure_stdio_utf8()
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+
 
 
 # ---------------------------------------------------------------------------
@@ -1232,7 +1238,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         if args.content is not None and args.content not in content:
             continue
         name = child_text(tp, "traceName")
-        if args.name is not None and args.name not in name:
+        if args.trace_name is not None and args.trace_name not in name:
             continue
         rows.append(node_to_row(node, depth, parent_id))
 
@@ -1256,6 +1262,15 @@ def _print_add_result(payload: dict) -> None:
 
 
 def cmd_add(args: argparse.Namespace) -> int:
+    return _cmd_add_or_ensure(args, get_or_add=False)
+
+
+def cmd_ensure(args: argparse.Namespace) -> int:
+    return _cmd_add_or_ensure(args, get_or_add=True)
+
+
+def _cmd_add_or_ensure(args: argparse.Namespace, *, get_or_add: bool) -> int:
+    action = "ensure" if get_or_add else "add"
     project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
         args.project, args.profile, ensure=True
     )
@@ -1269,7 +1284,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     if kind == "LINE":
         if not args.file or args.content is None:
             raise SystemExit(
-                "ERROR: LINE add requires --file and --content "
+                "ERROR: LINE add/ensure requires --file and --content "
                 "(--line optional if content uniquely resolves)"
             )
         resolved = resolve_source_locator(
@@ -1286,53 +1301,55 @@ def cmd_add(args: argparse.Namespace) -> int:
             "totalOccurrences": total,
             "occurrenceIndex": occ_index,
         }
-        existing = find_existing_line_node(roots_el, loc, occ_index)
-        if existing is not None:
-            _print_add_result(
-                {
-                    "action": "add",
-                    "skipped": True,
-                    "reason": "already_exists",
-                    "profile": profile_name,
-                    "id": child_text(existing, "id"),
-                    "parentId": child_text(existing, "parentId"),
-                    "resolve": resolve_meta,
-                    "node": node_to_row(
-                        existing, 0, child_text(existing, "parentId")
-                    ),
-                }
-            )
-            return 0
+        if get_or_add:
+            existing = find_existing_line_node(roots_el, loc, occ_index)
+            if existing is not None:
+                _print_add_result(
+                    {
+                        "action": action,
+                        "skipped": True,
+                        "reason": "already_exists",
+                        "profile": profile_name,
+                        "id": child_text(existing, "id"),
+                        "parentId": child_text(existing, "parentId"),
+                        "resolve": resolve_meta,
+                        "node": node_to_row(
+                            existing, 0, child_text(existing, "parentId")
+                        ),
+                    }
+                )
+                return 0
         node = build_line_node(
-            project_root, loc, parent_id, args.name or "", args.description or ""
+            project_root, loc, parent_id, args.trace_name or "", args.description or ""
         )
     elif kind in ("FILE", "DIRECTORY"):
         path = args.file
         if not path:
-            raise SystemExit(f"ERROR: {kind} add requires --file (path)")
+            raise SystemExit(f"ERROR: {kind} add/ensure requires --file (path)")
         rel = norm_rel(path)
-        existing = find_existing_path_node(roots_el, rel, kind)
-        if existing is not None:
-            _print_add_result(
-                {
-                    "action": "add",
-                    "skipped": True,
-                    "reason": "already_exists",
-                    "profile": profile_name,
-                    "id": child_text(existing, "id"),
-                    "parentId": child_text(existing, "parentId"),
-                    "node": node_to_row(
-                        existing, 0, child_text(existing, "parentId")
-                    ),
-                }
-            )
-            return 0
+        if get_or_add:
+            existing = find_existing_path_node(roots_el, rel, kind)
+            if existing is not None:
+                _print_add_result(
+                    {
+                        "action": action,
+                        "skipped": True,
+                        "reason": "already_exists",
+                        "profile": profile_name,
+                        "id": child_text(existing, "id"),
+                        "parentId": child_text(existing, "parentId"),
+                        "node": node_to_row(
+                            existing, 0, child_text(existing, "parentId")
+                        ),
+                    }
+                )
+                return 0
         node = build_path_node(
             project_root,
             rel,
             kind,
             parent_id,
-            args.name or "",
+            args.trace_name or "",
             args.description or "",
         )
     else:
@@ -1340,7 +1357,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         payload: dict = {
-            "action": "add",
+            "action": action,
             "dry_run": True,
             "profile": profile_name,
             "parentId": parent_id,
@@ -1362,14 +1379,15 @@ def cmd_add(args: argparse.Namespace) -> int:
         request_refresh_profile(project_root, profile_name)
 
     payload = {
-        "action": "add",
-        "skipped": False,
+        "action": action,
         "profile": profile_name,
         "storage_xml": str(storage_xml),
         "parentId": parent_id,
         "node": node_to_row(node, 0, parent_id),
         "refreshed": not args.no_refresh,
     }
+    if get_or_add:
+        payload["skipped"] = False
     if resolve_meta is not None:
         payload["resolve"] = resolve_meta
     _print_add_result(payload)
@@ -1633,6 +1651,40 @@ def add_locator_flags(p: argparse.ArgumentParser, required_line: bool = False) -
     p.add_argument("--content", help="Trimmed line content (LINE)")
 
 
+def add_insert_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "pos_args",
+        nargs="*",
+        help="Positional: FILE [LINE] CONTENT  or  FILE CONTENT  or  path (FILE/DIRECTORY)",
+    )
+    p.add_argument("--file")
+    p.add_argument("--line", type=int)
+    p.add_argument("--content")
+    p.add_argument(
+        "--parent-id",
+        action="append",
+        dest="parent_ids",
+        default=None,
+        metavar="ID",
+        help=(
+            "Parent node UUID; repeat rootward → immediate parent "
+            "(shell-safe; preferred over --parent). Omit for root."
+        ),
+    )
+    p.add_argument(
+        "--parent",
+        default=None,
+        help=(
+            'Optional JSON parent path: ids and/or ["file","content"] / '
+            '["file",line,"content"]. Prefer repeated --parent-id. '
+            "Do not combine with --parent-id."
+        ),
+    )
+    p.add_argument("--trace-name", default="")
+    p.add_argument("--description", default="")
+    p.add_argument("--type", choices=["LINE", "FILE", "DIRECTORY"], default=None)
+
+
 def apply_shared_defaults(args: argparse.Namespace) -> None:
     if not hasattr(args, "project"):
         args.project = None
@@ -1654,7 +1706,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_shared_flags(shared_sub, suppress_defaults=True)
 
     parser = argparse.ArgumentParser(
-        description="Search / add / move / delete / rebind Code Trace Tree nodes (no occurrence args).",
+        description="Search / add / ensure / move / delete / rebind Code Trace Tree nodes (no occurrence args).",
         parents=[shared_root],
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1668,47 +1720,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--file")
     p_search.add_argument("--line", type=int)
     p_search.add_argument("--content", help="Substring match on lineContent")
-    p_search.add_argument("--name", help="Substring match on traceName")
+    p_search.add_argument("--trace-name", help="Substring match on traceName")
     p_search.add_argument("--type", choices=["LINE", "FILE", "DIRECTORY"])
     p_search.set_defaults(func=cmd_search)
 
     p_add = sub.add_parser(
         "add",
         parents=[shared_sub],
-        help="Add a node under an optional parent path",
+        help="Always create a new node (new UUID)",
     )
-    p_add.add_argument(
-        "pos_args",
-        nargs="*",
-        help="Positional: FILE [LINE] CONTENT  or  FILE CONTENT  or  path (FILE/DIRECTORY)",
-    )
-    p_add.add_argument("--file")
-    p_add.add_argument("--line", type=int)
-    p_add.add_argument("--content")
-    p_add.add_argument(
-        "--parent-id",
-        action="append",
-        dest="parent_ids",
-        default=None,
-        metavar="ID",
-        help=(
-            "Parent node UUID; repeat rootward → immediate parent "
-            "(shell-safe; preferred over --parent). Omit for root."
-        ),
-    )
-    p_add.add_argument(
-        "--parent",
-        default=None,
-        help=(
-            'Optional JSON parent path: ids and/or ["file","content"] / '
-            '["file",line,"content"]. Prefer repeated --parent-id. '
-            "Do not combine with --parent-id."
-        ),
-    )
-    p_add.add_argument("--name", default="")
-    p_add.add_argument("--description", default="")
-    p_add.add_argument("--type", choices=["LINE", "FILE", "DIRECTORY"], default=None)
+    add_insert_flags(p_add)
     p_add.set_defaults(func=cmd_add)
+
+    p_ensure = sub.add_parser(
+        "ensure",
+        parents=[shared_sub],
+        help="Get existing node by identity, or add if missing",
+    )
+    add_insert_flags(p_ensure)
+    p_ensure.set_defaults(func=cmd_ensure)
 
     p_move = sub.add_parser(
         "move",
@@ -1763,7 +1793,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def normalize_add_args(args: argparse.Namespace) -> None:
-    if args.command != "add":
+    if args.command not in ("add", "ensure"):
         return
     pos = list(getattr(args, "pos_args", None) or [])
     if args.file is None and pos:
@@ -1800,7 +1830,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
     apply_shared_defaults(args)
     normalize_add_args(args)
-    if args.command == "add" and args.type is None and args.file:
+    if args.command in ("add", "ensure") and args.type is None and args.file:
         # Infer FILE vs DIRECTORY when no line/content
         start = Path(args.project or ".")
         try:

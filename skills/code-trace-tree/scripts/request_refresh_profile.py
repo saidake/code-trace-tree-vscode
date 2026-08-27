@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from trace_tree import find_project_root, read_project_id, request_refresh_profile
+from trace_tree import find_project_root, print_json, read_project_id, request_refresh_profile
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,12 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    print(f"wrote={wrote}")
-    print(f"profile={profile_name or '(active)'}")
-    print(
-        "IDE should reload that profile if the project is open with the plugin "
-        "(signal TTL 60s)."
-    )
+    print_json({"profile": profile_name or None})
     return 0
 
 

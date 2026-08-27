@@ -10,7 +10,7 @@ _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from trace_tree import find_project_root, request_refresh_settings  # noqa: E402
+from trace_tree import find_project_root, print_json, request_refresh_settings  # noqa: E402
 
 
 def main() -> int:
@@ -20,7 +20,7 @@ def main() -> int:
     if not wrote:
         print("ERROR: no bound project id", file=sys.stderr)
         return 1
-    print(f"wrote={wrote}")
+    print_json({"ok": True})
     return 0
 
 

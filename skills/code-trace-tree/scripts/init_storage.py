@@ -8,7 +8,7 @@ If `.idea` id exists but XML is gone, recreates with that same projectId (not a 
 Does **not** create/overwrite `.idea/code-trace-tree.project.id`.
 
 Use before writing traces when the project has never used the plugin.
-Mutating `trace_tree` commands (add / move / delete / rebind) also call this
+Mutating `trace_tree` commands (add / ensure / move / delete / rebind) also call this
 automatically via ensure_storage.
 """
 from __future__ import annotations
@@ -20,6 +20,7 @@ from trace_tree import (
     create_fresh_storage,
     find_project_root,
     global_app_dir,
+    print_json,
     read_project_id,
     resolve_storage,
 )
@@ -44,17 +45,15 @@ def main(argv: list[str] | None = None) -> int:
     project_id = read_project_id(project_root)
     app_dir = global_app_dir()
 
-    print(f"created={'true' if created else 'false'}")
-    print(f"project_root={project_root}")
-    print(f"global_dir={app_dir}")
-    print(f"project_id={project_id}")
-    if project_id:
-        print(f"refresh_signal={app_dir / 'signals' / f'{project_id}.request_refresh'}")
-        print(f"select_signal={app_dir / 'signals' / f'{project_id}.select_trace_points'}")
-    else:
-        print("refresh_signal=")
-        print("select_signal=")
-    print(f"storage_xml={storage_xml}")
+    print_json(
+        {
+            "created": created,
+            "project_root": str(project_root),
+            "global_dir": str(app_dir),
+            "project_id": project_id or None,
+            "storage_xml": str(storage_xml) if storage_xml else None,
+        }
+    )
     return 0
 
 

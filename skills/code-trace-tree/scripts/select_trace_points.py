@@ -8,7 +8,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from trace_tree import find_project_root, request_select
+from trace_tree import find_project_root, print_json, request_select
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,18 +22,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         project_root = find_project_root(Path("."))
-        wrote = request_select(project_root, args)
+        request_select(project_root, args)
     except SystemExit as exc:
         print(exc, file=sys.stderr)
         # Distinguish missing project id (exit 2) from missing project root (exit 1).
         msg = str(exc)
         return 2 if "project id" in msg else 1
 
-    print(f"wrote={wrote}")
-    print(
-        "IDE should select the listed trace points if the project is open "
-        "with the plugin (signal TTL 60s)."
-    )
+    print_json({"ids": args})
     return 0
 
 

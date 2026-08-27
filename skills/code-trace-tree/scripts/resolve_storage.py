@@ -8,6 +8,7 @@ from pathlib import Path
 from trace_tree import (
     find_project_root,
     global_app_dir,
+    print_json,
     read_project_id,
     resolve_storage,
 )
@@ -30,16 +31,14 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit:
         storage_xml = ""
 
-    print(f"project_root={project_root}")
-    print(f"global_dir={app_dir}")
-    print(f"project_id={project_id}")
-    if project_id:
-        print(f"refresh_signal={app_dir / 'signals' / f'{project_id}.request_refresh'}")
-        print(f"select_signal={app_dir / 'signals' / f'{project_id}.select_trace_points'}")
-    else:
-        print("refresh_signal=")
-        print("select_signal=")
-    print(f"storage_xml={storage_xml}")
+    print_json(
+        {
+            "project_root": str(project_root),
+            "global_dir": str(app_dir),
+            "project_id": project_id or None,
+            "storage_xml": storage_xml or None,
+        }
+    )
 
     if not storage_xml:
         print(
