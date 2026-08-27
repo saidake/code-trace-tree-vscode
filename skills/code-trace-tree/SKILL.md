@@ -19,6 +19,8 @@ trace points. Operate the hybrid storage used by the Code Trace Tree IDE plugins
 
 Only edit or sync traces when the user explicitly asks (for example: generate topic-related
 nodes, add a tip at a line, rebind after edits). Do not auto-sync every turn.
+Never `delete` existing trace points (including ones `rebind` reports as `"invalid"`) unless
+the user explicitly asks to remove them.
 
 ## Skill scripts location
 
@@ -155,7 +157,7 @@ method A def
     method C call   ← ensure with --parent-id idA --parent-id idB
 ```
 
-**Rebind after disk edits:** Agents do not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences.
+**Rebind after disk edits:** Agents do not edit through the IDE editor, so live line shifting does not apply. After any turn that modified project source, run `rebind` (optionally `--file` for touched paths) before relying on locators or select/navigate. Rebind repairs `lineNumber` from trimmed `lineContent` and recomputes occurrences. The `"invalid"` array means those LINE locators were not found — leave those nodes in the tree; do not `delete` them unless the user asked to remove them.
 
 For many mutating calls, use `--no-refresh` on each, then one `request_refresh.py` at the end.
 
@@ -322,7 +324,7 @@ Stdout is JSON (`indent=2`, UTF-8). Errors print `ERROR: …` on stderr and exit
 }
 ```
 
-`--dry-run` adds `"dry_run": true` and does not write XML / refresh. Exit `0` on success (including skipped `ensure`). `add` never skips.
+`--dry-run` adds `"dry_run": true` and does not write XML / refresh. Exit `0` on success (including skipped `ensure`). `add` never skips. Rebind `"invalid"` is a locator status, not a delete list.
 
 **Example**:
 ```text
@@ -515,7 +517,7 @@ not UTF-8, so JSON status output cannot fail the process after a successful writ
 Prefer scripts ([Trace Tree OPs](#trace-tree-ops)). Do not create `.idea/code-trace-tree.project.id`.
 
 1. **Resolve / init** if storage is missing: `resolve_storage.py`, then `init_storage.py` if needed (mutating `trace_tree` also auto-init).
-2. **Mutate** with `trace_tree.py` (`search` / `add` / `ensure` / `move` / `delete` / `rebind`). Prefer `ensure` for workflow trees.
+2. **Mutate** with `trace_tree.py` (`search` / `add` / `ensure` / `move` / `delete` / `rebind`). Prefer `ensure` for workflow trees. Use `delete` only when the user asked to remove nodes (never to “clean up” invalid tips or to replace a tree).
 3. **Refresh** is automatic on mutating `trace_tree` calls unless `--no-refresh`. For a batch, use `--no-refresh` on each then one `request_refresh.py`. Settings-only: `request_refresh_settings.py`. One profile without a structure op: `request_refresh_profile.py`.
 
 If scripts fail or storage looks corrupt, see [references/data-format.md](references/data-format.md).
