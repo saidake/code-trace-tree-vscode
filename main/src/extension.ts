@@ -144,6 +144,8 @@ export function activate(context: vscode.ExtensionContext) {
   refreshEditorEligibleContext()
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => refreshEditorEligibleContext()),
+    vscode.window.tabGroups.onDidChangeTabs(() => refreshEditorEligibleContext()),
+    vscode.window.tabGroups.onDidChangeTabGroups(() => refreshEditorEligibleContext()),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void service.loadState().then(afterLoadState)
     })
@@ -157,6 +159,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.window.onDidChangeVisibleTextEditors(() => {
+      refreshEditorEligibleContext()
       service.applyHighlightsToAllEditors()
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {

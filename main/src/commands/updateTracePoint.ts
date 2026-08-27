@@ -7,7 +7,7 @@ import * as path from 'path'
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointNode } from '../domain/types'
-import { isTraceEditorUri } from '../utils/editorEligibility'
+import { isTraceTextEditor } from '../utils/editorEligibility'
 
 export function registerUpdateTracePoint(
   context: vscode.ExtensionContext,
@@ -26,7 +26,7 @@ export function registerUpdateTracePoint(
         vscode.window.showWarningMessage('No active editor.')
         return
       }
-      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
+      if (!isTraceTextEditor(editor, service.getWorkspaceRoot())) return
       const lineNumber = editor.selection.active.line + 1
       const lineContent = editor.document.lineAt(lineNumber - 1).text.trim()
       if (!lineContent) {

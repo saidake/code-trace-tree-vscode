@@ -7,7 +7,7 @@ import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { TracePointNode } from '../domain/types'
-import { isTraceEditorUri } from '../utils/editorEligibility'
+import { isTraceTextEditor } from '../utils/editorEligibility'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateTracePointUnderSelected(
@@ -24,7 +24,7 @@ export function registerCreateTracePointUnderSelected(
         vscode.window.showWarningMessage('No active editor.')
         return
       }
-      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
+      if (!isTraceTextEditor(editor, service.getWorkspaceRoot())) return
       if (selected.length === 0) {
         vscode.window.showWarningMessage('No trace points selected.')
         return

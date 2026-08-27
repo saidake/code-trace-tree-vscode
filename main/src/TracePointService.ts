@@ -24,7 +24,7 @@ import {
   DEFAULT_HIGHLIGHT_DARK
 } from './domain/types'
 import { formatLocationSuffix } from './utils/displayText'
-import { isTraceEditorUri } from './utils/editorEligibility'
+import { isTraceEditorUri, isTraceTextEditor } from './utils/editorEligibility'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
 
@@ -993,6 +993,7 @@ export class TracePointService {
   }
 
   async attachListenersAndHighlight(document: vscode.TextDocument) {
+    if (!isTraceEditorUri(document.uri, this.getWorkspaceRoot())) return
     this.rebindLineNodesForDocument(document)
     if (this.fileNodesMap.has(vscode.workspace.asRelativePath(document.uri))) {
       this.highlightTracePointsInFile(document)
@@ -1032,6 +1033,8 @@ export class TracePointService {
   }
 
   highlightTracePointsInFile(document: vscode.TextDocument) {
+    const root = this.getWorkspaceRoot()
+    if (!isTraceEditorUri(document.uri, root)) return
     if (!this.isHighlightingEnabled()) {
       this.removeHighlights(document.uri.fsPath)
       return
@@ -1052,7 +1055,13 @@ export class TracePointService {
     })
     vscode.window.visibleTextEditors
       .filter((editor) => editor.document.uri.fsPath === document.uri.fsPath)
-      .forEach((editor) => editor.setDecorations(decorationType, ranges))
+      .forEach((editor) => {
+        if (isTraceTextEditor(editor, root)) {
+          editor.setDecorations(decorationType, ranges)
+        } else {
+          editor.setDecorations(decorationType, [])
+        }
+      })
   }
 
   private removeHighlights(filePath: string) {
@@ -1071,13 +1080,14 @@ export class TracePointService {
         this.clearAllHighlights()
         return
       }
-      if (editor) {
-        this.highlightTracePointsInFile(editor.document)
-        return
-      }
-      // One decoration type for all editors; set ranges per visible document once.
+      const root = this.getWorkspaceRoot()
+      const decorationType = this.ensureHighlightDecorationType()
       const seen = new Set<string>()
       for (const ed of vscode.window.visibleTextEditors) {
+        if (!isTraceTextEditor(ed, root)) {
+          ed.setDecorations(decorationType, [])
+          continue
+        }
         const key = ed.document.uri.fsPath
         if (seen.has(key)) continue
         seen.add(key)
@@ -1089,6 +1099,7 @@ export class TracePointService {
   }
 
   async handleDocumentChange(event: vscode.TextDocumentChangeEvent) {
+    if (!isTraceEditorUri(event.document.uri, this.getWorkspaceRoot())) return
     const filePath = vscode.workspace.asRelativePath(event.document.uri)
     const affectedTracePoints =
       this.getTraceNodesByFilePath(filePath)?.filter((n) => n.tracePoint.traceType === 'LINE') ?? []

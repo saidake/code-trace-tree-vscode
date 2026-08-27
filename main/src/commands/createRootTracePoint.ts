@@ -6,7 +6,7 @@
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
-import { isTraceEditorUri } from '../utils/editorEligibility'
+import { isTraceTextEditor } from '../utils/editorEligibility'
 import { resolveNewTracePointName } from './tracePointNamePrompt'
 
 export function registerCreateRootTracePoint(
@@ -22,7 +22,7 @@ export function registerCreateRootTracePoint(
         vscode.window.showWarningMessage('No active editor.')
         return
       }
-      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
+      if (!isTraceTextEditor(editor, service.getWorkspaceRoot())) return
       const lineNumber = editor.selection.active.line + 1
       if (!editor.document.lineAt(lineNumber - 1).text.trim()) {
         vscode.window.showWarningMessage('Cannot create a line trace point on an empty line.')

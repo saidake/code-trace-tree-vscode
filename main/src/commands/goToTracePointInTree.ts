@@ -5,7 +5,7 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
-import { isTraceEditorUri } from '../utils/editorEligibility'
+import { isTraceTextEditor } from '../utils/editorEligibility'
 
 /** True when the editor selection spans at most one line (caret-only counts). */
 function isSingleLineSelection(editor: vscode.TextEditor): boolean {
@@ -28,7 +28,7 @@ export function registerGoToTracePointInTree(
     vscode.commands.registerCommand('codeTraceTree.goToTracePointInTree', async () => {
       const editor = vscode.window.activeTextEditor
       if (!editor || !isSingleLineSelection(editor)) return
-      if (!isTraceEditorUri(editor.document.uri, service.getWorkspaceRoot())) return
+      if (!isTraceTextEditor(editor, service.getWorkspaceRoot())) return
 
       const filePath = vscode.workspace.asRelativePath(editor.document.uri)
       const lineNumber = editor.selection.active.line + 1
