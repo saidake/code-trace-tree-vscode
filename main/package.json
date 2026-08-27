@@ -2,7 +2,7 @@
   "name": "code-trace-tree-vscode",
   "displayName": "Code Trace Tree for VS Code",
   "description": "Trace code in a tree structure—build and display code workflows as nested, navigable trace points",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "publisher": "CraigBrown",
   "license": "MIT",
   "author": "Code Trace Tree  Copyright (C) 2025-2026 Craig Brown and Code Trace Tree Contributors",
