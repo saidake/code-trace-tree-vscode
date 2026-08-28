@@ -9,7 +9,7 @@ import {
   DEFAULT_PROFILE_NAME,
   PROJECT_DOCUMENT_VERSION
 } from '../domain/constants'
-import { ProjectDocument, TraceProfile, advancedSettingsFromXml, isDefaultAdvancedSettings } from '../domain/types'
+import { ProjectDocument, TraceProfile, advancedSettingsFromXml } from '../domain/types'
 import {
   nodeFromXml,
   nodeToXml,
@@ -17,6 +17,7 @@ import {
   profileToXmlShape
 } from '../utils/traceProfileXml'
 import { asArray, parseXml, serializeXml } from '../utils/xmlUtils'
+import { globalSettingsExist } from './globalSettingsXml'
 
 /** Parse project document XML (`data.xml` design, version 4). */
 export function parseProjectDocument(xml: string, storageFile?: string): ProjectDocument {
@@ -56,10 +57,13 @@ export function parseProjectDocument(xml: string, storageFile?: string): Project
       root.highlightingEnabled == null ? true : String(root.highlightingEnabled) === 'true',
     namePromptEnabled:
       root.namePromptEnabled == null ? true : String(root.namePromptEnabled) === 'true',
-    advancedSettings: advancedSettingsFromXml(
-      root.advancedSettings?.highlightLineBackground?.light,
-      root.advancedSettings?.highlightLineBackground?.dark
-    ),
+    // Leftover project <advancedSettings> (pre-settings.xml). Used as highlight fallback.
+    legacyAdvancedSettings: root.advancedSettings
+      ? advancedSettingsFromXml(
+          root.advancedSettings?.highlightLineBackground?.light,
+          root.advancedSettings?.highlightLineBackground?.dark
+        )
+      : undefined,
     storageFile
   }
 }
@@ -80,11 +84,13 @@ export function projectDocumentToXml(doc: ProjectDocument): string {
     highlightingEnabled: String(doc.highlightingEnabled),
     namePromptEnabled: String(doc.namePromptEnabled)
   }
-  if (!isDefaultAdvancedSettings(doc.advancedSettings)) {
+  const legacy = doc.legacyAdvancedSettings
+  // Keep writing leftover colors until settings.xml exists; then omit the project block.
+  if (legacy && !globalSettingsExist()) {
     project.advancedSettings = {
       highlightLineBackground: {
-        light: doc.advancedSettings.highlightLineBackgroundLight,
-        dark: doc.advancedSettings.highlightLineBackgroundDark
+        light: legacy.highlightLineBackgroundLight,
+        dark: legacy.highlightLineBackgroundDark
       }
     }
   }

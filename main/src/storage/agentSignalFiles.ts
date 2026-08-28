@@ -12,7 +12,8 @@ import {
   SELECT_SUFFIX,
   SIGNAL_TTL_MS,
   SIGNALS_DIR_NAME,
-  STORAGE_READY_SUFFIX
+  STORAGE_READY_SUFFIX,
+  GLOBAL_REFRESH_SETTINGS_FILE_NAME
 } from '../domain/constants'
 import { resolveAppDir } from './globalStoragePaths'
 
@@ -22,7 +23,8 @@ import { resolveAppDir } from './globalStoragePaths'
  * - `<projectId>.request_refresh` — full project reload (all profiles + toolbar flags)
  * - `<projectId>.request_refresh_profile` — one profile; body = profile name
  *   (empty / missing name → active profile). Does not change activeProfileName or flags.
- * - `<projectId>.request_refresh_settings` — toolbar flags / advancedSettings / activeProfileName
+ * - `<projectId>.request_refresh_settings` — toolbar flags / activeProfileName
+ * - `request_refresh_global_settings` — global highlight colors (`settings.xml`; no projectId)
  * - `<projectId>.select_trace_points`
  * - `<projectId>.storage-ready` — Case C bind handshake (no TTL; agent overwrites).
  *   Body = absolute project path (first non-empty line); empty/legacy → IDE reads XML `<path>`.
@@ -74,6 +76,10 @@ export function refreshProfilePath(projectId: string): string {
 
 export function refreshSettingsPath(projectId: string): string {
   return path.join(signalsDir(), refreshSettingsFileName(projectId))
+}
+
+export function globalRefreshSettingsPath(): string {
+  return path.join(signalsDir(), GLOBAL_REFRESH_SETTINGS_FILE_NAME)
 }
 
 export function selectPath(projectId: string): string {
@@ -180,9 +186,15 @@ export function writeRequestRefreshProfile(
   writeStorageReady(projectId, projectRoot)
 }
 
-/** Toolbar / advancedSettings / activeProfileName reload signal. */
+/** Toolbar / activeProfileName reload signal. */
 export function writeRequestRefreshSettings(projectId: string, projectRoot?: string): void {
   ensureSignalsDir()
   fs.writeFileSync(refreshSettingsPath(projectId), '1\n', 'utf8')
   writeStorageReady(projectId, projectRoot)
+}
+
+/** Global highlight-color reload (`settings.xml`). Does not write storage-ready. */
+export function writeGlobalRequestRefreshSettings(): void {
+  ensureSignalsDir()
+  fs.writeFileSync(globalRefreshSettingsPath(), '1\n', 'utf8')
 }

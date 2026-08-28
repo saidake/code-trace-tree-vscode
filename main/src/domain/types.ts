@@ -52,7 +52,7 @@ export interface AdvancedSettings {
 }
 
 export const DEFAULT_HIGHLIGHT_LIGHT = '#FFFFC8'
-export const DEFAULT_HIGHLIGHT_DARK = '#646400'
+export const DEFAULT_HIGHLIGHT_DARK = '#236C60'
 
 export function defaultAdvancedSettings(): AdvancedSettings {
   return {
@@ -96,7 +96,11 @@ export interface ProjectDocument {
   descriptionAreaOpened: boolean
   highlightingEnabled: boolean
   namePromptEnabled: boolean
-  advancedSettings: AdvancedSettings
+  /**
+   * Leftover project `<advancedSettings>` (only if that tag is present).
+   * Highlight fallback until `settings.xml` exists; omitted on write after that.
+   */
+  legacyAdvancedSettings?: AdvancedSettings
   /** Absolute path of the XML file this document is bound to. */
   storageFile?: string
 }

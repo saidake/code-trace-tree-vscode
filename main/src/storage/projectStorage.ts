@@ -6,9 +6,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION } from '../domain/constants'
-import { ProjectDocument, TraceProfile, AdvancedSettings, defaultAdvancedSettings } from '../domain/types'
+import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION, GLOBAL_SETTINGS_FILE_NAME } from '../domain/constants'
+import { AdvancedSettings, ProjectDocument, TraceProfile } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
+import { globalSettingsExist } from './globalSettingsXml'
 import {
   parseProjectFile,
   writeProjectDocumentAtomic
@@ -144,7 +145,7 @@ export class ProjectStorage {
     descriptionAreaOpened: boolean,
     highlightingEnabled: boolean,
     namePromptEnabled: boolean,
-    advancedSettings: AdvancedSettings = defaultAdvancedSettings()
+    legacyAdvancedSettings?: AdvancedSettings
   ): void {
     const file = this.boundFile
     const projectId = this.boundProjectId
@@ -164,7 +165,8 @@ export class ProjectStorage {
       descriptionAreaOpened,
       highlightingEnabled,
       namePromptEnabled,
-      advancedSettings,
+      // Once settings.xml exists, stop persisting leftover project <advancedSettings>.
+      legacyAdvancedSettings: globalSettingsExist() ? undefined : legacyAdvancedSettings,
       storageFile: file
     }
     this.saveDocument(doc)
@@ -192,7 +194,7 @@ export class ProjectStorage {
 
     const summaries: StoredProjectSummary[] = []
     for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith('.xml') || name.endsWith('.tmp')) continue
+      if (!name.endsWith('.xml') || name.endsWith('.tmp') || name === GLOBAL_SETTINGS_FILE_NAME) continue
       const file = path.join(dir, name)
       if (!fs.statSync(file).isFile()) continue
       try {
@@ -252,7 +254,7 @@ export class ProjectStorage {
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return []
     return fs
       .readdirSync(dir)
-      .filter((name) => name.endsWith('.xml') && !name.endsWith('.tmp'))
+      .filter((name) => name.endsWith('.xml') && !name.endsWith('.tmp') && name !== GLOBAL_SETTINGS_FILE_NAME)
       .map((name) => path.join(dir, name))
       .filter((file) => fs.statSync(file).isFile())
   }

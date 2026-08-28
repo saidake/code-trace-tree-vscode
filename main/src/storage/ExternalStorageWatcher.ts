@@ -7,6 +7,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import * as AgentSignalFiles from './agentSignalFiles'
+import { GLOBAL_REFRESH_SETTINGS_FILE_NAME } from '../domain/constants'
 
 const DEBOUNCE_MS = 400
 const POLL_MS = 1000
@@ -19,6 +20,7 @@ const POLL_MS = 1000
  * - `<projectId>.request_refresh`
  * - `<projectId>.request_refresh_profile`
  * - `<projectId>.request_refresh_settings`
+ * - `request_refresh_global_settings` (global highlight colors; no projectId)
  * - `<projectId>.select_trace_points`
  *
  * FileSystemWatcher plus a periodic mtime poll so repeated overwrites of the same
@@ -75,6 +77,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       this.rememberMtime(AgentSignalFiles.refreshProfilePath(this.projectId))
       this.rememberMtime(AgentSignalFiles.refreshSettingsPath(this.projectId))
     }
+    this.rememberMtime(AgentSignalFiles.globalRefreshSettingsPath())
     this.considerSignal(
       AgentSignalFiles.selectPath(this.projectId),
       AgentSignalFiles.selectFileName(this.projectId),
@@ -109,6 +112,11 @@ export class ExternalStorageWatcher implements vscode.Disposable {
     this.considerSignal(
       AgentSignalFiles.refreshSettingsPath(this.projectId),
       AgentSignalFiles.refreshSettingsFileName(this.projectId),
+      () => this.scheduleSettingsReload()
+    )
+    this.considerSignal(
+      AgentSignalFiles.globalRefreshSettingsPath(),
+      GLOBAL_REFRESH_SETTINGS_FILE_NAME,
       () => this.scheduleSettingsReload()
     )
     this.considerSignal(
@@ -150,7 +158,8 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       AgentSignalFiles.refreshFileName(this.projectId),
       AgentSignalFiles.refreshProfileFileName(this.projectId),
       AgentSignalFiles.refreshSettingsFileName(this.projectId),
-      AgentSignalFiles.selectFileName(this.projectId)
+      AgentSignalFiles.selectFileName(this.projectId),
+      GLOBAL_REFRESH_SETTINGS_FILE_NAME
     ]
     for (const name of names) {
       const watcher = vscode.workspace.createFileSystemWatcher(
@@ -189,6 +198,12 @@ export class ExternalStorageWatcher implements vscode.Disposable {
       this.considerSignal(AgentSignalFiles.refreshSettingsPath(this.projectId), name, () =>
         this.scheduleSettingsReload()
       )
+      return
+    }
+    if (name === GLOBAL_REFRESH_SETTINGS_FILE_NAME) {
+      this.considerSignal(AgentSignalFiles.globalRefreshSettingsPath(), name, () =>
+        this.scheduleSettingsReload()
+      )
     }
   }
 
@@ -225,6 +240,7 @@ export class ExternalStorageWatcher implements vscode.Disposable {
         this.onSettingsRefresh()
       } catch {
         this.clearSeen(AgentSignalFiles.refreshSettingsFileName(this.projectId))
+        this.clearSeen(GLOBAL_REFRESH_SETTINGS_FILE_NAME)
       }
     }, DEBOUNCE_MS)
   }

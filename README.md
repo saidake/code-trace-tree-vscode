@@ -1,13 +1,18 @@
 # Code Trace Tree
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/saidake/code-trace-tree-vscode?sort=semver)](https://github.com/saidake/code-trace-tree-vscode/releases/latest)
-[![Version](https://vsmarketplacebadges.dev/version/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
-[![Downloads](https://vsmarketplacebadges.dev/downloads/CraigBrown.code-trace-tree-vscode.svg)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
+[![Open VSX](https://img.shields.io/open-vsx/v/craigbrown/code-trace-tree?label=Open%20VSX)](https://open-vsx.org/extension/craigbrown/code-trace-tree)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/craigbrown/code-trace-tree?label=Open%20VSX%20Downloads)](https://open-vsx.org/extension/craigbrown/code-trace-tree)
+[![VS Code Marketplace](https://badgen.net/vs-marketplace/v/CraigBrown.code-trace-tree-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
+[![VS Code Marketplace Downloads](https://badgen.net/vs-marketplace/d/CraigBrown.code-trace-tree-vscode?label=VS%20Code%20Marketplace%20Downloads)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 ![Build](https://github.com/saidake/code-trace-tree-vscode/actions/workflows/release.yml/badge.svg)
 
 <img src="main/assets/icons/logo.png" width="100" alt="Code Trace Tree logo">
 
 <p>
+  <a href="https://open-vsx.org/extension/craigbrown/code-trace-tree">
+    <img src="https://img.shields.io/badge/Open_VSX-C160EF?style=for-the-badge" alt="Open VSX">
+  </a>
   <a href="https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode">
     <img src="https://img.shields.io/badge/Plugin_home_page-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Plugin home page">
   </a>
@@ -20,15 +25,13 @@
   Trace code in a tree structure.
   Build and display code workflows as nested trace points
   (lines, files, and directories) so you can follow the flow and jump back to source anytime.
-  Double-click any trace point to navigate to its source, with support for multiple trace levels.
+  <b>Double-click</b> any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
   Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
-  refresh the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
+  notify the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
-  install the Code Trace Tree skill (extract the GitHub Release zip into the
-  agent’s skills directory, replacing <code>code-trace-tree</code> if it already exists)
-  — once installed, the agent can
+  install the Code Trace Tree skill. Once installed, the agent can
   <b>auto-load</b> it when relevant.
 </p>
 <!-- Plugin description end -->
@@ -72,8 +75,7 @@
 <h1>Agent Skill</h1>
 <p>
   This extension does <b>not</b> ship an AI agent. Install your preferred coding agent, then install
-  the Code Trace Tree skill: extract the GitHub Release zip into the agent’s skills
-  directory (replace <code>code-trace-tree</code> if it already exists). Once installed, the agent can <b>auto-load</b> it when your
+  the Code Trace Tree skill. Once installed, the agent can <b>auto-load</b> it when your
   request is relevant. The skill is general — any agent that can load skill folders can use it.
 </p>
 <p>Example agents:</p>
@@ -100,14 +102,9 @@
 </p>
 
 <h2>Install the skill (recommended)</h2>
-<p>
-  Extract the zip <b>into</b> your agent’s skills directory (table below).
-  If <code>code-trace-tree</code> is already there, replace that folder.
-  The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside).
-</p>
 <ol>
-  <li>Download <code>code-trace-tree-skill-1.3.0.zip</code> from the GitHub Release (one zip works across agents).</li>
-  <li>Extract it into the skills directory for your agent. When asked, replace the existing <code>code-trace-tree</code> folder. Global = all projects; project-local = this repo only.</li>
+  <li>Download <code>code-trace-tree-skill-1.3.1.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.1">GitHub Release</a> (one zip works across agents).</li>
+  <li>Extract it <b>into</b> the skills directory for your agent (table below). When asked, replace the existing <code>code-trace-tree</code> folder. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
 </ol>
 <p>
   Done when the skills directory contains <code>code-trace-tree/SKILL.md</code>
@@ -128,21 +125,21 @@
 
 <h2>Install example (command line, optional)</h2>
 <p>Same result as the steps above. Claude Code global path, Linux &amp; macOS:</p>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.0/code-trace-tree-skill-1.3.0.zip -o code-trace-tree-skill-1.3.0.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.1/code-trace-tree-skill-1.3.1.zip -o code-trace-tree-skill-1.3.1.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.3.0.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.3.0.zip</code>
+<code>unzip code-trace-tree-skill-1.3.1.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.3.1.zip</code>
 </pre>
 <p>Project-local: unzip into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and the skills path from the table above.</p>
 
 <h2>Install example (Windows PowerShell, optional)</h2>
 <p>Claude Code global path:</p>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.0/code-trace-tree-skill-1.3.0.zip" -OutFile "code-trace-tree-skill-1.3.0.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.1/code-trace-tree-skill-1.3.1.zip" -OutFile "code-trace-tree-skill-1.3.1.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.3.0.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.3.0.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.3.1.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.3.1.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code>. For other agents, use the same zip and change the destination to that agent’s skills path (see the table above for examples).</p>
 
@@ -155,13 +152,13 @@
   <li><b>Global</b> — available across projects for that agent</li>
 </ul>
 <p>
-  In <b>VS Code</b>, keep the extension open for the same project: it loads the agent’s
+  If the IDE is open on this project, it loads the agent’s
   trace point changes in real time (no manual reload).
 </p>
 <p>Examples:</p>
-<pre><code>Help me generate some trace point nodes related to the current topic.
+<pre><code>Help me generate some simple trace points related to the current topic.
 </code></pre>
-<pre><code>Add a root trace point at the login handler, then children for validation and token issue.
+<pre><code>Add simple trace points along the call path of method `test`.
 </code></pre>
 
 <h1>Storage</h1>
@@ -186,6 +183,8 @@
   <li><b>Recover UI:</b> grey <b>Import stored data</b> after move/rename appears only when another
     stored global project still has a trace point. Clearing this workspace’s tree (including
     delete-all) does not keep recover UI visible for the bound file while it is empty.</li>
+  <li><b>Highlight colors:</b> a global preference (<code>settings.xml</code> in that folder),
+    shared across projects and IDEs (defaults <code>#FFFFC8</code> light, <code>#236C60</code> dark).</li>
 </ul>
 <!-- Plugin description end -->
 

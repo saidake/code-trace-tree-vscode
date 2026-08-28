@@ -18,15 +18,17 @@ import {
   TracePointNode,
   TraceProfile,
   AdvancedSettings,
-  defaultAdvancedSettings,
-  normalizeHighlightHex,
-  DEFAULT_HIGHLIGHT_LIGHT,
-  DEFAULT_HIGHLIGHT_DARK
+  defaultAdvancedSettings
 } from './domain/types'
 import { formatLocationSuffix } from './utils/displayText'
 import { isTraceEditorUri, isTraceTextEditor } from './utils/editorEligibility'
 import * as AgentSignalFiles from './storage/agentSignalFiles'
 import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
+import {
+  ensureAndWriteGlobalSettings,
+  globalSettingsExist,
+  resolveGlobalSettings
+} from './storage/globalSettingsXml'
 
 export class TracePointService {
   private static instance: TracePointService
@@ -49,6 +51,9 @@ export class TracePointService {
   private _descriptionAreaOpened: boolean = false
   private _namePromptEnabled: boolean = true
   private _advancedSettings: AdvancedSettings = defaultAdvancedSettings()
+  /** Leftover project `<advancedSettings>`; highlight fallback until `settings.xml` exists. */
+  private legacyAdvancedSettings: AdvancedSettings | undefined
+  private ignoreGlobalSettingsUntilMs = 0
   private ignoreExternalChangesUntilMs = 0
   private suppressPersist = false
   private workspaceRoot: string | undefined
@@ -113,6 +118,7 @@ export class TracePointService {
         this.storage = undefined
         await this.syncWorkspaceFolderContextKey()
         await vscode.commands.executeCommand('setContext', 'codeTraceTree.showEmptyState', true)
+        this.applyHighlightSettings(undefined)
         this.notifyProfileListeners()
         return
       }
@@ -124,12 +130,14 @@ export class TracePointService {
       if (doc) {
         await this.applyDocument(doc)
       } else {
-        // Lazy Case C: keep in-memory defaults until first real use
+        this.applyHighlightSettings(undefined)
+        // Lazy Case C: keep in-memory tree defaults until first real use
         await this.syncToggleContextKeys()
         await this.loadActiveProfileFromStore()
       }
       this.notifyProfileListeners()
     } catch (e) {
+      this.applyHighlightSettings(undefined)
       vscode.window.showErrorMessage(`Failed to load trace points: ${e}`)
     }
   }
@@ -166,7 +174,7 @@ export class TracePointService {
     highlightingEnabled: boolean
     descriptionAreaOpened: boolean
     namePromptEnabled: boolean
-    advancedSettings?: AdvancedSettings
+    legacyAdvancedSettings?: AdvancedSettings
   }) {
     this.profiles = doc.profiles.map((p) => ({
       name: p.name || DEFAULT_PROFILE_NAME,
@@ -185,9 +193,7 @@ export class TracePointService {
     this._highlightingEnabled = doc.highlightingEnabled
     this._descriptionAreaOpened = doc.descriptionAreaOpened
     this._namePromptEnabled = doc.namePromptEnabled
-    this._advancedSettings = doc.advancedSettings
-      ? { ...doc.advancedSettings }
-      : defaultAdvancedSettings()
+    this.applyHighlightSettings(doc.legacyAdvancedSettings)
     await this.syncToggleContextKeys()
     await this.loadActiveProfileFromStore()
   }
@@ -232,7 +238,8 @@ export class TracePointService {
       this._descriptionAreaOpened,
       this._highlightingEnabled,
       this._namePromptEnabled,
-      this._advancedSettings
+      // Drop leftover <advancedSettings> from project XML once settings.xml exists.
+      globalSettingsExist() ? undefined : this.legacyAdvancedSettings
     )
     this.emitPendingPeerSignals()
   }
@@ -374,16 +381,38 @@ export class TracePointService {
     return { ...this._advancedSettings }
   }
 
+  /**
+   * Persist highlight colors to global `settings.xml` (create + migrate on first save).
+   * Does not create project storage.
+   */
   setAdvancedSettings(settings: AdvancedSettings) {
-    this.ensureStorage()
-    this._advancedSettings = {
-      highlightLineBackgroundLight:
-        normalizeHighlightHex(settings.highlightLineBackgroundLight) ?? DEFAULT_HIGHLIGHT_LIGHT,
-      highlightLineBackgroundDark:
-        normalizeHighlightHex(settings.highlightLineBackgroundDark) ?? DEFAULT_HIGHLIGHT_DARK
-    }
+    this.ignoreGlobalSettingsUntilMs = Date.now() + 1500
+    // First create seeds settings.xml from leftover project colors, then overlays the dialog values.
+    this._advancedSettings = ensureAndWriteGlobalSettings(settings, this.legacyAdvancedSettings)
+    this.legacyAdvancedSettings = undefined
+    AgentSignalFiles.writeGlobalRequestRefreshSettings()
     this.applyHighlightsToAllEditors()
-    this.scheduleSettingsPersist()
+  }
+
+  reloadGlobalHighlightSettings() {
+    if (Date.now() < this.ignoreGlobalSettingsUntilMs) return
+    const resolved = resolveGlobalSettings(this.legacyAdvancedSettings)
+    if (
+      resolved.highlightLineBackgroundLight === this._advancedSettings.highlightLineBackgroundLight &&
+      resolved.highlightLineBackgroundDark === this._advancedSettings.highlightLineBackgroundDark
+    ) {
+      if (globalSettingsExist()) this.legacyAdvancedSettings = undefined
+      return
+    }
+    this._advancedSettings = resolved
+    if (globalSettingsExist()) this.legacyAdvancedSettings = undefined
+    this.applyHighlightsToAllEditors()
+  }
+
+  private applyHighlightSettings(legacy?: AdvancedSettings) {
+    // Keep leftover project colors only while settings.xml is missing (fallback + first-save migrate).
+    this.legacyAdvancedSettings = globalSettingsExist() ? undefined : legacy
+    this._advancedSettings = resolveGlobalSettings(legacy)
   }
 
   /** Theme-aware highlight fill from advanced settings. */
@@ -1654,7 +1683,8 @@ export class TracePointService {
   }
 
   /**
-   * Reloads project toolbar flags, advancedSettings, and activeProfileName from XML.
+   * Reloads project toolbar flags and activeProfileName from XML.
+   * Highlight colors come from `settings.xml` (legacy project block only if that file is missing).
    * Does not replace other profile trees unless the active profile name changed.
    */
   async reloadSettingsFromExternalStorage(bypassIgnoreWindow = false): Promise<boolean> {
@@ -1668,9 +1698,7 @@ export class TracePointService {
       this._descriptionAreaOpened = !!doc.descriptionAreaOpened
       this._highlightingEnabled = doc.highlightingEnabled !== false
       this._namePromptEnabled = doc.namePromptEnabled !== false
-      this._advancedSettings = doc.advancedSettings
-        ? { ...doc.advancedSettings }
-        : defaultAdvancedSettings()
+      this.applyHighlightSettings(doc.legacyAdvancedSettings)
       await this.syncToggleContextKeys()
       if (prevActive !== this.activeProfileName) {
         await this.loadActiveProfileFromStore()
@@ -1685,13 +1713,18 @@ export class TracePointService {
     return true
   }
 
-  /** Handles `<projectId>.request_refresh_settings`. */
+  /** Handles `<projectId>.request_refresh_settings` and `request_refresh_global_settings`. */
   async handleExternalSettingsRefreshRequest(): Promise<void> {
     const projectId = this.getBoundProjectId()
-    if (!projectId) return
-    const requestPath = AgentSignalFiles.refreshSettingsPath(projectId)
-    if (!AgentSignalFiles.isFresh(requestPath)) return
-    await this.reloadSettingsFromExternalStorage(false)
+    if (projectId) {
+      const requestPath = AgentSignalFiles.refreshSettingsPath(projectId)
+      if (AgentSignalFiles.isFresh(requestPath)) {
+        await this.reloadSettingsFromExternalStorage(false)
+      }
+    }
+    if (AgentSignalFiles.isFresh(AgentSignalFiles.globalRefreshSettingsPath())) {
+      this.reloadGlobalHighlightSettings()
+    }
   }
 
   /**

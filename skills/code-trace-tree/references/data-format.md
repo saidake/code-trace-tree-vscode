@@ -9,11 +9,13 @@ Prefer `trace_tree` scripts over hand-editing. Use this file when scripts fail, 
 | Piece | Location |
 |-------|----------|
 | Project id | Prefer `.idea/code-trace-tree.project.id` when present; else path match to global XML `<path>` / `<projectId>` (never write the `.idea` file) |
-| Global XML | `<OS Config Dir>/code-trace-tree/` — `<ProjectFolderName>.xml` on lazy create; legacy `<projectId>.xml` and folder-named files resolved by scanning XML |
+| Global XML | `<OS Config Dir>/code-trace-tree/` — `<ProjectFolderName>.xml` on lazy create; legacy `<projectId>.xml` and folder-named files resolved by scanning XML. Skip `settings.xml` when scanning. |
+| Global settings | `<OS Config Dir>/code-trace-tree/settings.xml` (lazy; highlight colors shared across projects and IDEs) |
 | Storage-ready (Case C bind) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.storage-ready` (no TTL; written by refresh scripts) |
 | Refresh signal (full) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh` (TTL 60s) |
 | Refresh signal (one profile) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_profile` (TTL 60s; body = profile name, empty → active) |
-| Refresh signal (settings) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_settings` (TTL 60s) |
+| Refresh signal (settings, project) | `<OS Config Dir>/code-trace-tree/signals/<projectId>.request_refresh_settings` (TTL 60s; toolbar flags / activeProfileName) |
+| Refresh signal (settings, global) | `<OS Config Dir>/code-trace-tree/signals/request_refresh_global_settings` (TTL 60s; highlight colors from `settings.xml`; no projectId) |
 | Select signal | `<OS Config Dir>/code-trace-tree/signals/<projectId>.select_trace_points` (one UUID per line; TTL 60s) |
 
 **OS Config Dir:**
@@ -32,17 +34,36 @@ correct; IDE binds via path match + `storage-ready`. Scripts: `resolve_storage.p
 
 ## Signals
 
-The IDE watches **signal files** (not the XML path). Refresh/select scripts write these.
+The IDE watches **signal files** (not the project XML path and not `settings.xml`). Refresh/select scripts write these.
 
 | Signal | Effect |
 |--------|--------|
-| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`, `advancedSettings`). Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
+| `request_refresh` | Full reload: all profiles, active profile, toolbar flags (`highlightingEnabled`, `namePromptEnabled`, `descriptionAreaOpened`). Highlight colors come from `settings.xml`. Also writes `<projectId>.storage-ready` so an open Case C IDE can bind first. |
 | `request_refresh_profile` | Reload one profile’s tree from XML into memory. Body = profile name (empty → active). Does **not** change active profile or toolbar flags. Also writes `storage-ready`. Structure ops (`add` / `ensure` / `move` / `delete` / `rebind`) emit this. |
-| `request_refresh_settings` | Reload project toolbar flags / `advancedSettings` / `activeProfileName` only (not profile trees). |
+| `request_refresh_global_settings` | Reload global highlight colors from `settings.xml`. Every open IDE window (bound or Case C). |
+| `<projectId>.request_refresh_settings` | Reload project toolbar flags / `activeProfileName` only (not profile trees or highlight colors). |
 | `<projectId>.storage-ready` | Case C bind handshake (no TTL). Body = absolute project path (same as XML `<path>`). IDE filters on the body first; empty/legacy body falls back to XML `<path>`. Does not create storage. |
 | `select_trace_points` | One node UUID per line. Every open IDE window for that project selects / reveals those nodes. |
 
 Bound windows watch the shared global signals folder for that projectId. Unbound (Case C) windows watch `signals/*.storage-ready` until they bind. Refresh/select files older than 60s are ignored and removed; `storage-ready` has no TTL (agent overwrites).
+
+## Global highlight settings
+
+Highlight line colors are **not** project data. They live in `<OS Config Dir>/code-trace-tree/settings.xml`, shared across projects and IDEs. The IDE creates this file on the first Advanced Settings save (not on read), then writes `signals/request_refresh_global_settings`. Agents do not need to write either file. The IDE does not watch `settings.xml`.
+
+Read path: `settings.xml` if present; else this project’s leftover `<advancedSettings>` (legacy); else defaults `#FFFFC8` (light) / `#236C60` (dark).
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+  <highlightLineBackground>
+    <light>#FFFFC8</light>
+    <dark>#236C60</dark>
+  </highlightLineBackground>
+</settings>
+```
+
+Do not treat `settings.xml` as a project document when scanning `*.xml`. After `settings.xml` exists, ignore leftover `<advancedSettings>` in project XML.
 
 ## Annotated full example
 
@@ -64,13 +85,6 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
-  <!-- Optional; omit when colors are still defaults (#FFFFC8 / #646400) -->
-  <advancedSettings>
-    <highlightLineBackground>
-      <light>#FFFFC8</light>
-      <dark>#646400</dark>
-    </highlightLineBackground>
-  </advancedSettings>
 
   <traceProfiles>
     <!-- Profile 1: user / default tree -->
@@ -215,7 +229,7 @@ within a profile (prefer globally unique UUIDs).
   <activeProfileName>main</activeProfileName>
   <highlightingEnabled>true</highlightingEnabled>
   <namePromptEnabled>true</namePromptEnabled>
-  <!-- Optional advancedSettings / highlightLineBackground (#RRGGBB light+dark) -->
+  <!-- Highlight colors live in settings.xml, not in the project document -->
   <traceProfiles>
     <traceProfile>
       <name>main</name>
@@ -336,6 +350,7 @@ Hand-edit XML only when scripts cannot do the job. Prefer an atomic write (`*.xm
 - Nest children under `<children>`; child `parentId` must equal the parent node id.
 - Do **not** persist `isValid` (runtime-only).
 - Do not delete unrelated profiles. Default profile name is `main`.
+- Highlight colors live in `settings.xml`, not in the project document. Do not treat `settings.xml` as project storage.
 
 ## Import/export
 

@@ -1,7 +1,7 @@
 ---
 name: code-trace-tree
 description: >
-  Read, edit, and refresh Code Trace Tree plugin data (JetBrains / VS Code shared storage).
+  Read, edit, and refresh Code Trace Tree plugin data.
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
   modify Code Trace Tree profiles, sync agent-written traces into the IDE, notify IntelliJ IDEA
   to reload plugin data, or select/navigate to trace points in the IDE tree.
@@ -407,7 +407,7 @@ python "<Agent Skill Path>/code-trace-tree/scripts/request_refresh_profile.py" /
 
 ### request_refresh_settings.py
 
-Reload project toolbar flags / `advancedSettings` / `activeProfileName` only (not profile trees).
+Reload project toolbar flags / `activeProfileName` only (not profile trees or global highlight colors).
 
 **Usage**
 ```text

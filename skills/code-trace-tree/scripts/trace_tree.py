@@ -1152,7 +1152,7 @@ def request_refresh_profile(
     return req
 
 def request_refresh_settings(project_root: Path) -> Optional[Path]:
-    """Reload toolbar flags / advancedSettings / activeProfileName only."""
+    """Reload toolbar flags / activeProfileName only."""
     project_id = read_project_id(project_root)
     if not project_id:
         return None

@@ -181,7 +181,7 @@ function getHtml(settings: AdvancedSettings): string {
     <input id="darkPicker" type="color" value="${dark}" />
     <input id="darkText" type="text" maxlength="7" value="${dark}" />
   </div>
-  <p class="hint">Used when editor highlights are enabled. Defaults: ${DEFAULT_HIGHLIGHT_LIGHT} (light), ${DEFAULT_HIGHLIGHT_DARK} (dark).</p>
+  <p class="hint">Shared across projects and IDEs. Defaults: ${DEFAULT_HIGHLIGHT_LIGHT} (light), ${DEFAULT_HIGHLIGHT_DARK} (dark).</p>
   <div class="actions">
     <button id="save">Save</button>
     <button id="cancel" class="secondary">Cancel</button>

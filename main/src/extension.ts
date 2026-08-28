@@ -197,14 +197,19 @@ function startExternalWatcher(
     externalWatcher?.dispose()
     externalWatcher = undefined
     if (!storageReadyWatcher) {
-      storageReadyWatcher = new StorageReadyWatcher((signalProjectId) => {
-        void service.handleStorageReadySignal(signalProjectId).then((bound) => {
-          if (bound) {
-            // Data already loaded via storage-ready; skip replaying request_refresh.
-            startExternalWatcher(context, { replayExistingRefresh: false })
-          }
-        })
-      })
+      storageReadyWatcher = new StorageReadyWatcher(
+        (signalProjectId) => {
+          void service.handleStorageReadySignal(signalProjectId).then((bound) => {
+            if (bound) {
+              // Data already loaded via storage-ready; skip replaying request_refresh.
+              startExternalWatcher(context, { replayExistingRefresh: false })
+            }
+          })
+        },
+        () => {
+          service.reloadGlobalHighlightSettings()
+        }
+      )
       storageReadyWatcher.start()
       context.subscriptions.push(storageReadyWatcher)
     }
