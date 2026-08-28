@@ -3,7 +3,7 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/craigbrown/code-trace-tree?label=Open%20VSX)](https://open-vsx.org/extension/craigbrown/code-trace-tree)
 [![VS Code Marketplace](https://badgen.net/vs-marketplace/v/CraigBrown.code-trace-tree-vscode?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
 [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/craigbrown/code-trace-tree?label=Open%20VSX%20Downloads)](https://open-vsx.org/extension/craigbrown/code-trace-tree)
-[![VS Code Marketplace Downloads](https://badgen.net/vs-marketplace/d/CraigBrown.code-trace-tree-vscode?label=VS%20Code%20Marketplace%20Downloads)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
+[![VS Code Marketplace Downloads](https://badgen.net/vs-marketplace/i/CraigBrown.code-trace-tree-vscode?label=VS%20Code%20Marketplace%20Downloads)](https://marketplace.visualstudio.com/items?itemName=CraigBrown.code-trace-tree-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 ![Build](https://github.com/saidake/code-trace-tree-vscode/actions/workflows/release.yml/badge.svg)
 
