@@ -318,7 +318,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "prepare-vsix": "node ../scripts/prepare-vsix-assets.mjs",
-    "package": "yarn run prepare-vsix && npx --yes @vscode/vsce package"
+    "package": "yarn run prepare-vsix && npx --yes @vscode/vsce package",
+    "package:open-vsx": "node ../scripts/package-open-vsx.mjs"
   },
   "devDependencies": {
     "@types/node": "16.x",
