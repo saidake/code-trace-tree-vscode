@@ -1,4 +1,12 @@
-﻿## v1.3.2
+﻿## v1.3.3
+
+- Agent skill `create_tree.py` generates a nested workflow in one call (ensures existing nodes, adds new ones)
+- LINE locators require `--file`, `--line`, and `--content`; the script computes occurrence
+- Mutating skill ops auto-create missing storage
+- Select every requested trace point in the tree, not only the first
+- Remove the skill before `npx skills add` (add does not overwrite)
+
+## v1.3.2
 
 - Toolbar Advanced Settings uses a gear icon
 - Tree context menu **Go to Trace Point** is first (jumps to source)

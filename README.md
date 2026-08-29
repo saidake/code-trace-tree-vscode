@@ -127,7 +127,7 @@ npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent 
 
 <h3>Option 2: Install from a ZIP file</h3>
 <ol>
-  <li>Download <code>code-trace-tree-skill-1.3.2.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.2">GitHub Release</a> (one zip works across agents).</li>
+  <li>Download <code>code-trace-tree-skill-1.3.3.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.3">GitHub Release</a> (one zip works across agents).</li>
   <li>Delete any existing <code>code-trace-tree</code> folder in the skills directory for your agent (table below), then extract the zip <b>into</b> that directory. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
 </ol>
 <p>
