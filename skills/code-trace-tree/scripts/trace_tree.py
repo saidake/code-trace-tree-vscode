@@ -3,9 +3,9 @@
 Code Trace Tree ops for Claude: search / add / ensure / move / delete / rebind.
 
 LINE nodes are stored as [file, line, full-trimmed-line-content].
-Callers may pass a stale line and/or a unique substring of the line; this script
-resolves to the canonical full trimmed line before writing.
-Claude never passes totalOccurrences / occurrenceIndex — this script computes them.
+Callers must pass --file, --line, and --content (a substring of that line is OK).
+This script expands --content to the full trimmed line and computes
+totalOccurrences / occurrenceIndex. Never pass occurrence fields.
 After disk edits, run `rebind` so line numbers stay aligned (DocumentListener will not fire).
 """
 from __future__ import annotations
@@ -155,7 +155,7 @@ def resolve_storage(project_root: Path) -> Path:
 
     raise SystemExit(
         "ERROR: no Code Trace Tree storage XML found. "
-        "Run init_storage.py, or create a trace point / profile in the IDE, "
+        "Run resolve_storage.py, or create a trace point / profile in the IDE, "
         "or import plugin data first."
     )
 
@@ -284,9 +284,8 @@ def parse_node_ref(item: Any) -> NodeRef:
 
     Accepted forms:
       - "uuid"
-      - [file, content]
       - [file, line, content]
-      - {"id": "..."} / {"file","line?","content"}
+      - {"id": "..."} / {"file","line","content"}
     """
     if isinstance(item, str):
         text = item.strip()
@@ -303,17 +302,26 @@ def parse_node_ref(item: Any) -> NodeRef:
         line = item.get("line")
         if file is None or content is None:
             raise SystemExit(
-                f"ERROR: object locator needs file+content or id, got {item!r}"
+                f"ERROR: object locator needs file+line+content or id, got {item!r}"
+            )
+        if line is None:
+            raise SystemExit(
+                "ERROR: LINE locator object needs file, line, and content "
+                "(the script computes occurrenceIndex/totalOccurrences)"
             )
         return NodeRef(
             file=norm_rel(str(file)),
-            line=int(line) if line is not None else None,
+            line=int(line),
             content=str(content).strip(),
         )
 
     if isinstance(item, (list, tuple)):
         if len(item) == 2:
-            return NodeRef(file=norm_rel(str(item[0])), content=str(item[1]).strip())
+            raise SystemExit(
+                "ERROR: LINE locator must be [file, line, content]; "
+                "got [file, content]. Pass the 1-based line. "
+                "Do not pass occurrenceIndex/totalOccurrences — the script computes them."
+            )
         if len(item) == 3:
             return NodeRef(
                 file=norm_rel(str(item[0])),
@@ -323,10 +331,10 @@ def parse_node_ref(item: Any) -> NodeRef:
         if len(item) >= 4:
             raise SystemExit(
                 "ERROR: do not pass occurrenceIndex/totalOccurrences in locators. "
-                "Use [file, content] or [file, line, content]; the script computes occurrences."
+                "Use [file, line, content]; the script computes occurrences."
             )
         raise SystemExit(
-            f"ERROR: LINE locator must be [file, content] or [file, line, content], got {item!r}"
+            f"ERROR: LINE locator must be [file, line, content], got {item!r}"
         )
 
     raise SystemExit(f"ERROR: unsupported locator item: {item!r}")
@@ -341,8 +349,7 @@ def parse_parent_path(raw: Optional[str]) -> List[NodeRef]:
         raise SystemExit(f"ERROR: invalid --parent JSON: {e}") from e
     if not isinstance(data, list):
         raise SystemExit(
-            "ERROR: --parent must be a JSON array of ids / [file,content] / "
-            "[file,line,content]"
+            "ERROR: --parent must be a JSON array of ids / [file,line,content]"
         )
     return [parse_node_ref(item) for item in data]
 
@@ -398,36 +405,11 @@ def match_lines(lines: Sequence[str], content: str) -> List[int]:
     return [i + 1 for i, ln in enumerate(lines) if ln.strip() == content]
 
 
-def match_lines_containing(lines: Sequence[str], needle: str) -> List[int]:
-    needle = needle.strip()
-    if not needle:
-        return []
-    return [i + 1 for i, ln in enumerate(lines) if needle in ln.strip()]
-
-
-def _pick_nearest(candidates: Sequence[int], hint_line: Optional[int]) -> int:
-    if hint_line is None:
-        return candidates[0]
-    return min(candidates, key=lambda ln: (abs(ln - hint_line), ln))
-
-
 @dataclass(frozen=True)
 class SourceResolve:
     locator: LineLocator
-    reason: str  # exact | unique_exact | unique_substring | nearest_substring
+    reason: str  # exact | substring_on_line
     needle: str
-
-
-def _ambiguous_line_error(
-    rel_file: str, needle: str, match_lines_1based: Sequence[int]
-) -> SystemExit:
-    listed = ", ".join(str(n) for n in match_lines_1based)
-    return SystemExit(
-        f"ERROR: ambiguous LINE content in {rel_file}: {needle!r} matches "
-        f"{len(match_lines_1based)} lines ({listed}). "
-        f"Pass --line N or use locator [file, line, content] to pick one occurrence. "
-        f"Do not pass occurrenceIndex/totalOccurrences — the script computes them."
-    )
 
 
 def resolve_source_locator(
@@ -436,74 +418,42 @@ def resolve_source_locator(
     line: Optional[int],
     content: str,
 ) -> SourceResolve:
-    """Resolve a possibly-stale / substring LINE tip against the source file.
+    """Resolve a LINE tip against the source line given by `--line`.
 
-    Always returns a locator whose `content` is the **full trimmed line**.
-    Duplicate trimmed lines require an explicit `--line` (no silent nearest pick).
+    Requires `--line`. Checks the trimmed text at that line:
+      - exact match → store as-is
+      - `--content` is a substring of that line → store the full trimmed line
+    Duplicate trimmed lines are distinct because `--line` picks which copy.
+    Occurrence fields are computed afterward from the file, not from the caller.
     """
     needle = content.strip()
     if not needle:
         raise SystemExit("ERROR: LINE content must be non-empty")
+    if line is None:
+        raise SystemExit(
+            "ERROR: LINE locator requires --line (1-based). "
+            "Do not pass occurrenceIndex/totalOccurrences — the script computes them."
+        )
     rel_file = norm_rel(rel_file)
     lines = read_source_lines(project_root, rel_file)
     if lines is None:
         raise SystemExit(f"ERROR: source file not found: {rel_file}")
-
-    if line is not None and 1 <= line <= len(lines):
-        actual = lines[line - 1].strip()
-        if actual == needle:
-            loc = LineLocator.from_parts(rel_file, line, actual)
-            return SourceResolve(loc, "exact", needle)
-
-    exact_matches = match_lines(lines, needle)
-    if exact_matches:
-        if len(exact_matches) == 1:
-            chosen = exact_matches[0]
-            loc = LineLocator.from_parts(rel_file, chosen, needle)
-            return SourceResolve(loc, "unique_exact", needle)
-        if line is not None and line in exact_matches:
-            loc = LineLocator.from_parts(rel_file, line, needle)
-            return SourceResolve(loc, "exact", needle)
-        if line is None:
-            raise _ambiguous_line_error(rel_file, needle, exact_matches)
-        actual_at = ""
-        if 1 <= line <= len(lines):
-            actual_at = f"; line {line} is currently {lines[line - 1].strip()!r}"
-        else:
-            actual_at = f"; line {line} is out of range (1..{len(lines)})"
-        listed = ", ".join(str(n) for n in exact_matches)
+    if line < 1 or line > len(lines):
         raise SystemExit(
-            f"ERROR: LINE content {needle!r} in {rel_file} does not match line {line}"
-            f"{actual_at}. Matching lines: {listed}. "
-            f"Pass --line for one of those lines, or fix --content."
+            f"ERROR: line {line} is out of range for {rel_file} (1..{len(lines)})"
         )
-
-    containing = match_lines_containing(lines, needle)
-    if containing:
-        if len(containing) == 1:
-            chosen = containing[0]
-            full = lines[chosen - 1].strip()
-            loc = LineLocator.from_parts(rel_file, chosen, full)
-            return SourceResolve(loc, "unique_substring", needle)
-        if line is None:
-            raise _ambiguous_line_error(rel_file, needle, containing)
-        if line in containing:
-            full = lines[line - 1].strip()
-            loc = LineLocator.from_parts(rel_file, line, full)
-            return SourceResolve(loc, "nearest_substring", needle)
-        chosen = _pick_nearest(containing, line)
-        full = lines[chosen - 1].strip()
-        loc = LineLocator.from_parts(rel_file, chosen, full)
-        return SourceResolve(loc, "nearest_substring", needle)
-
-    actual_at = ""
-    if line is not None and 1 <= line <= len(lines):
-        actual_at = f"; line {line} is currently {lines[line - 1].strip()!r}"
-    elif line is not None:
-        actual_at = f"; line {line} is out of range (1..{len(lines)})"
+    actual = lines[line - 1].strip()
+    if not actual:
+        raise SystemExit(f"ERROR: line {line} in {rel_file} is empty")
+    if actual == needle:
+        loc = LineLocator.from_parts(rel_file, line, actual)
+        return SourceResolve(loc, "exact", needle)
+    if needle in actual:
+        loc = LineLocator.from_parts(rel_file, line, actual)
+        return SourceResolve(loc, "substring_on_line", needle)
     raise SystemExit(
-        f"ERROR: could not resolve LINE locator in {rel_file}: "
-        f"no line equals or uniquely contains {needle!r}{actual_at}"
+        f"ERROR: LINE content {needle!r} does not match line {line} in {rel_file}; "
+        f"line {line} is currently {actual!r}"
     )
 
 
@@ -710,7 +660,7 @@ def matches_line_locator(node: ET.Element, loc: LineLocator, *, strict_line: boo
 
 
 def node_matches_ref(node: ET.Element, ref: NodeRef) -> bool:
-    """Loose match for parent / target lookup (tolerates stale lines + substrings)."""
+    """Match parent / target lookup. LINE refs require file + line + content (substring OK)."""
     if ref.id:
         return child_text(node, "id") == ref.id
 
@@ -729,9 +679,11 @@ def node_matches_ref(node: ET.Element, ref: NodeRef) -> bool:
     needle = (ref.content or "").strip()
     if not needle:
         return False
+    if ref.line is not None and child_text(tp, "lineNumber") != str(ref.line):
+        return False
     if stored == needle:
         return True
-    # Allow either side to be a unique-enough substring tip from Claude
+    # Allow either side to be a substring tip from the caller
     return needle in stored or stored in needle
 
 
@@ -765,7 +717,7 @@ def find_by_id(roots_el: ET.Element, node_id: str) -> Tuple[ET.Element, ET.Eleme
             f"ERROR: no node with id {node_id!r}. "
             "Bare --parent strings are node UUIDs, not traceName labels. "
             "Use an id from search/add, or a locator "
-            "[file, content] / [file, line, content]."
+            "[file, line, content]."
         )
     if len(matches) > 1:
         raise SystemExit(f"ERROR: duplicate id {node_id}")
@@ -877,14 +829,11 @@ def resolve_parent_path(
                     f"ERROR: parent path step {i} not found: {ref.describe()}. "
                     "Bare strings are node UUIDs, not traceName labels. "
                     "Use an id from search/add, or "
-                    "[file, content] / [file, line, content]."
+                    "[file, line, content]."
                 )
             hint = ""
             if ref.file and ref.content and ref.line is None:
-                hint = (
-                    " If this content appears more than once, use "
-                    "[file, line, content]."
-                )
+                hint = " LINE locators must be [file, line, content]."
             raise SystemExit(
                 f"ERROR: parent path step {i} not found: {ref.describe()}.{hint}"
             )
@@ -892,7 +841,7 @@ def resolve_parent_path(
             ids = ", ".join(child_text(n, "id") for n in matches)
             hint = ""
             if ref.file and ref.content and ref.line is None:
-                hint = " Pass [file, line, content] to disambiguate."
+                hint = " Pass [file, line, content] (line is required)."
             raise SystemExit(
                 f"ERROR: parent path step {i} is ambiguous ({ids}): "
                 f"{ref.describe()}.{hint}"
@@ -1167,7 +1116,7 @@ def request_select(project_root: Path, ids: Sequence[str]) -> Path:
     project_id = read_project_id(project_root)
     if not project_id:
         raise SystemExit(
-            "ERROR: no bound project id. Run init_storage.py or create data in the IDE first."
+            "ERROR: no bound project id. Run resolve_storage.py or create data in the IDE first."
         )
     dest = signals_dir()
     dest.mkdir(parents=True, exist_ok=True)
@@ -1271,22 +1220,22 @@ def cmd_ensure(args: argparse.Namespace) -> int:
 
 def _cmd_add_or_ensure(args: argparse.Namespace, *, get_or_add: bool) -> int:
     action = "ensure" if get_or_add else "add"
+    kind = (args.type or "LINE").upper()
+    if kind == "LINE":
+        if not args.file or args.content is None or args.line is None:
+            raise SystemExit(
+                "ERROR: LINE add/ensure requires --file, --line, and --content "
+                "(the script computes occurrenceIndex/totalOccurrences)"
+            )
     project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
         args.project, args.profile, ensure=True
     )
     parent_path = parent_refs_from_args(args, required=False)
     parent = resolve_parent_path(roots_el, parent_path)
     parent_id = child_text(parent, "id") if parent is not None else ""
-
-    kind = (args.type or "LINE").upper()
     resolve_meta: Optional[dict] = None
 
     if kind == "LINE":
-        if not args.file or args.content is None:
-            raise SystemExit(
-                "ERROR: LINE add/ensure requires --file and --content "
-                "(--line optional if content uniquely resolves)"
-            )
         resolved = resolve_source_locator(
             project_root, args.file, args.line, args.content
         )
@@ -1402,20 +1351,17 @@ def resolve_target_node(
     if args.id:
         return find_by_id(roots_el, args.id)
     if args.file and args.content is not None:
+        if args.line is None:
+            raise SystemExit(
+                "ERROR: LINE locator requires --file, --line, and --content "
+                "(or use --id)"
+            )
         loc: Optional[LineLocator] = None
         if project_root is not None:
-            try:
-                loc = resolve_source_locator(
-                    project_root, args.file, args.line, args.content
-                ).locator
-            except SystemExit:
-                loc = None
-        if loc is None:
-            if args.line is None:
-                raise SystemExit(
-                    "ERROR: could not resolve LINE locator; provide a unique --content "
-                    "or an accurate --line"
-                )
+            loc = resolve_source_locator(
+                project_root, args.file, args.line, args.content
+            ).locator
+        else:
             loc = LineLocator.from_parts(args.file, args.line, args.content)
         return find_by_line_locator(roots_el, loc)
     if args.file and args.line is None and args.content is None:
@@ -1432,7 +1378,7 @@ def resolve_target_node(
             raise SystemExit(f"ERROR: multiple path nodes match {path!r}: {ids}")
         return matches[0]
     raise SystemExit(
-        "ERROR: provide --id or LINE locator (--file --content, optional --line)"
+        "ERROR: provide --id or LINE locator (--file --line --content)"
     )
 
 
@@ -1647,7 +1593,7 @@ def add_shared_flags(p: argparse.ArgumentParser, *, suppress_defaults: bool = Fa
 def add_locator_flags(p: argparse.ArgumentParser, required_line: bool = False) -> None:
     p.add_argument("--id", help="Node UUID")
     p.add_argument("--file", help="Relative file/directory path")
-    p.add_argument("--line", type=int, help="1-based line number (LINE)")
+    p.add_argument("--line", type=int, help="1-based line number (required for LINE)")
     p.add_argument("--content", help="Trimmed line content (LINE)")
 
 
@@ -1655,7 +1601,7 @@ def add_insert_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "pos_args",
         nargs="*",
-        help="Positional: FILE [LINE] CONTENT  or  FILE CONTENT  or  path (FILE/DIRECTORY)",
+        help="Positional: FILE LINE CONTENT  or  path (FILE/DIRECTORY)",
     )
     p.add_argument("--file")
     p.add_argument("--line", type=int)
@@ -1675,8 +1621,8 @@ def add_insert_flags(p: argparse.ArgumentParser) -> None:
         "--parent",
         default=None,
         help=(
-            'Optional JSON parent path: ids and/or ["file","content"] / '
-            '["file",line,"content"]. Prefer repeated --parent-id. '
+            'Optional JSON parent path: ids and/or ["file",line,"content"]. '
+            "Prefer repeated --parent-id. "
             "Do not combine with --parent-id."
         ),
     )
@@ -1762,7 +1708,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             'JSON parent path (use [] for root): ids and/or '
-            '["file","content"] / ["file",line,"content"]. '
+            '["file",line,"content"]. '
             "Prefer repeated --parent-id. Do not combine with --parent-id."
         ),
     )
@@ -1800,9 +1746,10 @@ def normalize_add_args(args: argparse.Namespace) -> None:
         if len(pos) == 1:
             args.file = pos[0]
         elif len(pos) == 2:
-            # file + content (line omitted) OR ambiguous; prefer content form
-            args.file = pos[0]
-            args.content = args.content if args.content is not None else pos[1]
+            raise SystemExit(
+                "ERROR: positional LINE form is FILE LINE CONTENT; "
+                "got FILE CONTENT. Pass a 1-based line number."
+            )
         elif len(pos) >= 3:
             args.file = pos[0]
             if args.line is None:

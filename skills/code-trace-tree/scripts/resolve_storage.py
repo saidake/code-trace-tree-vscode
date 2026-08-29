@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""Resolve Code Trace Tree project id + bound global XML for the current project."""
+"""
+Resolve Code Trace Tree project id + bound global XML for the current project.
+
+If storage is missing, create it (Case C). If `.idea/code-trace-tree.project.id`
+exists but XML is gone, recreates XML with that same projectId.
+Does not create/overwrite `.idea/code-trace-tree.project.id`.
+
+The inspect function `resolve_storage()` in trace_tree.py stays read-only
+(`trace_tree search` does not auto-create).
+"""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
 from trace_tree import (
+    create_fresh_storage,
     find_project_root,
     global_app_dir,
     print_json,
@@ -23,31 +33,27 @@ def main(argv: list[str] | None = None) -> int:
         print(exc, file=sys.stderr)
         return 1
 
-    app_dir = global_app_dir()
-    project_id = read_project_id(project_root)
-    storage_xml = ""
+    created = False
     try:
-        storage_xml = str(resolve_storage(project_root))
+        storage_xml = resolve_storage(project_root)
     except SystemExit:
-        storage_xml = ""
+        try:
+            storage_xml = create_fresh_storage(project_root)
+            created = True
+        except SystemExit as exc:
+            print(exc, file=sys.stderr)
+            return 1
 
+    project_id = read_project_id(project_root)
     print_json(
         {
+            "created": created,
             "project_root": str(project_root),
-            "global_dir": str(app_dir),
+            "global_dir": str(global_app_dir()),
             "project_id": project_id or None,
-            "storage_xml": storage_xml or None,
+            "storage_xml": str(storage_xml) if storage_xml else None,
         }
     )
-
-    if not storage_xml:
-        print(
-            "ERROR: no Code Trace Tree storage XML found. "
-            "Run init_storage.py, or create a trace point / profile in the IDE, "
-            "or import plugin data first.",
-            file=sys.stderr,
-        )
-        return 2
     return 0
 
 

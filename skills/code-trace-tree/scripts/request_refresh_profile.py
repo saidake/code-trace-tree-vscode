@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not read_project_id(project_root):
         print(
-            "ERROR: no bound project id. Run init_storage.py or create data in the IDE first.",
+            "ERROR: no bound project id. Run resolve_storage.py or create data in the IDE first.",
             file=sys.stderr,
         )
         return 2
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     wrote = request_refresh_profile(project_root, profile_name or None)
     if wrote is None:
         print(
-            "ERROR: no bound project id. Run init_storage.py or create data in the IDE first.",
+            "ERROR: no bound project id. Run resolve_storage.py or create data in the IDE first.",
             file=sys.stderr,
         )
         return 2

@@ -111,9 +111,14 @@
   This installs from the dedicated skill repo (small clone, default branch).
 </p>
 <pre><code>npx skills add saidake/code-trace-tree-skill -g</code></pre>
-<p>Explicit, non-interactive Cursor install:</p>
+<p>Explicit, non-interactive install for the agent you currently use (Cursor example):</p>
 <pre><code>npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
-<p>Try without installing:</p>
+<p>
+  Set <code>--agent</code> to your current agent, for example
+  <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
+  <code>codex</code>, or <code>gemini-cli</code>.
+</p>
+<p>Try without installing (Codex example; same <code>--agent</code> values):</p>
 <pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
 
 <h3>Option 2: Install from a ZIP file</h3>

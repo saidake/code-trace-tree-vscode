@@ -5,7 +5,7 @@ description: >
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
   modify Code Trace Tree profiles, sync agent-written traces into the IDE, ask the IDE to
   reload plugin data, or select/navigate to trace points in the IDE tree.
-  Prefer scripts/trace_tree.py for search/add/ensure/move/delete/rebind (flexible LINE tips; no occurrence args).
+  Prefer scripts/trace_tree.py for search/add/ensure/move/delete/rebind (LINE locators need --file --line --content; script computes occurrence).
   Prefer `ensure` when generating a workflow tree so retries do not duplicate; `add` always creates a new UUID.
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.
   Only edit traces when the user explicitly asks. Writing under `<OS Config Dir>/code-trace-tree/`
@@ -43,7 +43,6 @@ On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per sessio
 All skill script calls. Substitute the absolute **Agent Skill Path** for THIS agent. Keep the process CWD in the IDE project (do not `cd` into the skill folder). On PowerShell, see [Windows PowerShell](#windows-powershell).
 
 - [resolve_storage.py](#resolve_storagepy)
-- [init_storage.py](#init_storagepy)
 - [trace_tree.py](#trace_treepy)
 - [request_refresh.py](#request_refreshpy)
 - [request_refresh_profile.py](#request_refresh_profilepy)
@@ -52,7 +51,7 @@ All skill script calls. Substitute the absolute **Agent Skill Path** for THIS ag
 
 ### resolve_storage.py
 
-Resolve the project id and bound global XML for the current project.
+Resolve the project id and bound global XML. If storage is missing, create it (Case C). If `.idea/code-trace-tree.project.id` exists but XML is gone, recreates XML with that same projectId. Does not create/overwrite the `.idea` id file. Mutating `trace_tree add` / `ensure` / `move` / `delete` / `rebind` also create storage automatically. `trace_tree search` does not auto-create.
 
 **Usage**
 ```text
@@ -60,48 +59,15 @@ python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" [project_
 ```
 
 **Optional Parameters**:
-- `[project_path]`: Path used to discover the IDE project root (default: CWD).
-
-**Return value**
-
-Stdout is JSON (`indent=2`, UTF-8). Missing id/xml fields are `null`. Errors print `ERROR: …` on stderr.
-
-```text
-{
-  "project_root": "<abs>",
-  "global_dir": "<OS Config Dir>/code-trace-tree",
-  "project_id": "<uuid or null>",
-  "storage_xml": "<abs xml path or null>"
-}
-```
-
-Exit `0` when XML is bound; `1` if the project root cannot be found; `2` if no storage XML (JSON is still printed).
-
-**Example**:
-```text
-python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py"
-python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" /path/to/project
-```
-
-### init_storage.py
-
-Create storage when missing (Case C). If `.idea/code-trace-tree.project.id` exists but XML is gone, recreates XML with that same projectId. Does not create/overwrite the `.idea` id file. Mutating `trace_tree add` / `ensure` / `move` / `delete` / `rebind` also create storage automatically.
-
-**Usage**
-```text
-python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py" [project_path]
-```
-
-**Optional Parameters**:
 - `[project_path]`: Path used to discover the IDE project root (default: CWD). Pass the project root so XML `<path>` is correct.
 
 **Return value**
 
-Stdout is JSON (`indent=2`, UTF-8). Missing id/xml fields are `null`.
+Stdout is JSON (`indent=2`, UTF-8). Errors print `ERROR: …` on stderr.
 
 ```text
 {
-  "created": true,
+  "created": false,
   "project_root": "<abs>",
   "global_dir": "<OS Config Dir>/code-trace-tree",
   "project_id": "<uuid or null>",
@@ -113,10 +79,9 @@ Stdout is JSON (`indent=2`, UTF-8). Missing id/xml fields are `null`.
 
 **Example**:
 ```text
-python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py" /path/to/project
-python "<Agent Skill Path>/code-trace-tree/scripts/init_storage.py"
+python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py"
+python "<Agent Skill Path>/code-trace-tree/scripts/resolve_storage.py" /path/to/project
 ```
-
 
 ### trace_tree.py
 
@@ -130,14 +95,13 @@ python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" [shared-flags]
 
 Shared flags (`--project`, `--profile`, `--dry-run`, `--no-refresh`) may appear **before or after** the subcommand. Omit `--project` when CWD is already inside the IDE project (scripts walk upward to find `.vscode` / `.idea` / `.git`, or other common project markers). Default profile: `<activeProfileName>`.
 
-**LINE locators (forgiving):** stored tip is `[file, line, full-trimmed-line]`; persistence also keeps script-computed `occurrenceIndex` / `totalOccurrences` so **duplicate trimmed lines in one file** are distinct. Callers may pass a **stale line** and/or a **unique substring**; the script resolves to the full trimmed line. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell](#windows-powershell)) or use a substring tip plus `--line`. Never wrap the CLI in a helper that uses a parameter named `$Args`.
+**LINE locators:** stored tip is `[file, line, full-trimmed-line]`. `--line` is **required**. The script checks the trimmed text at that line, stores the full trimmed line (a substring `--content` is expanded), then sets `occurrenceIndex` / `totalOccurrences` by scanning the file. Duplicate trimmed lines in one file are distinct because `--line` picks which copy. Never pass occurrence fields. On PowerShell, protect quoted `--content` with `--%` (see [Windows PowerShell](#windows-powershell)) or use a substring tip plus `--line`. Never wrap the CLI in a helper that uses a parameter named `$Args`.
 
 | Tip | Result |
 |-----|--------|
 | Exact line + full trimmed text | Used as-is |
-| Unique content (one match in file) | `--line` optional; line corrected if stale |
-| Same trimmed text on 2+ lines | **Must** pass `--line` (or `[file, line, content]`); otherwise error |
-| Distinctive substring (e.g. `.handleEmailTriggerRequest(`) | Anchors the matching line when unique; if several matches, pass `--line` |
+| Distinctive substring of that line (e.g. `.handleEmailTriggerRequest(`) | `--line` required; stores the full trimmed line |
+| Same trimmed text on 2+ lines | Pass `--line` for the intended copy; script sets occurrence |
 | Multi-line call | Prefer the most distinctive physical line (often the `.methodName(` continuation) |
 
 **add vs ensure:** `add` always creates a new UUID (same as the IDE plugin). Use it for a second node on the same line with a different label or parent. `ensure` is get-or-create: same identity → `"skipped": true` (exit 0). For LINE, identity is file + trimmed `lineContent` + **occurrenceIndex** (so two `featureFlagService,` tips at different lines both ensure). FILE/DIRECTORY identity is path + type. `--trace-name`, description, and parent are not identity. Prefer `ensure` when generating a workflow tree.
@@ -148,8 +112,7 @@ Shared flags (`--project`, `--profile`, `--dry-run`, `--no-refresh`) may appear 
 |-----------------|---------|
 | Root | `--parent []` (needed for `move` to root; `add` / `ensure` default to root) |
 | Node id in JSON | `--parent '["3d41c2d1-…"]'` |
-| `[file, content]` | `--parent '[["src/A.java","void methodA() {"]]'` — only when content is unique |
-| `[file, line, content]` | `--parent '[["src/A.java",10,"void methodA() {"]]'` — when content repeats |
+| `[file, line, content]` | `--parent '[["src/A.java",10,"void methodA() {"]]'` |
 
 ```text
 method A def
@@ -161,16 +124,16 @@ method A def
 
 For many mutating calls, use `--no-refresh` on each, then one `request_refresh.py` at the end.
 
-**Required Parameters**:
+**Required Subcommand**:
 - `<subcommand>`: `search` | `add` | `ensure` | `move` | `delete` | `rebind`
 
-**Optional Parameters** (shared):
+**Parameters** (shared; all optional):
 - `--project <path>`: Project path (default: CWD).
 - `--profile <name>`: Profile name override (default: `<activeProfileName>`).
 - `--dry-run`: Do not write XML or refresh.
 - `--no-refresh`: Skip the IDE refresh signal.
 
-**Optional Parameters** (`search`):
+**Parameters** (`search`; all optional):
 - `--id <uuid>`: Node UUID.
 - `--file <path>`: Relative file/directory path.
 - `--line <n>`: 1-based line number.
@@ -178,20 +141,22 @@ For many mutating calls, use `--no-refresh` on each, then one `request_refresh.p
 - `--trace-name <text>`: Substring match on `traceName`.
 - `--type <LINE|FILE|DIRECTORY>`: Filter by type.
 
-**Optional Parameters** (`add` / `ensure`):
-- `--file <path>` / `--line <n>` / `--content <text>`: LINE locator (or positional `FILE [LINE] CONTENT`, `FILE CONTENT`, or path for FILE/DIRECTORY).
-- `--parent-id <uuid>`: Parent node UUID; repeat rootward → immediate parent (preferred). Omit for root.
-- `--parent <json>`: JSON parent path (do not combine with `--parent-id`).
-- `--trace-name <text>`: Trace point label.
-- `--description <text>`: Optional description.
-- `--type <LINE|FILE|DIRECTORY>`: Type override.
+**Parameters** (`add` / `ensure`):
+- Locator (**required**): `--file` + `--line` + `--content` for LINE (substring of that line is OK); `--file` for FILE/DIRECTORY. Or positional `FILE LINE CONTENT`, or path.
+- `--parent-id <uuid>` (**optional**): Parent node UUID; repeat rootward → immediate parent (preferred). Omit for root.
+- `--parent <json>` (**optional**): JSON parent path (do not combine with `--parent-id`).
+- `--trace-name <text>` (**optional**): Trace point label.
+- `--description <text>` (**optional**): Description.
+- `--type <LINE|FILE|DIRECTORY>` (**optional**): Type override (default: LINE).
 
-**Optional Parameters** (`move` / `delete`):
-- `--id <uuid>` / `--file <path>` / `--line <n>` / `--content <text>`: Node locator.
-- `--parent-id <uuid>` (`move`): New parent UUID; repeat rootward → immediate parent. For root, use `--parent []`.
-- `--parent <json>` (`move`): JSON parent path, including `[]` for root (do not combine with `--parent-id`).
+**Parameters** (`move`):
+- Locator (**required**): `--id`, or `--file` + `--line` + `--content`, or `--file` alone for FILE/DIRECTORY.
+- New parent (**required**): `--parent-id` (repeat rootward → immediate parent) or `--parent` JSON. For root, use `--parent []`. Do not combine `--parent-id` with `--parent`.
 
-**Optional Parameters** (`rebind`):
+**Parameters** (`delete`):
+- Locator (**required**): `--id`, or `--file` + `--line` + `--content`, or `--file` alone for FILE/DIRECTORY.
+
+**Parameters** (`rebind`; all optional):
 - `--file <path>`: Limit to relative path(s); repeatable. Default: all LINE nodes in the profile.
 
 **Return value**
@@ -267,7 +232,7 @@ Stdout is JSON (`indent=2`, UTF-8). Errors print `ERROR: …` on stderr and exit
 `resolve-object` (LINE only; omitted for FILE/DIRECTORY):
 ```text
 {
-  "reason": "<exact|unique_exact|unique_substring|…>",
+  "reason": "<exact|substring_on_line>",
   "needle": "<passed --content>",
   "resolved": ["<file>", <line>, "<full trimmed line>"],
   "totalOccurrences": 1,
@@ -331,7 +296,7 @@ Stdout is JSON (`indent=2`, UTF-8). Errors print `ERROR: …` on stderr and exit
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" search
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" search --project /path/to/project
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" --project /path/to/project search
-python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure --file src/A.java --content '.handleEmailTriggerRequest(' --trace-name 'handleEmail'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure --file src/A.java --line 42 --content '.handleEmailTriggerRequest(' --trace-name 'handleEmail'
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure --file src/A.java --line 10 --content 'void methodA() {' --trace-name 'methodA'
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure src/B.java 40 'void methodB() {' \
   --parent-id "$PARENT_ID" \
@@ -339,7 +304,7 @@ python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure src/B.j
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" ensure --file src/C.java --line 20 --content 'void methodC() {' \
   --parent-id "$ID_A" --parent-id "$ID_B" --trace-name 'methodC'
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" add --file src/A.java --line 10 --content 'void methodA() {' --trace-name 'methodA alt'
-python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" move --file src/B.java --content 'void methodB() {' --parent '[]'
+python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" move --file src/B.java --line 40 --content 'void methodB() {' --parent '[]'
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" move --id "$NODE_ID" --parent []
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" delete --id <uuid>
 python "<Agent Skill Path>/code-trace-tree/scripts/trace_tree.py" rebind
@@ -510,13 +475,13 @@ not UTF-8, so JSON status output cannot fail the process after a successful writ
 
 * Keep trace point names simple and concise. Add descriptions only when additional context is needed.
 * Prefer **LINE** anchors whose trimmed text is **unique (or rare) in that file**. Avoid generic lines such as `}`, `return;`, or blank-looking braces. Occurrence index is how the plugin and `rebind` restore a line after it moves; duplicate content in the same file makes rebinding fragile.
-* For multi-line calls, pass a **distinctive substring** of the best physical line (e.g. `.handleEmailTriggerRequest(`); the script stores the full trimmed line. Do not invent a logical “call name” that is not on one source line.
+* For multi-line calls, pass **`--line` and a distinctive substring** of that physical line (e.g. `.handleEmailTriggerRequest(`); the script stores the full trimmed line. Do not invent a logical “call name” that is not on one source line.
 
 ## Edit plugin data action
 
 Prefer scripts ([Trace Tree OPs](#trace-tree-ops)). Do not create `.idea/code-trace-tree.project.id`.
 
-1. **Resolve / init** if storage is missing: `resolve_storage.py`, then `init_storage.py` if needed (mutating `trace_tree` also auto-init).
+1. **Resolve** (creates if missing): `resolve_storage.py`. Mutating `trace_tree` also auto-init.
 2. **Mutate** with `trace_tree.py` (`search` / `add` / `ensure` / `move` / `delete` / `rebind`). Prefer `ensure` for workflow trees. Use `delete` only when the user asked to remove nodes (never to “clean up” invalid tips or to replace a tree).
 3. **Refresh** is automatic on mutating `trace_tree` calls unless `--no-refresh`. For a batch, use `--no-refresh` on each then one `request_refresh.py`. Settings-only: `request_refresh_settings.py`. One profile without a structure op: `request_refresh_profile.py`.
 
