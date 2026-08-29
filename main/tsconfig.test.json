@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["mocha", "node"]
+  },
+  "include": ["src/domain/**/*.ts", "src/storage/globalStoragePaths.ts", "src/storage/agentSignalFiles.ts", "src/domain/constants.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "out"]
+}

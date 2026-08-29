@@ -319,15 +319,27 @@
     "watch": "tsc -watch -p ./",
     "prepare-vsix": "node ../scripts/prepare-vsix-assets.mjs",
     "package": "yarn run prepare-vsix && npx --yes @vscode/vsce package",
-    "package:open-vsx": "node ../scripts/package-open-vsx.mjs"
+    "package:open-vsx": "node ../scripts/package-open-vsx.mjs",
+    "test": "mocha --timeout 30000 -r ts-node/register/transpile-only \"test/**/*.test.ts\""
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "16.x",
     "@types/vscode": "^1.80.0",
+    "mocha": "^10.8.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.1.6"
   },
   "dependencies": {
     "fast-xml-parser": "^5.3.0",
     "uuid": "^13.0.1"
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "commonjs",
+      "target": "ES2020",
+      "esModuleInterop": true
+    }
   }
 }

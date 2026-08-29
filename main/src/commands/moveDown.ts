@@ -7,6 +7,7 @@ import * as vscode from 'vscode'
 import { TracePointService } from '../TracePointService'
 import { TracePointTreeDataProvider } from '../TracePointTreeDataProvider'
 import { TracePointNode } from '../domain/types'
+import { moveSiblingsDown } from '../domain/treeOps'
 
 export function registerMoveDown(
   context: vscode.ExtensionContext,
@@ -32,29 +33,11 @@ export function registerMoveDown(
         groupedByParent.get(parentId)!.push(node)
       }
 
-      for (const [parentId, nodes] of groupedByParent.entries()) {
+      for (const [parentId] of groupedByParent.entries()) {
         const parentNode = service.getTracePointNodeById(parentId)
         affectedParentNodes.add(parentNode)
         const originalSiblings = service.getTracePointSiblingsByParentId(parentId)
-
-        const orderedSelected = nodes
-          .slice()
-          .sort((a, b) => originalSiblings.indexOf(a) - originalSiblings.indexOf(b))
-
-        for (let i = orderedSelected.length - 1; i >= 0; i--) {
-          const node = orderedSelected[i]
-          const originalIndex = originalSiblings.indexOf(node)
-
-          if (
-            originalIndex < originalSiblings.length - 1 &&
-            !selectedIds.has(originalSiblings[originalIndex + 1].id)
-          ) {
-            ;[originalSiblings[originalIndex], originalSiblings[originalIndex + 1]] = [
-              originalSiblings[originalIndex + 1],
-              originalSiblings[originalIndex]
-            ]
-          }
-        }
+        moveSiblingsDown(originalSiblings, selectedIds)
       }
 
       // Save updated order back to the service

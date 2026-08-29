@@ -11,6 +11,12 @@ import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_PROFILE_NAME } from './domain/constants'
 import {
+  applyTypingLineShift,
+  shouldContentRebindDocumentChange
+} from './domain/documentChange'
+import { applyLineRebind } from './domain/lineRebind'
+import { pruneInvalidNodes } from './domain/treeOps'
+import {
   NodeListener,
   NodeListenerEventType,
   ProfileListener,
@@ -1182,76 +1188,26 @@ export class TracePointService {
     const newLinesCount = change.text.split(/\r?\n/).length - 1
     const lineOffset = newLinesCount - oldLines
     const changedLine = change.range.start.line + 1
+    const isEnterAtLineStart =
+      change.range.start.character === 0 && /\r?\n/.test(change.text) && lineOffset > 0
     const updatedNodes: TracePointNode[] = []
     let affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
 
     for (const node of affectedTracePoints) {
-      const tp = node.tracePoint
-      if (!tp.isValid) {
-        const valid = newLines[tp.lineNumber - 1]?.trim() === tp.lineContent?.trim()
-        if (valid) {
-          node.tracePoint = { ...tp, isValid: true }
-          updatedNodes.push(node)
-          affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
-        }
-        continue
+      const result = applyTypingLineShift(
+        node.tracePoint,
+        newLines,
+        lineOffset,
+        changedLine,
+        isEnterAtLineStart
+      )
+      if (result.kind === 'rebind-all') {
+        this.rebindLineNodesForDocument(event.document)
+        void this.highlightTracePointsInFile(event.document)
+        return
       }
-      const newContent = newLines[tp.lineNumber - 1]?.trim() ?? null
-      const isLineStart = change.range.start.character === 0
-      const isEnter = /\r?\n/.test(change.text)
-      // CASE 1: Press Enter at the beginning of the line (lineOffset !== 0)
-      if (tp.lineNumber === changedLine && isEnter && lineOffset > 0 && isLineStart) {
-        const newLineNumber = tp.lineNumber + lineOffset
-        const [total, matches] = this.getLineOccurrences(event.document, tp.lineContent ?? '')
-        const occIdx = matches.indexOf(newLineNumber) + 1
-
-        node.tracePoint = {
-          ...tp,
-          lineNumber: newLineNumber,
-          isValid: occIdx > 0,
-          totalOccurrences: total,
-          occurrenceIndex: occIdx >= 0 ? occIdx : 0
-        }
-        updatedNodes.push(node)
-        affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
-      }
-      // CASE 2: Edit on the trace point line (lineOffset = 0)
-      else if (tp.lineNumber === changedLine && lineOffset === 0) {
-        const [total, matches] = this.getLineOccurrences(event.document, newContent ?? '')
-        const occIdx =
-          newContent === tp.lineContent ? tp.occurrenceIndex : matches.indexOf(changedLine) + 1
-
-        node.tracePoint = {
-          ...tp,
-          lineContent: newContent ?? '',
-          isValid: newContent !== null,
-          totalOccurrences: total,
-          occurrenceIndex: occIdx >= 0 ? occIdx : 0
-        }
-        updatedNodes.push(node)
-        affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
-      }
-
-      // CASE 3: Edit above the trace point line (shift line numbers only)
-      else if (tp.lineNumber > changedLine && lineOffset !== 0) {
-        const newLineNumber = tp.lineNumber + lineOffset
-        if (newLineNumber < 1) {
-          // Shift cannot represent this (typical of bulk delete from file start) — rebind.
-          this.rebindLineNodesForDocument(event.document)
-          void this.highlightTracePointsInFile(event.document)
-          return
-        }
-        const [total, matches] = this.getLineOccurrences(event.document, tp.lineContent ?? '')
-        const occIdx = matches.indexOf(newLineNumber) + 1
-        const stillThere = occIdx > 0
-
-        node.tracePoint = {
-          ...tp,
-          lineNumber: stillThere ? newLineNumber : tp.lineNumber,
-          isValid: stillThere,
-          totalOccurrences: total,
-          occurrenceIndex: stillThere ? occIdx : 0
-        }
+      if (result.kind === 'update') {
+        node.tracePoint = result.tip
         updatedNodes.push(node)
         affectedParentNodes.add(this.getTracePointNodeById(node.parentId))
       }
@@ -1304,35 +1260,21 @@ export class TracePointService {
   }
 
   /**
-   * True when the edit replaced the entire previous document (disk reload, select-all paste).
-   * After the event, `document` already has the new text.
-   */
-  private isFullDocumentReplace(event: vscode.TextDocumentChangeEvent): boolean {
-    if (event.contentChanges.length !== 1) return false
-    const change = event.contentChanges[0]
-    if (change.rangeOffset !== 0) return false
-    const newLen = event.document.getText().length
-    const oldLen = newLen - change.text.length + change.rangeLength
-    return oldLen > 0 && change.rangeLength === oldLen
-  }
-
-  /**
    * Bulk / agent-style rewrites must content-rebind. Incremental line-offset math treats a
    * rewrite from the top of the file as "edit at line 1", then Math.max(1, line+offset)
    * collapses every tip onto line 1 and overwrites lineContent.
    */
   private shouldContentRebindDocumentChange(event: vscode.TextDocumentChangeEvent): boolean {
-    if (this.isFullDocumentReplace(event)) return true
-    if (event.contentChanges.length !== 1) {
-      // Multi-span reloads are not typing; prefer content match.
-      return event.contentChanges.length > 1
-    }
-    const change = event.contentChanges[0]
-    if (change.rangeOffset !== 0) return false
-    const oldLineSpan = change.range.end.line - change.range.start.line
-    const newLineBreaks = (change.text.match(/\r?\n/g) ?? []).length
-    // Multi-line replace/insert from the start of the file (agent patch / rewrite).
-    return oldLineSpan >= 1 || newLineBreaks >= 2
+    return shouldContentRebindDocumentChange(
+      event.contentChanges.map((change) => ({
+        rangeOffset: change.rangeOffset,
+        rangeLength: change.rangeLength,
+        startLine: change.range.start.line,
+        endLine: change.range.end.line,
+        text: change.text
+      })),
+      event.document.getText().length
+    )
   }
 
   /** Relative paths that have FILE or DIRECTORY trace points. */
@@ -1531,43 +1473,7 @@ export class TracePointService {
 
   /** Content-based LINE rebind (matches JetBrains / skill `trace_tree rebind`). */
   rebindLineTracePoint(tp: TracePoint, lines: string[]): TracePoint {
-    const content = tp.lineContent?.trim()
-    if (!content) {
-      return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
-    }
-    const matches: number[] = []
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === content) matches.push(i + 1)
-    }
-    const total = matches.length
-    if (total === 0) {
-      return { ...tp, isValid: false, totalOccurrences: 0, occurrenceIndex: 0 }
-    }
-    const oldLine = tp.lineNumber
-    let newLine: number
-    let newIndex: number
-    if (oldLine >= 1 && oldLine <= lines.length && lines[oldLine - 1].trim() === content) {
-      newLine = oldLine
-      newIndex = matches.indexOf(oldLine) + 1
-    } else if (total === 1) {
-      newLine = matches[0]
-      newIndex = 1
-    } else if (total === tp.totalOccurrences && tp.occurrenceIndex >= 1 && tp.occurrenceIndex <= total) {
-      newLine = matches[tp.occurrenceIndex - 1]
-      newIndex = tp.occurrenceIndex
-    } else {
-      newLine = matches.reduce((best, n) =>
-        Math.abs(n - oldLine) < Math.abs(best - oldLine) ? n : best
-      )
-      newIndex = matches.indexOf(newLine) + 1
-    }
-    return {
-      ...tp,
-      lineNumber: newLine,
-      totalOccurrences: total,
-      occurrenceIndex: newIndex,
-      isValid: true
-    }
+    return applyLineRebind(tp, lines)
   }
 
   async rebindLineNodesForPaths(relativePaths?: string[]): Promise<boolean> {
@@ -1965,24 +1871,8 @@ export class TracePointService {
    */
   async removeInvalidTracePoints(): Promise<number> {
     this.ensureStorage()
-    const removedIds: string[] = []
+    const removedIds = pruneInvalidNodes(this.tracePointNodes, undefined)
 
-    const prune = (nodes: TracePointNode[], parentId?: string): void => {
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const node = nodes[i]
-        prune(node.children, node.id)
-        if (!node.tracePoint.isValid) {
-          removedIds.push(node.id)
-          for (const child of node.children) {
-            child.parentId = parentId
-          }
-          nodes.splice(i, 1, ...node.children)
-          node.children = []
-        }
-      }
-    }
-
-    prune(this.tracePointNodes, undefined)
     if (removedIds.length === 0) return 0
 
     for (const id of removedIds) {
