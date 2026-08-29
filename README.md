@@ -109,10 +109,14 @@
   Pass <code>-g</code> for all projects; omit it for this project only.
   On Windows, add <code>--copy</code> if symlinks are not available.
   This installs from the dedicated skill repo (small clone, default branch).
+  If the skill is already installed, remove it first —
+  <code>npx skills add</code> does not overwrite an existing skill.
 </p>
-<pre><code>npx skills add saidake/code-trace-tree-skill -g</code></pre>
+<pre><code>npx skills remove code-trace-tree -g
+npx skills add saidake/code-trace-tree-skill -g</code></pre>
 <p>Explicit, non-interactive install for the agent you currently use (Cursor example):</p>
-<pre><code>npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
+<pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
+npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
 <p>
   Set <code>--agent</code> to your current agent, for example
   <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
@@ -124,7 +128,7 @@
 <h3>Option 2: Install from a ZIP file</h3>
 <ol>
   <li>Download <code>code-trace-tree-skill-1.3.2.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.2">GitHub Release</a> (one zip works across agents).</li>
-  <li>Extract it <b>into</b> the skills directory for your agent (table below). When asked, replace the existing <code>code-trace-tree</code> folder. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
+  <li>Delete any existing <code>code-trace-tree</code> folder in the skills directory for your agent (table below), then extract the zip <b>into</b> that directory. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
 </ol>
 <p>
   Done when the skills directory contains <code>code-trace-tree/SKILL.md</code>
@@ -148,8 +152,8 @@
   Installing the skill makes it available to the agent:
 </p>
 <ul>
-  <li><b>Project-local</b> — omit <code>-g</code>, or extract the zip into the project skills folder</li>
-  <li><b>Global</b> — pass <code>-g</code>, or extract the zip into the global skills folder</li>
+  <li><b>Project-local</b> — <code>npx...</code>, omit <code>-g</code>, or extract the zip into the project skills folder</li>
+  <li><b>Global</b> — <code>npx...</code>, pass <code>-g</code>, or extract the zip into the global skills folder</li>
 </ul>
 <p>
   If the IDE is open on this project, it loads the agent’s

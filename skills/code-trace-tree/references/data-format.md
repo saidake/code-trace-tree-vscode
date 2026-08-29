@@ -30,7 +30,7 @@ recreate XML with **that same** projectId (do not mint a new id). Else bind by X
 `<path>`. **Case C** (nothing found): create initial global XML with `<path>` only —
 never create/write the `.idea` id file. Pass / resolve the project root so `<path>` is
 correct; IDE binds via path match + `storage-ready`. Scripts: `resolve_storage.py`
-(creates if missing); mutating `trace_tree` (`add` / `ensure` / `move` / `delete` / `rebind`) auto-inits.
+(creates if missing); mutating `create_tree.py` and `trace_tree` (`add` / `ensure` / `move` / `delete` / `rebind`) auto-inits.
 
 ## Signals
 
@@ -329,7 +329,7 @@ Line comparisons always use trimmed text: `documentLine.trim() == lineContent.tr
 
 For agent-written `LINE` nodes:
 
-1. Prefer `scripts/trace_tree.py` (`add` / `ensure` / `move` / `delete` / `rebind`) with locator `[file, line, content]` — do **not** pass occurrence fields. For parents, prefer repeated `--parent-id` over `--parent` JSON. Prefer `ensure` for workflow trees; `add` always creates a new UUID.
+1. Prefer `scripts/create_tree.py` for a nested workflow (do not `search` if not needed; the script ensures existing nodes and `add`s new ones). For a single node, `scripts/trace_tree.py` (`add` / `ensure` / `move` / `delete` / `rebind`) with locator `[file, line, content]` — do **not** pass occurrence fields. For parents, prefer repeated `--parent-id` over `--parent` JSON. `add` always creates a new UUID. Use `search` to inspect or get ids, not as a prelude to create.
 2. The script checks trimmed text at `--line`, stores the full line (substring `--content` is expanded), then sets `totalOccurrences` / `occurrenceIndex` by scanning the file.
 3. Duplicate trimmed text in one file is allowed: `--line` picks which copy. `ensure` identity is file + trimmed content + `occurrenceIndex`, so each occurrence can be a separate node.
 4. After agent edits source on disk, run `trace_tree rebind` so `lineNumber` tracks moved content (IDE DocumentListener does not see agent edits).
