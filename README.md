@@ -103,29 +103,16 @@
 </p>
 
 <h2>Agent Skill Installation</h2>
-<h3>Option 1: Install with npx (Recommended)</h3>
 <p>
-  Requires <a href="https://nodejs.org/">Node.js</a> (<code>npx</code>).
-  Pass <code>-g</code> for all projects; omit it for this project only.
-  On Windows, add <code>--copy</code> if symlinks are not available.
-  This installs from the dedicated skill repo (small clone, default branch).
-  If the skill is already installed, remove it first —
-  <code>npx skills add</code> does not overwrite an existing skill.
+  This extension does <b>not</b> need Node.js. The skill needs Python.
+  Use Option 1 (ZIP or the command-line examples) unless you already have Node.js.
+  If you have Node.js, you can use Option 2 (<code>npx</code>) instead.
 </p>
-<pre><code>npx skills remove code-trace-tree -g
-npx skills add saidake/code-trace-tree-skill -g</code></pre>
-<p>Explicit, non-interactive install for the agent you currently use (Cursor example):</p>
-<pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
-npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
+<h3>Option 1: Install from a ZIP file (no Node.js)</h3>
 <p>
-  Set <code>--agent</code> to your current agent, for example
-  <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
-  <code>codex</code>, or <code>gemini-cli</code>.
+  Pick <b>one</b>: extract the zip by hand, <b>or</b> run the Linux/macOS commands, <b>or</b> run the Windows PowerShell commands.
+  They all install the <b>skill</b> the same way (not the extension).
 </p>
-<p>Try without installing (Codex example; same <code>--agent</code> values):</p>
-<pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
-
-<h3>Option 2: Install from a ZIP file</h3>
 <ol>
   <li>Download <code>code-trace-tree-skill-1.3.4.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.4">GitHub Release</a> (one zip works across agents).</li>
   <li>Delete any existing <code>code-trace-tree</code> folder in the skills directory for your agent (table below), then extract the zip <b>into</b> that directory. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
@@ -147,13 +134,61 @@ npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent 
   </tbody>
 </table>
 
+<p><b>Or</b> skip the manual extract and install from the command line (use one OS below):</p>
+<p>
+  Example below is Claude Code (<code>~/.claude/skills/</code>).
+  Replace <code>.claude</code> with your agent from the table
+  (for example <code>.cursor</code>, <code>.copilot</code>, <code>.agents</code>, or <code>.gemini</code>).
+</p>
+<h4>Linux &amp; macOS</h4>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.4/code-trace-tree-skill-1.3.4.zip -o code-trace-tree-skill-1.3.4.zip</code>
+<code>rm -rf ~/.claude/skills/code-trace-tree</code>
+<code>mkdir -p ~/.claude/skills</code>
+<code>unzip code-trace-tree-skill-1.3.4.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.3.4.zip</code>
+</pre>
+<p>Project-local: unzip into <code>.claude/skills/</code> (or your agent’s project-local path from the table) instead of the global folder.</p>
+
+<h4>Windows PowerShell</h4>
+<p>Same as the Linux/macOS commands, for Windows. Replace <code>.claude</code> with your agent from the table.</p>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.4/code-trace-tree-skill-1.3.4.zip" -OutFile "code-trace-tree-skill-1.3.4.zip"</code>
+<code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
+<code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.3.4.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.3.4.zip"</code>
+</pre>
+<p>Project-local: extract into <code>.claude\skills\</code> (or your agent’s project-local path from the table).</p>
+
+<h3>Option 2: Install with npx (if you have Node.js)</h3>
+<p>
+  Optional shortcut if you already have <a href="https://nodejs.org/">Node.js</a> (<code>npx</code>).
+  The extension does not need Node.js.
+  Pass <code>-g</code> for all projects; omit it for this project only.
+  On Windows, add <code>--copy</code> if symlinks are not available.
+  This installs from the dedicated skill repo (small clone, default branch).
+  If the skill is already installed, remove it first —
+  <code>npx skills add</code> does not overwrite an existing skill.
+</p>
+<pre><code>npx skills remove code-trace-tree -g
+npx skills add saidake/code-trace-tree-skill -g</code></pre>
+<p>Explicit, non-interactive install for the agent you currently use (Cursor example):</p>
+<pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
+npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
+<p>
+  Set <code>--agent</code> to your current agent, for example
+  <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
+  <code>codex</code>, or <code>gemini-cli</code>.
+</p>
+<p>Try without installing (Codex example; same <code>--agent</code> values):</p>
+<pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
+
 <h2>How to use the skill</h2>
 <p>
   Installing the skill makes it available to the agent:
 </p>
 <ul>
-  <li><b>Project-local</b> — <code>npx...</code>, omit <code>-g</code>, or extract the zip into the project skills folder</li>
-  <li><b>Global</b> — <code>npx...</code>, pass <code>-g</code>, or extract the zip into the global skills folder</li>
+  <li><b>Project-local</b> — extract the zip (or <code>npx...</code> without <code>-g</code>) into the project skills folder</li>
+  <li><b>Global</b> — extract the zip (or <code>npx...</code> with <code>-g</code>) into the global skills folder</li>
 </ul>
 <p>
   If the IDE is open on this project, it loads the agent’s
