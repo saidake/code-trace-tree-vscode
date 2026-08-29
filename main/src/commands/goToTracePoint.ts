@@ -17,27 +17,28 @@ export function registerGoToTracePoint(
   let lastActivateId: string | undefined
   let lastActivateAt = 0
 
-  const navigate = async (item: vscode.TreeItem | undefined) => {
+  const navigate = async (
+    item: vscode.TreeItem | undefined,
+    restoreExpandAfterDoubleClick: boolean
+  ) => {
     const selected = item ? [item] : [...treeView.selection]
     if (selected.length !== 1) {
       vscode.window.showWarningMessage('Select exactly one trace point.')
       return
     }
-    // Arm before awaits — host already toggled expand on this double-click.
-    service.armExpandEventSuppress()
     const nodeId = service.resolveNodeId(selected[0].id)
     const tp = nodeId ? service.getTracePointNodeById(nodeId) : null
     if (tp) {
-      await service.navigateToTracePoint(tp, treeView)
+      await service.navigateToTracePoint(tp, treeView, { restoreExpandAfterDoubleClick })
     }
   }
 
   context.subscriptions.push(
-    // Command Palette / explicit go-to: navigate immediately.
+    // Command Palette / tree context menu: jump without treating it as a double-click.
     vscode.commands.registerCommand(
       'codeTraceTree.goToTracePoint',
       async (item: vscode.TreeItem) => {
-        await navigate(item)
+        await navigate(item, false)
       }
     ),
     // Tree item activation: double-click to jump (single-click only selects).
@@ -52,7 +53,7 @@ export function registerGoToTracePoint(
         if (openMode === 'doubleClick') {
           lastActivateId = undefined
           lastActivateAt = 0
-          await navigate(item)
+          await navigate(item, true)
           return
         }
 
@@ -61,7 +62,7 @@ export function registerGoToTracePoint(
         if (id && id === lastActivateId && now - lastActivateAt <= DOUBLE_CLICK_MS) {
           lastActivateId = undefined
           lastActivateAt = 0
-          await navigate(item)
+          await navigate(item, true)
           return
         }
         lastActivateId = id

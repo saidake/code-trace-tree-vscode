@@ -1781,13 +1781,17 @@ export class TracePointService {
 
   async navigateToTracePoint(
     tracePointNode: TracePointNode,
-    treeView: vscode.TreeView<vscode.TreeItem>
+    treeView: vscode.TreeView<vscode.TreeItem>,
+    options?: { restoreExpandAfterDoubleClick?: boolean }
   ) {
     // Double-click toggles expand before this command runs — restore prior state first.
-    this.armExpandEventSuppress()
-    const treeItem = this.getTreeNodeById(tracePointNode.id) ?? treeView.selection[0]
-    if (treeItem) {
-      await this.restoreExpandStateAfterDoubleClick(treeView, treeItem)
+    // Context menu / Command Palette Go to must not collapse or re-expand the row.
+    if (options?.restoreExpandAfterDoubleClick !== false) {
+      this.armExpandEventSuppress()
+      const treeItem = this.getTreeNodeById(tracePointNode.id) ?? treeView.selection[0]
+      if (treeItem) {
+        await this.restoreExpandStateAfterDoubleClick(treeView, treeItem)
+      }
     }
 
     const tp = tracePointNode.tracePoint

@@ -22,13 +22,13 @@
 
 <!-- Plugin description -->
 <p>
-  Trace code in a tree structure.
-  Build and display code workflows as nested trace points
+  Let AI agents help you build and display code workflows as nested trace points
   (lines, files, and directories) so you can follow the flow and jump back to source anytime.
   <b>Double-click</b> any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
-  Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
+  By default, add trace points from the editor right-click menu.
+  Install the Agent Skill so a coding agent can search, add, move, and rebind traces, and
   notify the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
   install the Code Trace Tree skill. Once installed, the agent can
@@ -60,6 +60,7 @@
     </ul>
   </li>
   <li>Single-click a node to select it; double-click to jump to that location (line, file, or Explorer for folders). Double-click restores the prior expand/collapse state if the host toggled it (brief flicker possible).</li>
+  <li>Right-click a node and choose <b>Go to Trace Point</b> (first item) to jump to that location (same as double-click).</li>
   <li>Right-click a node and choose <b>Copy Label</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
   <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
   <li>Use the view title-bar actions to expand/collapse, <b>Recheck Trace Availability</b>, <b>Remove Invalid Trace Points</b>, reorder, highlight, prompt for name on create, or edit descriptions. Import/Export live under <b>Advanced Settings</b>. Drag a node onto another to reparent it (the target expands automatically).</li>
@@ -101,7 +102,21 @@
   Resolve / refresh / select helper scripts are plain shell or batch and do not need Python.
 </p>
 
-<h2>Install the skill (recommended)</h2>
+<h2>Agent Skill Installation</h2>
+<h3>Option 1: Install with npx (Recommended)</h3>
+<p>
+  Requires <a href="https://nodejs.org/">Node.js</a> (<code>npx</code>).
+  Pass <code>-g</code> for all projects; omit it for this project only.
+  On Windows, add <code>--copy</code> if symlinks are not available.
+  This installs from the dedicated skill repo (small clone, default branch).
+</p>
+<pre><code>npx skills add saidake/code-trace-tree-skill -g</code></pre>
+<p>Explicit, non-interactive Cursor install:</p>
+<pre><code>npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
+<p>Try without installing:</p>
+<pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
+
+<h3>Option 2: Install from a ZIP file</h3>
 <ol>
   <li>Download <code>code-trace-tree-skill-1.3.1.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.1">GitHub Release</a> (one zip works across agents).</li>
   <li>Extract it <b>into</b> the skills directory for your agent (table below). When asked, replace the existing <code>code-trace-tree</code> folder. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
@@ -123,33 +138,13 @@
   </tbody>
 </table>
 
-<h2>Install example (command line, optional)</h2>
-<p>Same result as the steps above. Claude Code global path, Linux &amp; macOS:</p>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.1/code-trace-tree-skill-1.3.1.zip -o code-trace-tree-skill-1.3.1.zip</code>
-<code>rm -rf ~/.claude/skills/code-trace-tree</code>
-<code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.3.1.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.3.1.zip</code>
-</pre>
-<p>Project-local: unzip into <code>.claude/skills/</code> instead of <code>~/.claude/skills/</code>. For other agents, use the same zip and the skills path from the table above.</p>
-
-<h2>Install example (Windows PowerShell, optional)</h2>
-<p>Claude Code global path:</p>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.1/code-trace-tree-skill-1.3.1.zip" -OutFile "code-trace-tree-skill-1.3.1.zip"</code>
-<code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
-<code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.3.1.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.3.1.zip"</code>
-</pre>
-<p>Project-local: extract into <code>.claude\skills\</code>. For other agents, use the same zip and change the destination to that agent’s skills path (see the table above for examples).</p>
-
 <h2>How to use the skill</h2>
 <p>
   Installing the skill makes it available to the agent:
 </p>
 <ul>
-  <li><b>Project-local</b> — available in agent sessions for that project</li>
-  <li><b>Global</b> — available across projects for that agent</li>
+  <li><b>Project-local</b> — omit <code>-g</code>, or extract the zip into the project skills folder</li>
+  <li><b>Global</b> — pass <code>-g</code>, or extract the zip into the global skills folder</li>
 </ul>
 <p>
   If the IDE is open on this project, it loads the agent’s
@@ -193,7 +188,7 @@
 - Open the project root in VS Code / Cursor
 - Install deps: `cd main && yarn install`
 - Press **F5** to launch an Extension Development Host
-- Shared agent skill source: `skills/code-trace-tree/`
+- Shared agent skill: `https://github.com/saidake/code-trace-tree-skill` (copy in `skills/code-trace-tree/` for zip packaging)
 
 # License
 

@@ -1,10 +1,10 @@
 ---
 name: code-trace-tree
 description: >
-  Read, edit, and refresh Code Trace Tree plugin data.
+  Read, edit, and refresh Code Trace Tree plugin data (VS Code and JetBrains).
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
-  modify Code Trace Tree profiles, sync agent-written traces into the IDE, notify IntelliJ IDEA
-  to reload plugin data, or select/navigate to trace points in the IDE tree.
+  modify Code Trace Tree profiles, sync agent-written traces into the IDE, ask the IDE to
+  reload plugin data, or select/navigate to trace points in the IDE tree.
   Prefer scripts/trace_tree.py for search/add/ensure/move/delete/rebind (flexible LINE tips; no occurrence args).
   Prefer `ensure` when generating a workflow tree so retries do not duplicate; `add` always creates a new UUID.
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.

@@ -4,6 +4,7 @@
 # Triggered on push of a git tag matching v* (e.g. v1.0.0).
 # Release title format: "vX.Y.Z"
 # Attachments: plugin .vsix + code-trace-tree-skill-X.Y.Z.zip
+# Agent skill: `npx skills add saidake/code-trace-tree-skill` or extract the zip
 
 name: Build and Release
 
@@ -43,9 +44,7 @@ jobs:
       - name: Package agent skill ZIP
         working-directory: .
         run: |
-          set -euo pipefail
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
+          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist/skills
           rm -f dist/skills/code-trace-tree-skill-*.zip
           (
