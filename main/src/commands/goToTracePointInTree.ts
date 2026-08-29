@@ -35,22 +35,12 @@ export function registerGoToTracePointInTree(
       const matches = service.findValidTracePointsAt(filePath, lineNumber)
       if (matches.length === 0) return
 
-      // Focus the Trace Points view, then expand ancestors and select matches
       await vscode.commands.executeCommand('codeTraceTree.view.focus')
-
-      const ids = matches.map((m) => m.id)
-      for (const id of ids) {
-        const item = service.getTreeNodeById(id)
-        if (!item) continue
-        await treeView.reveal(item, { expand: true, select: false, focus: false })
-      }
-
-      const first = service.getTreeNodeById(ids[0])
-      if (first) {
-        await treeView.reveal(first, { expand: true, select: true, focus: true })
-      }
-      // Keep service selection in sync (covers multi-match when tree UI selects one)
-      service.selectTracePoints(ids)
+      await service.selectTracePointsInTree(
+        treeView,
+        matches.map((m) => m.id),
+        { focus: true }
+      )
     })
   )
 }

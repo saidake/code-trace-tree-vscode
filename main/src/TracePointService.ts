@@ -83,6 +83,13 @@ export class TracePointService {
    * Model {@link expandedTracePointIds} still holds the pre-toggle state during this window.
    */
   private suppressExpandEventPersistUntilMs = 0
+  /**
+   * Ignore {@link vscode.TreeView.onDidChangeSelection} while applying programmatic
+   * multi-select. Reveal with {@code select: true} always emits a single-item event.
+   */
+  private ignoreTreeSelectionEvents = false
+  private ignoreTreeSelectionTimer: ReturnType<typeof setTimeout> | undefined
+  private treeSelectionApplyGen = 0
 
   private constructor(private context: vscode.ExtensionContext) {}
 
@@ -619,6 +626,28 @@ export class TracePointService {
 
   shouldSuppressExpandEventPersist(): boolean {
     return Date.now() < this.suppressExpandEventPersistUntilMs
+  }
+
+  shouldIgnoreTreeSelectionEvent(): boolean {
+    return this.ignoreTreeSelectionEvents
+  }
+
+  private beginIgnoreTreeSelectionEvents() {
+    this.ignoreTreeSelectionEvents = true
+    if (this.ignoreTreeSelectionTimer) {
+      clearTimeout(this.ignoreTreeSelectionTimer)
+      this.ignoreTreeSelectionTimer = undefined
+    }
+  }
+
+  private endIgnoreTreeSelectionEventsSoon(applyGen: number, ids: string[]) {
+    if (this.ignoreTreeSelectionTimer) clearTimeout(this.ignoreTreeSelectionTimer)
+    this.ignoreTreeSelectionTimer = setTimeout(() => {
+      this.ignoreTreeSelectionTimer = undefined
+      if (applyGen !== this.treeSelectionApplyGen) return
+      this.selectTracePoints(ids)
+      this.ignoreTreeSelectionEvents = false
+    }, 150)
   }
 
   private beginIgnoreExpandEvents() {
@@ -1765,15 +1794,7 @@ export class TracePointService {
 
     await vscode.commands.executeCommand('codeTraceTree.view.focus')
     const ids = resolved.map((n) => n.id)
-    for (const id of ids) {
-      const item = this.getTreeNodeById(id)
-      if (item) await treeView.reveal(item, { expand: true, select: false, focus: false })
-    }
-    const firstItem = this.getTreeNodeById(ids[0])
-    if (firstItem) {
-      await treeView.reveal(firstItem, { expand: true, select: true, focus: true })
-    }
-    this.selectTracePoints(ids)
+    await this.selectTracePointsInTree(treeView, ids, { focus: true })
     if (resolved.length === 1) {
       await this.navigateToTracePoint(resolved[0], treeView)
     }
@@ -2011,6 +2032,10 @@ export class TracePointService {
   /**
    * Select and reveal nodes in the Trace Points tree without navigating to source.
    * Keeps editor focus by default ({@code focus: false}).
+   *
+   * VS Code {@link vscode.TreeView.reveal} with {@code select: true} replaces the
+   * whole selection with that one element. For multiple ids, select the first then
+   * add the rest with {@code list.toggleSelection} (Ctrl+Space on the list widget).
    */
   async selectTracePointsInTree(
     treeView: vscode.TreeView<vscode.TreeItem>,
@@ -2020,22 +2045,57 @@ export class TracePointService {
     if (ids.length === 0) return
     const focus = options?.focus ?? false
     await this.syncEmptyStateContextKey()
-    this.selectTracePoints(ids)
+
+    const items: vscode.TreeItem[] = []
+    const seen = new Set<string>()
     for (const id of ids) {
+      if (seen.has(id)) continue
+      seen.add(id)
       const item = this.getTreeNodeById(id)
-      if (!item) continue
+      if (item) items.push(item)
+    }
+    if (items.length === 0) return
+
+    const applyGen = ++this.treeSelectionApplyGen
+    this.beginIgnoreTreeSelectionEvents()
+    try {
+      for (const item of items) {
+        try {
+          await treeView.reveal(item, { expand: true, select: false, focus: false })
+        } catch {
+          // Tree view may be hidden or disposed
+        }
+      }
+
       try {
-        await treeView.reveal(item, { expand: true, select: false, focus: false })
+        await treeView.reveal(items[0], {
+          expand: true,
+          select: true,
+          focus: items.length > 1 ? true : focus
+        })
       } catch {
         // Tree view may be hidden or disposed
       }
-    }
-    const first = this.getTreeNodeById(ids[0])
-    if (!first) return
-    try {
-      await treeView.reveal(first, { expand: true, select: true, focus })
-    } catch {
-      // Tree view may be hidden or disposed
+
+      if (items.length > 1) {
+        // Host has no setSelection([...]); toggle the focused row into the selection.
+        await vscode.commands.executeCommand('codeTraceTree.view.focus')
+        for (let i = 1; i < items.length; i++) {
+          try {
+            await treeView.reveal(items[i], { expand: true, select: false, focus: true })
+            await new Promise<void>((resolve) => setTimeout(resolve, 0))
+            await vscode.commands.executeCommand('list.toggleSelection')
+          } catch {
+            // Tree view may be hidden or disposed
+          }
+        }
+        if (!focus) {
+          await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup')
+        }
+      }
+    } finally {
+      this.selectTracePoints(ids)
+      this.endIgnoreTreeSelectionEventsSoon(applyGen, ids)
     }
   }
 

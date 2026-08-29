@@ -72,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     treeView.onDidChangeSelection((e) => {
+      if (service.shouldIgnoreTreeSelectionEvent()) return
       const selectedIds = e.selection
         .map((item) => service.resolveNodeId(item.id))
         .filter((id): id is string => !!id)
