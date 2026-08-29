@@ -1,4 +1,8 @@
-﻿## v1.3.3
+﻿## v1.3.4
+
+- Bump `uuid` to 13.0.2 (CVE-2026-41907)
+
+## v1.3.3
 
 - Agent skill `create_tree.py` generates a nested workflow in one call (ensures existing nodes, adds new ones)
 - LINE locators require `--file`, `--line`, and `--content`; the script computes occurrence
