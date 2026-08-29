@@ -1,6 +1,4 @@
-﻿# Change Log
-
-## v1.3.2
+﻿## v1.3.2
 
 - Toolbar Advanced Settings uses a gear icon
 - Tree context menu **Go to Trace Point** is first (jumps to source)
