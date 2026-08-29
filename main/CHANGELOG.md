@@ -1,4 +1,9 @@
-﻿## v1.3.4
+﻿## v1.3.5
+
+- Put tree context menu **Go to Trace Point** in the navigation group so it appears first
+- Clarify Agent Skill install: Python 3 on PATH; ZIP first; `npx` only if Node.js is present
+
+## v1.3.4
 
 - Bump `uuid` to 13.0.2 (CVE-2026-41907)
 

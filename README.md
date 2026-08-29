@@ -69,15 +69,14 @@
   <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),
   not generic lines like <code>}</code> or <code>return;</code>. Empty lines are not allowed.
   The extension stores occurrence counts to re-find the line after it moves; unique content rebinds more reliably.
-  Opening a file re-checks line traces in that file so highlights and validity stay aligned.
-  Use <b>Recheck Trace Availability</b> in the toolbar to recheck every line, file, and directory trace.
 </p>
 
 <h1>Agent Skill</h1>
 <p>
   This extension does <b>not</b> ship an AI agent. Install your preferred coding agent, then install
-  the Code Trace Tree skill. Once installed, the agent can <b>auto-load</b> it when your
-  request is relevant. The skill is general — any agent that can load skill folders can use it.
+  the <code>code-trace-tree</code> skill. Once installed, the agent can <b>auto-load</b> it when your
+  request is relevant, and the IDE syncs the agent's trace-point changes as they are written.
+  The skill is general — any agent that can load skill folders can use it.
 </p>
 <p>Example agents:</p>
 <ul>
@@ -95,26 +94,18 @@
   <li>Ask the IDE to reload / refresh extension data</li>
   <li>Select or navigate to nodes in the Code Trace Tree view</li>
 </ul>
-<p>
-  <b>Python required:</b> the main skill ops (<code>trace_tree</code> search / add / move / delete / rebind)
-  run <code>trace_tree.py</code>, so <b>Python 3</b> must be on your <code>PATH</code>
-  (<code>python3</code> or <code>python</code>).
-  Resolve / refresh / select helper scripts are plain shell or batch and do not need Python.
-</p>
 
 <h2>Agent Skill Installation</h2>
 <p>
-  This extension does <b>not</b> need Node.js. The skill needs Python.
-  Use Option 1 (ZIP or the command-line examples) unless you already have Node.js.
-  If you have Node.js, you can use Option 2 (<code>npx</code>) instead.
+  <b>Python required:</b> skill ops are Python scripts, so <b>Python 3</b> must be on your
+  <code>PATH</code> (<code>python3</code> or <code>python</code>).
 </p>
-<h3>Option 1: Install from a ZIP file (no Node.js)</h3>
+<h3>Option 1: Install from a ZIP file</h3>
 <p>
-  Pick <b>one</b>: extract the zip by hand, <b>or</b> run the Linux/macOS commands, <b>or</b> run the Windows PowerShell commands.
-  They all install the <b>skill</b> the same way (not the extension).
+  Extract the zip by hand, or run the Linux/macOS commands, or run the Windows PowerShell commands.
 </p>
 <ol>
-  <li>Download <code>code-trace-tree-skill-1.3.4.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.4">GitHub Release</a> (one zip works across agents).</li>
+  <li>Download <code>code-trace-tree-skill-1.3.5.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.5">GitHub Release</a> (one zip works across agents).</li>
   <li>Delete any existing <code>code-trace-tree</code> folder in the skills directory for your agent (table below), then extract the zip <b>into</b> that directory. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
 </ol>
 <p>
@@ -141,37 +132,35 @@
   (for example <code>.cursor</code>, <code>.copilot</code>, <code>.agents</code>, or <code>.gemini</code>).
 </p>
 <h4>Linux &amp; macOS</h4>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.4/code-trace-tree-skill-1.3.4.zip -o code-trace-tree-skill-1.3.4.zip</code>
+<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.5/code-trace-tree-skill-1.3.5.zip -o code-trace-tree-skill-1.3.5.zip</code>
 <code>rm -rf ~/.claude/skills/code-trace-tree</code>
 <code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.3.4.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.3.4.zip</code>
+<code>unzip code-trace-tree-skill-1.3.5.zip -d ~/.claude/skills/</code>
+<code>rm code-trace-tree-skill-1.3.5.zip</code>
 </pre>
 <p>Project-local: unzip into <code>.claude/skills/</code> (or your agent’s project-local path from the table) instead of the global folder.</p>
 
 <h4>Windows PowerShell</h4>
 <p>Same as the Linux/macOS commands, for Windows. Replace <code>.claude</code> with your agent from the table.</p>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.4/code-trace-tree-skill-1.3.4.zip" -OutFile "code-trace-tree-skill-1.3.4.zip"</code>
+<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.5/code-trace-tree-skill-1.3.5.zip" -OutFile "code-trace-tree-skill-1.3.5.zip"</code>
 <code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
 <code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.3.4.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.3.4.zip"</code>
+<code>Expand-Archive -Path "code-trace-tree-skill-1.3.5.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
+<code>Remove-Item "code-trace-tree-skill-1.3.5.zip"</code>
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code> (or your agent’s project-local path from the table).</p>
 
 <h3>Option 2: Install with npx (if you have Node.js)</h3>
 <p>
-  Optional shortcut if you already have <a href="https://nodejs.org/">Node.js</a> (<code>npx</code>).
-  The extension does not need Node.js.
+  If you already have <a href="https://nodejs.org/">Node.js</a>, you can install the skill with <code>npx</code>.
   Pass <code>-g</code> for all projects; omit it for this project only.
   On Windows, add <code>--copy</code> if symlinks are not available.
-  This installs from the dedicated skill repo (small clone, default branch).
   If the skill is already installed, remove it first —
   <code>npx skills add</code> does not overwrite an existing skill.
 </p>
 <pre><code>npx skills remove code-trace-tree -g
 npx skills add saidake/code-trace-tree-skill -g</code></pre>
-<p>Explicit, non-interactive install for the agent you currently use (Cursor example):</p>
+<p>Or explicit, non-interactive install for the agent you currently use (Cursor example):</p>
 <pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
 npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
 <p>
@@ -179,22 +168,12 @@ npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent 
   <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
   <code>codex</code>, or <code>gemini-cli</code>.
 </p>
-<p>Try without installing (Codex example; same <code>--agent</code> values):</p>
+<p>Or try without installing (Codex example; same <code>--agent</code> values):</p>
 <pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
 
 <h2>How to use the skill</h2>
-<p>
-  Installing the skill makes it available to the agent:
-</p>
-<ul>
-  <li><b>Project-local</b> — extract the zip (or <code>npx...</code> without <code>-g</code>) into the project skills folder</li>
-  <li><b>Global</b> — extract the zip (or <code>npx...</code> with <code>-g</code>) into the global skills folder</li>
-</ul>
-<p>
-  If the IDE is open on this project, it loads the agent’s
-  trace point changes in real time (no manual reload).
-</p>
-<p>Examples:</p>
+<p>The agent loads global or project-local skills (including the installed <code>code-trace-tree</code>).
+  Use it in your agent chat:</p>
 <pre><code>Help me generate some simple trace points related to the current topic.
 </code></pre>
 <pre><code>Add simple trace points along the call path of method `test`.
@@ -206,24 +185,6 @@ npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent 
   <li>Windows: <code>%LOCALAPPDATA%\code-trace-tree</code></li>
   <li>macOS: <code>~/Library/Application Support/code-trace-tree</code></li>
   <li>Linux: <code>$XDG_CONFIG_HOME/code-trace-tree</code> or <code>~/.config/code-trace-tree</code></li>
-</ul>
-<ul>
-  <li><b>Binding:</b> each workspace matches a global XML by <code>&lt;path&gt;</code> (path mode).</li>
-  <li><b>New projects:</b> allocate <code>&lt;ProjectFolderName&gt;.xml</code> (or <code>Name1.xml</code>, …)
-    with a UUID <code>&lt;projectId&gt;</code> on first use.</li>
-  <li><b>Agents (Case C):</b> create that global XML without
-    <code>.idea/code-trace-tree.project.id</code> (IDE-agnostic).</li>
-  <li><b>Legacy:</b> <code>&lt;projectId&gt;.xml</code> and folder-named files from older releases
-    are still resolved by scanning XML contents.</li>
-  <li><b>No workspace:</b> the empty panel asks you to open one
-    (Profile / Description / toolbar stay hidden).</li>
-  <li><b>Empty tree:</b> an empty-state webview explains how to create a root trace point
-    (no nodes; only the default <code>main</code> profile or no profiles).</li>
-  <li><b>Recover UI:</b> grey <b>Import stored data</b> after move/rename appears only when another
-    stored global project still has a trace point. Clearing this workspace’s tree (including
-    delete-all) does not keep recover UI visible for the bound file while it is empty.</li>
-  <li><b>Highlight colors:</b> a global preference (<code>settings.xml</code> in that folder),
-    shared across projects and IDEs (defaults <code>#FFFFC8</code> light, <code>#236C60</code> dark).</li>
 </ul>
 <!-- Plugin description end -->
 
