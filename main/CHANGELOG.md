@@ -1,5 +1,12 @@
 ﻿# Change Log
 
+## v1.3.2
+
+- Toolbar Advanced Settings uses a gear icon
+- Tree context menu **Go to Trace Point** is first (jumps to source)
+- Install the Agent Skill from the dedicated repo: `npx skills add saidake/code-trace-tree-skill`
+- Update Marketplace preview screenshots
+
 ## v1.3.1
 
 - Highlight line colors are a global preference (`settings.xml`), shared across projects and IDEs; dark default is `#236C60`

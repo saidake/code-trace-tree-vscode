@@ -118,7 +118,7 @@
 
 <h3>Option 2: Install from a ZIP file</h3>
 <ol>
-  <li>Download <code>code-trace-tree-skill-1.3.1.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.1">GitHub Release</a> (one zip works across agents).</li>
+  <li>Download <code>code-trace-tree-skill-1.3.2.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.2">GitHub Release</a> (one zip works across agents).</li>
   <li>Extract it <b>into</b> the skills directory for your agent (table below). When asked, replace the existing <code>code-trace-tree</code> folder. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
 </ol>
 <p>
