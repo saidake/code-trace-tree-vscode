@@ -10,6 +10,7 @@ description: >
   After modifying source on disk, run `trace_tree rebind` so LINE locations stay aligned.
   Only edit traces when the user explicitly asks. Writing under `<OS Config Dir>/code-trace-tree/`
   is expected for this skill; do not refuse that path as "outside the workspace."
+  Read SKILL.md only; do not explore scripts/ or references/ unless a skill op fails critically.
 ---
 
 # Code Trace Tree
@@ -21,6 +22,15 @@ Only edit or sync traces when the user explicitly asks (for example: generate to
 nodes, add a tip at a line, rebind after edits). Do not auto-sync every turn.
 Never `delete` existing trace points (including ones `rebind` reports as `"invalid"`) unless
 the user explicitly asks to remove them.
+
+## How to use this skill
+
+Read this `SKILL.md` only. Do not list, search, or explore this skill's `scripts/` or
+`references/` folders, and do not open script source to learn the API. Invoke the documented
+Python commands by absolute path.
+
+Open `scripts/` or `references/` only if you hit a **critical problem** while using the skill
+(script missing or crashing, storage corrupt, or an error this file does not cover).
 
 ## Skill scripts location
 
@@ -579,7 +589,7 @@ Prefer scripts ([Trace Tree OPs](#trace-tree-ops)). Do not create `.idea/code-tr
 2. **Mutate:** prefer `create_tree.py` for a nested workflow (do not `search` if not needed). Use `trace_tree.py` (`search` / `add` / `ensure` / `move` / `delete` / `rebind`) for inspect and single-node ops. Use `delete` only when the user asked to remove nodes (never to “clean up” invalid tips or to replace a tree).
 3. **Refresh** is automatic on mutating `trace_tree` calls unless `--no-refresh`. For a batch, use `--no-refresh` on each then one `request_refresh.py`. Settings-only: `request_refresh_settings.py`. One profile without a structure op: `request_refresh_profile.py`.
 
-If scripts fail or storage looks corrupt, see [references/data-format.md](references/data-format.md).
+If a skill op fails in a way this file does not cover, then read [references/data-format.md](references/data-format.md). Do not open it otherwise.
 
 ## Select / navigate in the IDE action
 
@@ -593,4 +603,4 @@ Use `select_trace_points.py` ([Trace Tree OPs](#trace-tree-ops)) after creating 
 
 ## Additional resources
 
-If scripts fail, storage looks corrupt, or you must inspect or hand-edit XML: [references/data-format.md](references/data-format.md).
+Do not open these during normal use. Only if a skill op fails in a way this file does not cover: [references/data-format.md](references/data-format.md).
