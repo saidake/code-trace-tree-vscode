@@ -22,16 +22,15 @@
 
 <!-- Plugin description -->
 <p>
-  Let AI agents help you build and display code workflows as nested trace points
+  Trace code in a tree structure with AI agent support. Build and display code workflows as nested trace points
   (lines, files, and directories) so you can follow the flow and jump back to source anytime.
   <b>Double-click</b> any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
-  By default, add trace points from the editor right-click menu.
-  Install the Agent Skill so a coding agent can search, add, move, and rebind traces, and
+  Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
   notify the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
-  install the Code Trace Tree skill. Once installed, the agent can
+  install the <code>code-trace-tree</code> skill. Once installed, the agent can
   <b>auto-load</b> it when relevant.
 </p>
 <!-- Plugin description end -->

@@ -15,8 +15,9 @@ description: >
 
 # Code Trace Tree
 
-Build and display code workflows as nested trees of line, file, and directory
-trace points. Operate the hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
+Trace code in a tree structure with AI agent support. Build and display code
+workflows as nested trace points (lines, files, and directories). Operate the
+hybrid storage used by the Code Trace Tree IDE plugins, then ask the IDE to reload.
 
 Only edit or sync traces when the user explicitly asks (for example: generate topic-related
 nodes, add a tip at a line, rebind after edits). Do not auto-sync every turn.
