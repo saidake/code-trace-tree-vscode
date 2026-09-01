@@ -154,6 +154,11 @@
         "icon": "$(clear-all)"
       },
       {
+        "command": "codeTraceTree.openAgentSkill",
+        "title": "Agent Skill",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "codeTraceTree.openAdvancedSettings",
         "title": "Advanced Settings",
         "icon": "$(gear)"
@@ -236,6 +241,11 @@
         {
           "command": "codeTraceTree.removeInvalidTracePoints",
           "group": "navigation@675",
+          "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
+        },
+        {
+          "command": "codeTraceTree.openAgentSkill",
+          "group": "navigation@690",
           "when": "codeTraceTree.hasWorkspaceFolder && (view == codeTraceTree.view || view == codeTraceTree.empty)"
         },
         {

@@ -17,6 +17,7 @@ import { registerExpandSelected } from './commands/expandSelected'
 import { registerCollapseAll } from './commands/collapseAll'
 import { registerToggleHighlights } from './commands/toggleHighlights'
 import { registerOpenAdvancedSettings } from './commands/openAdvancedSettings'
+import { maybeNotifyAgentSkill, registerOpenAgentSkill } from './commands/openAgentSkill'
 import { registerRecheckTracePoints } from './commands/recheckTracePoints'
 import { registerRemoveInvalidTracePoints } from './commands/removeInvalidTracePoints'
 import { registerToggleNamePrompt } from './commands/toggleNamePrompt'
@@ -119,6 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerRemoveInvalidTracePoints(context, service)
   registerToggleHighlights(context, service)
   registerOpenAdvancedSettings(context, service)
+  registerOpenAgentSkill(context, service)
   registerToggleNamePrompt(context, service)
   registerExportTracePoints(context, service)
   registerImportTracePoints(context, service)
@@ -140,6 +142,7 @@ export function activate(context: vscode.ExtensionContext) {
     emptyProvider.refresh()
     startExternalWatcher(context)
     refreshEditorEligibleContext()
+    maybeNotifyAgentSkill(context, service)
   }
 
   refreshEditorEligibleContext()

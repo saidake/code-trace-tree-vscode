@@ -33,6 +33,7 @@ import { ProjectStorage, StoredProjectSummary } from './storage/projectStorage'
 import {
   ensureAndWriteGlobalSettings,
   globalSettingsExist,
+  readGlobalSettingsFile,
   resolveGlobalSettings
 } from './storage/globalSettingsXml'
 
@@ -392,6 +393,11 @@ export class TracePointService {
 
   getAdvancedSettings(): AdvancedSettings {
     return { ...this._advancedSettings }
+  }
+
+  /** Last bundled skill version the user dismissed or installed from the plugin. */
+  getAgentSkillNoticeVersion(): string | undefined {
+    return readGlobalSettingsFile()?.agentSkillVersion
   }
 
   /**

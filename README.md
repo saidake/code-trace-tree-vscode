@@ -22,13 +22,13 @@
 
 <!-- Plugin description -->
 <p>
-  Trace code in a tree structure with AI agent support. Build and display code workflows as nested trace points
+  Trace code in a tree structure with AI support. Build and display code workflows as nested trace points
   (lines, files, and directories) so you can follow the flow and jump back to source anytime.
   <b>Double-click</b> any trace point to navigate to its source, with support for multiple trace levels.
 </p>
 <p>
-  Pair it with the Agent Skill so a coding agent can search, add, move, and rebind traces, and
-  notify the IDE when you ask (for example Claude Code, Cursor, or Gemini CLI).<br/>
+  Use it manually or pair it with the Agent Skill so coding agents such as Claude Code, Cursor, or Gemini CLI
+  can search, add, move, and rebind traces, and notify the IDE to refresh.<br/>
   This extension does <b>not</b> include an AI agent; install your preferred agent separately, then
   install the <code>code-trace-tree</code> skill. Once installed, the agent can
   <b>auto-load</b> it when relevant.
@@ -62,7 +62,7 @@
   <li>Right-click a node and choose <b>Go to Trace Point</b> (first item) to jump to that location (same as double-click).</li>
   <li>Right-click a node and choose <b>Copy Label</b> to copy its display text, e.g. <code>test233 (TestControllerWebFlux.java:54)</code>.</li>
   <li>Right-click a line trace point and choose <b>Show Line Content</b> to view its saved trimmed line text.</li>
-  <li>Use the view title-bar actions to expand/collapse, <b>Recheck Trace Availability</b>, <b>Remove Invalid Trace Points</b>, reorder, highlight, prompt for name on create, or edit descriptions. Import/Export live under <b>Advanced Settings</b>. Drag a node onto another to reparent it (the target expands automatically).</li>
+  <li>Use the view title-bar actions to expand/collapse, <b>Recheck Trace Availability</b>, <b>Remove Invalid Trace Points</b>, reorder, highlight, prompt for name on create, or edit descriptions. <b>Agent Skill</b> installs or updates the bundled skill for coding agents. Import/Export live under <b>Advanced Settings</b>. Drag a node onto another to reparent it (the target expands automatically).</li>
 </ol>
 <p>
   <b>TIPS:</b> Prefer creating line trace points on text that is <b>unique in that file</b> (or uncommon),
@@ -96,10 +96,23 @@
 
 <h2>Agent Skill Installation</h2>
 <p>
-  <b>Python required:</b> skill ops are Python scripts, so <b>Python 3</b> must be on your
-  <code>PATH</code> (<code>python3</code> or <code>python</code>).
+  <b>Python required to run skill ops:</b> skill scripts need <b>Python 3</b> on your
+  <code>PATH</code> (<code>python3</code> or <code>python</code>). Copying the skill from the IDE does not require Python.
 </p>
-<h3>Option 1: Install from a ZIP file</h3>
+<h3>Option 1: Install from the IDE</h3>
+<p>
+  Open the <b>Code Trace Tree</b> view and click <b>Agent Skill</b> on the toolbar.
+  The status page shows Python 3 and which agents have the skill (missing, outdated, or latest).
+  Click <b>Install / Update…</b> and choose agents. The extension copies the bundled
+  <code>code-trace-tree</code> skill into each agent's global skills folder
+  (for example <code>~/.cursor/skills/code-trace-tree</code>).
+</p>
+<p>
+  On first project open, if a detected agent is missing the skill or is behind the bundled
+  version, the extension shows a notification (once per skill version; <b>Later</b> or a
+  successful install is remembered in global <code>settings.xml</code>).
+</p>
+<h3>Option 2: Install from a ZIP file</h3>
 <p>
   Extract the zip by hand, or run the Linux/macOS commands, or run the Windows PowerShell commands.
 </p>
@@ -149,7 +162,7 @@
 </pre>
 <p>Project-local: extract into <code>.claude\skills\</code> (or your agent’s project-local path from the table).</p>
 
-<h3>Option 2: Install with npx (if you have Node.js)</h3>
+<h3>Option 3: Install with npx (if you have Node.js)</h3>
 <p>
   If you already have <a href="https://nodejs.org/">Node.js</a>, you can install the skill with <code>npx</code>.
   Pass <code>-g</code> for all projects; omit it for this project only.

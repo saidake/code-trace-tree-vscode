@@ -16,6 +16,14 @@ import {
 } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import { parseXml, serializeXml } from '../utils/xmlUtils'
+import { AgentSkillNoticeStatus } from '../skill/agentSkill'
+
+export interface GlobalSettingsFile {
+  highlightLineBackgroundLight: string
+  highlightLineBackgroundDark: string
+  agentSkillVersion?: string
+  agentSkillNoticeStatus?: AgentSkillNoticeStatus
+}
 
 export function settingsFilePath(): string {
   return path.join(resolveAppDir(), GLOBAL_SETTINGS_FILE_NAME)
@@ -26,20 +34,62 @@ export function globalSettingsExist(): boolean {
   return fs.existsSync(file) && fs.statSync(file).isFile()
 }
 
-export function readGlobalSettings(): AdvancedSettings | undefined {
+export function readGlobalSettingsFile(): GlobalSettingsFile | undefined {
   const file = settingsFilePath()
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return undefined
   try {
-    const xml = fs.readFileSync(file, 'utf8')
-    const parsed = parseXml(xml)
-    const root = parsed.settings
-    if (!root) return undefined
-    return advancedSettingsFromXml(
-      root.highlightLineBackground?.light,
-      root.highlightLineBackground?.dark
-    )
+    return parseGlobalSettingsXml(fs.readFileSync(file, 'utf8'))
   } catch {
     return undefined
+  }
+}
+
+export function parseGlobalSettingsXml(xml: string): GlobalSettingsFile | undefined {
+  const parsed = parseXml(xml)
+  const root = parsed.settings
+  if (!root) return undefined
+  const colors = advancedSettingsFromXml(
+    xmlText(root.highlightLineBackground?.light),
+    xmlText(root.highlightLineBackground?.dark)
+  )
+  const skill = root.agentSkill
+  const version = xmlText(skill?.version)?.trim() || undefined
+  const statusRaw = xmlText(skill?.noticeStatus)?.trim()
+  const status: AgentSkillNoticeStatus | undefined =
+    statusRaw === 'dismissed' || statusRaw === 'installed' ? statusRaw : undefined
+  return {
+    highlightLineBackgroundLight: colors.highlightLineBackgroundLight,
+    highlightLineBackgroundDark: colors.highlightLineBackgroundDark,
+    agentSkillVersion: version,
+    agentSkillNoticeStatus: status
+  }
+}
+
+export function serializeGlobalSettingsXml(doc: GlobalSettingsFile): string {
+  const settings: Record<string, unknown> = {
+    highlightLineBackground: {
+      light: doc.highlightLineBackgroundLight,
+      dark: doc.highlightLineBackgroundDark
+    }
+  }
+  if (doc.agentSkillVersion || doc.agentSkillNoticeStatus) {
+    const agentSkill: Record<string, string> = {}
+    if (doc.agentSkillVersion) agentSkill.version = doc.agentSkillVersion
+    if (doc.agentSkillNoticeStatus) agentSkill.noticeStatus = doc.agentSkillNoticeStatus
+    settings.agentSkill = agentSkill
+  }
+  return serializeXml({
+    '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
+    settings
+  })
+}
+
+export function readGlobalSettings(): AdvancedSettings | undefined {
+  const doc = readGlobalSettingsFile()
+  if (!doc) return undefined
+  return {
+    highlightLineBackgroundLight: doc.highlightLineBackgroundLight,
+    highlightLineBackgroundDark: doc.highlightLineBackgroundDark
   }
 }
 
@@ -53,18 +103,42 @@ export function resolveGlobalSettings(legacy?: AdvancedSettings): AdvancedSettin
 
 /**
  * Ensure `settings.xml` exists (seed from leftover project colors on first create), then write.
+ * Preserves agent-skill notice fields when the file already exists.
  */
 export function ensureAndWriteGlobalSettings(
   settings: AdvancedSettings,
   legacy?: AdvancedSettings
 ): AdvancedSettings {
-  const file = settingsFilePath()
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  const toWrite = globalSettingsExist()
+  const existing = readGlobalSettingsFile()
+  const colors = existing
     ? normalizeSettings(settings)
     : migrateOnCreate(settings, legacy)
-  writeAtomic(toWrite, file)
-  return toWrite
+  writeGlobalSettingsFile({
+    ...colors,
+    agentSkillVersion: existing?.agentSkillVersion,
+    agentSkillNoticeStatus: existing?.agentSkillNoticeStatus
+  })
+  return colors
+}
+
+/** Persist skill-notice state. Creates `settings.xml` if needed (seeds colors). */
+export function upsertAgentSkillNotice(
+  version: string,
+  status: AgentSkillNoticeStatus,
+  colorSeed: AdvancedSettings
+): void {
+  const existing = readGlobalSettingsFile()
+  const colors = existing
+    ? {
+        highlightLineBackgroundLight: existing.highlightLineBackgroundLight,
+        highlightLineBackgroundDark: existing.highlightLineBackgroundDark
+      }
+    : normalizeSettings(colorSeed)
+  writeGlobalSettingsFile({
+    ...colors,
+    agentSkillVersion: version,
+    agentSkillNoticeStatus: status
+  })
 }
 
 /** First settings.xml: leftover project colors as seed, then overlay dialog values. */
@@ -89,17 +163,10 @@ function normalizeSettings(settings: AdvancedSettings): AdvancedSettings {
   }
 }
 
-function writeAtomic(settings: AdvancedSettings, filePath: string): void {
-  const obj = {
-    '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
-    settings: {
-      highlightLineBackground: {
-        light: settings.highlightLineBackgroundLight,
-        dark: settings.highlightLineBackgroundDark
-      }
-    }
-  }
-  const xml = serializeXml(obj)
+function writeGlobalSettingsFile(doc: GlobalSettingsFile): void {
+  const filePath = settingsFilePath()
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  const xml = serializeGlobalSettingsXml(doc)
   const tmp = filePath + '.tmp'
   fs.writeFileSync(tmp, xml, 'utf8')
   try {
@@ -108,4 +175,13 @@ function writeAtomic(settings: AdvancedSettings, filePath: string): void {
     fs.copyFileSync(tmp, filePath)
     fs.unlinkSync(tmp)
   }
+}
+
+function xmlText(value: unknown): string | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (typeof value === 'object' && value !== null && '#text' in value) {
+    return String((value as { '#text': unknown })['#text'])
+  }
+  return undefined
 }

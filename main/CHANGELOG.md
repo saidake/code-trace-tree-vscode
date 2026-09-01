@@ -1,4 +1,9 @@
-﻿## v1.3.5
+﻿## v1.3.6
+
+- Bundle the Agent Skill in the extension; toolbar **Agent Skill** installs or updates it per coding agent
+- Prompt once per bundled skill version when a detected agent is missing or outdated
+
+## v1.3.5
 
 - Put tree context menu **Go to Trace Point** in the navigation group so it appears first
 - Clarify Agent Skill install: Python 3 on PATH; ZIP first; `npx` only if Node.js is present

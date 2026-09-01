@@ -44,4 +44,20 @@ if (fs.existsSync(legacyPreview)) {
   fs.unlinkSync(legacyPreview)
 }
 
-console.log('Prepared main/README.md, main/LICENSE, and docs assets for vsce packaging')
+const skillSrc = path.join(root, 'skills', 'code-trace-tree')
+const skillDest = path.join(mainDir, 'skills', 'code-trace-tree')
+fs.rmSync(skillDest, { recursive: true, force: true })
+copyDir(skillSrc, skillDest)
+
+console.log('Prepared main/README.md, main/LICENSE, docs assets, and bundled skill for vsce packaging')
+
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true })
+  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
+    if (ent.name === '__pycache__' || ent.name.endsWith('.pyc')) continue
+    const from = path.join(src, ent.name)
+    const to = path.join(dest, ent.name)
+    if (ent.isDirectory()) copyDir(from, to)
+    else fs.copyFileSync(from, to)
+  }
+}
