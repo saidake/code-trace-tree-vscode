@@ -96,8 +96,10 @@
 
 <h2>Agent Skill Installation</h2>
 <p>
-  <b>Python required to run skill ops:</b> skill scripts need <b>Python 3</b> on your
-  <code>PATH</code> (<code>python3</code> or <code>python</code>). Copying the skill from the IDE does not require Python.
+  <b>Python 3 required:</b> skill scripts need <b>Python 3</b> on your
+  <code>PATH</code> (<code>python3</code> or <code>python</code>).
+  <b>Choose agents</b> and <b>Install / Update</b> stay disabled until Python 3 is found.
+  <a href="https://www.python.org/downloads/">Install Python 3</a>, add it to PATH, then restart the IDE.
 </p>
 <p>
   Open the <b>Code Trace Tree</b> view and click <b>Agent Skill</b> on the toolbar

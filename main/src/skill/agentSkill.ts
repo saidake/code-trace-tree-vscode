@@ -115,16 +115,21 @@ export interface AgentSkillStatus {
   state: AgentSkillState
 }
 
+export const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/'
+
 export interface PythonStatus {
   ready: boolean
   command?: string
   version?: string
 }
 
+/** Bundled skill version from SKILL.md `metadata.version`. */
 export function parseSkillVersion(skillMd: string): string | undefined {
   const fm = skillMd.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!fm) return undefined
-  const m = fm[1].match(/^version:\s*['"]?([0-9]+(?:\.[0-9]+)*)['"]?\s*$/m)
+  const meta = fm[1].match(/^metadata:\s*\r?\n((?:[ \t]+\S.*\r?\n?)*)/m)
+  if (!meta) return undefined
+  const m = meta[1].match(/^[ \t]+version:\s*['"]?([0-9]+)['"]?\s*$/m)
   return m?.[1]
 }
 

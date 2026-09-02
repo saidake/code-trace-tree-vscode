@@ -25,9 +25,10 @@ import {
 import { skillScriptsDir } from './helpers/skillSpawn'
 
 describe('agent skill version', () => {
-  it('reads version from SKILL frontmatter', () => {
-    const md = `---\nname: code-trace-tree\nversion: 1\ndescription: test\n---\n\n# Hi\n`
+  it('reads version from SKILL metadata', () => {
+    const md = `---\nname: code-trace-tree\nmetadata:\n  version: "1"\ndescription: test\n---\n\n# Hi\n`
     assert.strictEqual(parseSkillVersion(md), '1')
+    assert.strictEqual(parseSkillVersion('---\nversion: 1\n---\n'), undefined)
     const bundled = fs.readFileSync(path.join(skillScriptsDir(), '..', 'SKILL.md'), 'utf8')
     assert.strictEqual(parseSkillVersion(bundled), '1')
   })
@@ -67,20 +68,20 @@ describe('agent skill scan', () => {
       fs.mkdirSync(path.join(home, '.cursor', 'skills', 'code-trace-tree'), { recursive: true })
       fs.writeFileSync(
         path.join(home, '.cursor', 'skills', 'code-trace-tree', 'SKILL.md'),
-        '---\nname: code-trace-tree\nversion: 1.3.4\n---\n',
+        '---\nname: code-trace-tree\nmetadata:\n  version: "1"\n---\n',
         'utf8'
       )
-      const statuses = scanAgentStatuses('1', home)
+      const statuses = scanAgentStatuses('2', home)
       const cursor = statuses.find((s) => s.id === 'cursor')
       const claude = statuses.find((s) => s.id === 'claude-code')
       assert.ok(cursor?.detected)
       assert.strictEqual(cursor?.state, 'outdated')
-      assert.strictEqual(cursor?.installedVersion, '1.3.4')
+      assert.strictEqual(cursor?.installedVersion, '1')
       assert.strictEqual(claude?.detected, false)
       assert.strictEqual(claude?.state, 'missing')
-      assert.strictEqual(shouldOfferSkillNotice('1', statuses, undefined), true)
-      assert.strictEqual(shouldOfferSkillNotice('1', statuses, '1.3.5'), true)
-      assert.strictEqual(shouldOfferSkillNotice('1', statuses, '1'), false)
+      assert.strictEqual(shouldOfferSkillNotice('2', statuses, undefined), true)
+      assert.strictEqual(shouldOfferSkillNotice('2', statuses, '1'), true)
+      assert.strictEqual(shouldOfferSkillNotice('2', statuses, '2'), false)
     } finally {
       fs.rmSync(home, { recursive: true, force: true })
     }
@@ -92,7 +93,7 @@ describe('agent skill scan', () => {
       const src = path.join(root, 'src')
       const dest = path.join(root, 'dest', 'code-trace-tree')
       fs.mkdirSync(src)
-      fs.writeFileSync(path.join(src, 'SKILL.md'), '---\nversion: 1.3.5\n---\n', 'utf8')
+      fs.writeFileSync(path.join(src, 'SKILL.md'), '---\nmetadata:\n  version: "1"\n---\n', 'utf8')
       fs.mkdirSync(path.join(src, 'scripts'))
       fs.writeFileSync(path.join(src, 'scripts', 'trace_tree.py'), 'print(1)\n', 'utf8')
       fs.mkdirSync(dest, { recursive: true })
@@ -111,7 +112,7 @@ describe('agent skill scan', () => {
     try {
       const dest = path.join(home, '.cursor', 'skills', 'code-trace-tree')
       fs.mkdirSync(dest, { recursive: true })
-      fs.writeFileSync(path.join(dest, 'SKILL.md'), '---\nversion: 1.3.5\n---\n', 'utf8')
+      fs.writeFileSync(path.join(dest, 'SKILL.md'), '---\nmetadata:\n  version: "1"\n---\n', 'utf8')
       const removed = removeSkillForAgents(['cursor', 'claude-code'], home)
       assert.strictEqual(removed.length, 1)
       assert.strictEqual(removed[0].id, 'cursor')
@@ -127,13 +128,13 @@ describe('global settings xml skill notice', () => {
     const xml = serializeGlobalSettingsXml({
       highlightLineBackgroundLight: '#FFFFC8',
       highlightLineBackgroundDark: '#236C60',
-      agentSkillVersion: '1.3.5',
+      agentSkillVersion: '1',
       agentSkillNoticeStatus: 'dismissed'
     })
     const parsed = parseGlobalSettingsXml(xml)
     assert.strictEqual(parsed?.highlightLineBackgroundLight, '#FFFFC8')
     assert.strictEqual(parsed?.highlightLineBackgroundDark, '#236C60')
-    assert.strictEqual(parsed?.agentSkillVersion, '1.3.5')
+    assert.strictEqual(parsed?.agentSkillVersion, '1')
     assert.strictEqual(parsed?.agentSkillNoticeStatus, 'dismissed')
     const openedXml = serializeGlobalSettingsXml({
       highlightLineBackgroundLight: '#FFFFC8',

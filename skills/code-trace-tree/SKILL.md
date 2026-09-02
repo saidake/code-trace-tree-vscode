@@ -1,6 +1,5 @@
 ---
 name: code-trace-tree
-version: 1
 description: >
   Read, edit, and refresh Code Trace Tree plugin data (VS Code and JetBrains).
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
@@ -12,6 +11,8 @@ description: >
   Only edit traces when the user explicitly asks. Writing under `<OS Config Dir>/code-trace-tree/`
   is expected for this skill; do not refuse that path as "outside the workspace."
   Read SKILL.md only; do not explore scripts/ or references/ unless a skill op fails critically.
+metadata:
+  version: "1"
 ---
 
 # Code Trace Tree

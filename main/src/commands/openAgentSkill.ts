@@ -11,6 +11,7 @@ import {
   bundledSkillVersion,
   detectPython3,
   installSkillForAgents,
+  PYTHON_DOWNLOAD_URL,
   removeSkillForAgents,
   agentsWithInstalledSkill,
   resolveBundledSkillDir,
@@ -92,6 +93,10 @@ function openAgentSkillPanel(
         postState(panel!, context)
         return
       }
+      if (msg?.command === 'openPythonDownload') {
+        void vscode.env.openExternal(vscode.Uri.parse(PYTHON_DOWNLOAD_URL))
+        return
+      }
       if (msg?.command === 'choose') {
         void runInstall(context, 'choose')
         return
@@ -123,6 +128,12 @@ async function runInstall(
 ): Promise<void> {
   const bundledDir = resolveBundledSkillDir(context.extensionPath)
   const bundled = bundledSkillVersion(context.extensionPath)
+  if (!detectPython3().ready) {
+    vscode.window.showErrorMessage(
+      'Python 3 is required on PATH before the skill is copied to agents.'
+    )
+    return
+  }
   if (!bundledDir || !bundled) {
     vscode.window.showErrorMessage('Bundled Code Trace Tree skill was not found in the extension.')
     return
@@ -260,6 +271,7 @@ function getHtml(): string {
     button.secondary:disabled:hover {
       background: var(--vscode-button-secondaryBackground, #5a5a5a);
     }
+    a { color: var(--vscode-textLink-foreground); }
     .ok { color: var(--vscode-testing-iconPassed, #4caf50); }
     .warn { color: var(--vscode-editorWarning-foreground, #d7ba7d); }
   </style>
@@ -270,7 +282,11 @@ function getHtml(): string {
   <p>Bundled skill version: <b id="bundled">…</b></p>
   <h2>Python 3</h2>
   <p id="python">Checking…</p>
-  <p class="hint">Python is required when an agent runs skill scripts, not to copy the files.</p>
+  <p class="hint">Python 3 must be on PATH before the skill is copied to agents, so they can run the scripts.</p>
+  <p id="pythonHelp" class="hint" hidden>
+    <a href="https://www.python.org/downloads/" id="pythonLink">Install Python 3</a>
+    — add it to PATH, restart the IDE, then Refresh.
+  </p>
   <h2>Agents (global)</h2>
   <table>
     <thead><tr><th>Agent</th><th>Installed</th></tr></thead>
@@ -297,6 +313,10 @@ function getHtml(): string {
     document.getElementById('refresh').addEventListener('click', () => {
       vscode.postMessage({ command: 'refresh' });
     });
+    document.getElementById('pythonLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      vscode.postMessage({ command: 'openPythonDownload' });
+    });
     function esc(s) {
       return String(s).replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
     }
@@ -311,12 +331,18 @@ function getHtml(): string {
         pyEl.textContent = 'Ready: Python ' + py.version + ' (' + py.command + ')';
       } else {
         pyEl.className = 'warn';
-        pyEl.textContent = 'Python 3 not found on PATH. Skill ops will fail until python3 or python is available.';
+        pyEl.textContent = 'Python 3 not found on PATH.';
       }
+      document.getElementById('pythonHelp').hidden = !!py.ready;
       const body = document.getElementById('agents');
       const agents = msg.agents || [];
-      document.getElementById('choose').disabled = !msg.canChoose;
-      document.getElementById('install').disabled = agents.length === 0;
+      const needPy = 'Python 3 is required before installing the skill.';
+      const choose = document.getElementById('choose');
+      const install = document.getElementById('install');
+      choose.disabled = !py.ready || !msg.canChoose;
+      install.disabled = !py.ready || agents.length === 0;
+      choose.title = py.ready ? '' : needPy;
+      install.title = py.ready ? '' : needPy;
       document.getElementById('remove').disabled = !msg.canRemove;
       if (agents.length === 0) {
         body.innerHTML = '<tr><td colspan="2">The skill is not installed for any agent.</td></tr>';
