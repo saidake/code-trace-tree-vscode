@@ -1,7 +1,13 @@
 ﻿## v1.3.6
 
-- Bundle the Agent Skill in the extension; toolbar **Agent Skill** installs or updates it per coding agent
+- Bundle the Agent Skill in the extension; toolbar **Agent Skill** opens a status page to install or update it per coding agent
 - Prompt once per bundled skill version when a detected agent is missing or outdated
+- Choose agents to install, Install / Update listed agents, or remove the skill from them
+- README: install the skill from the toolbar; ZIP and `npx` stay on the skill repo
+
+![Click Agent Skill on the Code Trace Tree toolbar](https://raw.githubusercontent.com/saidake/code-trace-tree-vscode/main/docs/assets/vscode-install-skill-1.png)
+
+![Agent Skill status page](https://raw.githubusercontent.com/saidake/code-trace-tree-vscode/main/docs/assets/vscode-install-skill-2.png)
 
 ## v1.3.5
 

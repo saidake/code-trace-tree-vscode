@@ -99,93 +99,38 @@
   <b>Python required to run skill ops:</b> skill scripts need <b>Python 3</b> on your
   <code>PATH</code> (<code>python3</code> or <code>python</code>). Copying the skill from the IDE does not require Python.
 </p>
-<h3>Option 1: Install from the IDE</h3>
 <p>
-  Open the <b>Code Trace Tree</b> view and click <b>Agent Skill</b> on the toolbar.
-  The status page shows Python 3 and which agents have the skill (missing, outdated, or latest).
-  Click <b>Choose agents to install</b> and pick agents. The extension copies the bundled
-  <code>code-trace-tree</code> skill into each agent's global skills folder
-  (for example <code>~/.cursor/skills/code-trace-tree</code>). Agent names and paths match
-  <a href="https://github.com/vercel-labs/skills">npx skills</a>.
+  Open the <b>Code Trace Tree</b> view and click <b>Agent Skill</b> on the toolbar
+  (cloud download icon):
+</p>
+<p>
+  <img src="docs/assets/vscode-install-skill-1.png" alt="Click Agent Skill on the Code Trace Tree toolbar">
+</p>
+<ul>
+  <li>The status page shows the bundled skill version, whether <b>Python 3</b> is on
+    <code>PATH</code>, and which agents already have the skill.</li>
+  <li><b>Choose agents to install</b> — pick agents that do not have it yet.</li>
+  <li><b>Install / Update</b> — copy the bundled <code>code-trace-tree</code> skill into
+    each listed agent's global skills folder
+    (for example <code>~/.cursor/skills/code-trace-tree</code>).</li>
+  <li><b>Remove from installed agents</b> — delete those copies.</li>
+</ul>
+<p>
+  <img src="docs/assets/vscode-install-skill-2.png" alt="Agent Skill status page: choose agents, install or update, or remove">
 </p>
 <p>
   On first project open, if a detected agent is missing the skill or is behind the bundled
   version, the extension shows a notification (once per skill version; <b>Later</b> or a
   successful install is remembered in global <code>settings.xml</code>).
 </p>
-<h3>Option 2: Install from a ZIP file</h3>
 <p>
-  Extract the zip by hand, or run the Linux/macOS commands, or run the Windows PowerShell commands.
+  ZIP and <code>npx skills</code> (including a project-local copy) remain on
+  <a href="https://github.com/saidake/code-trace-tree-skill">code-trace-tree-skill</a>
+  if you need them.
 </p>
-<ol>
-  <li>Download <code>code-trace-tree-skill-1.3.5.zip</code> from the <a href="https://github.com/saidake/code-trace-tree-vscode/releases/tag/v1.3.5">GitHub Release</a> (one zip works across agents).</li>
-  <li>Delete any existing <code>code-trace-tree</code> folder in the skills directory for your agent (table below), then extract the zip <b>into</b> that directory. The zip contains one <code>code-trace-tree</code> folder (with <code>SKILL.md</code> inside). Global = all projects; project-local = this repo only.</li>
-</ol>
-<p>
-  Done when the skills directory contains <code>code-trace-tree/SKILL.md</code>
-  (not the zip file, and not an extra nested <code>code-trace-tree/code-trace-tree</code> folder).
-</p>
-<table>
-  <thead>
-    <tr><th>Agent (examples)</th><th>Global</th><th>Project-local</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>Claude Code</td><td><code>~/.claude/skills/</code></td><td><code>.claude/skills/</code></td></tr>
-    <tr><td>Cursor</td><td><code>~/.cursor/skills/</code></td><td><code>.agents/skills/</code></td></tr>
-    <tr><td>GitHub Copilot</td><td><code>~/.copilot/skills/</code></td><td><code>.agents/skills/</code></td></tr>
-    <tr><td>Codex</td><td><code>~/.codex/skills/</code></td><td><code>.agents/skills/</code></td></tr>
-    <tr><td>Gemini CLI</td><td><code>~/.gemini/skills/</code></td><td><code>.gemini/skills/</code></td></tr>
-  </tbody>
-</table>
-
-<p><b>Or</b> skip the manual extract and install from the command line (use one OS below):</p>
-<p>
-  Example below is Claude Code (<code>~/.claude/skills/</code>).
-  Replace <code>.claude</code> with your agent from the table
-  (for example <code>.cursor</code>, <code>.copilot</code>, <code>.agents</code>, or <code>.gemini</code>).
-</p>
-<h4>Linux &amp; macOS</h4>
-<pre><code>curl -L https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.5/code-trace-tree-skill-1.3.5.zip -o code-trace-tree-skill-1.3.5.zip</code>
-<code>rm -rf ~/.claude/skills/code-trace-tree</code>
-<code>mkdir -p ~/.claude/skills</code>
-<code>unzip code-trace-tree-skill-1.3.5.zip -d ~/.claude/skills/</code>
-<code>rm code-trace-tree-skill-1.3.5.zip</code>
-</pre>
-<p>Project-local: unzip into <code>.claude/skills/</code> (or your agent’s project-local path from the table) instead of the global folder.</p>
-
-<h4>Windows PowerShell</h4>
-<p>Same as the Linux/macOS commands, for Windows. Replace <code>.claude</code> with your agent from the table.</p>
-<pre><code>Invoke-WebRequest -Uri "https://github.com/saidake/code-trace-tree-vscode/releases/download/v1.3.5/code-trace-tree-skill-1.3.5.zip" -OutFile "code-trace-tree-skill-1.3.5.zip"</code>
-<code>Remove-Item -Recurse -Force "$HOME\.claude\skills\code-trace-tree" -ErrorAction SilentlyContinue</code>
-<code>New-Item -ItemType Directory -Force -Path "$HOME\.claude\skills" | Out-Null</code>
-<code>Expand-Archive -Path "code-trace-tree-skill-1.3.5.zip" -DestinationPath "$HOME\.claude\skills" -Force</code>
-<code>Remove-Item "code-trace-tree-skill-1.3.5.zip"</code>
-</pre>
-<p>Project-local: extract into <code>.claude\skills\</code> (or your agent’s project-local path from the table).</p>
-
-<h3>Option 3: Install with npx (if you have Node.js)</h3>
-<p>
-  If you already have <a href="https://nodejs.org/">Node.js</a>, you can install the skill with <code>npx</code>.
-  Pass <code>-g</code> for all projects; omit it for this project only.
-  On Windows, add <code>--copy</code> if symlinks are not available.
-  If the skill is already installed, remove it first —
-  <code>npx skills add</code> does not overwrite an existing skill.
-</p>
-<pre><code>npx skills remove code-trace-tree -g
-npx skills add saidake/code-trace-tree-skill -g</code></pre>
-<p>Or explicit, non-interactive install for the agent you currently use (Cursor example):</p>
-<pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
-npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
-<p>
-  Set <code>--agent</code> to any agent supported by
-  <a href="https://github.com/vercel-labs/skills">npx skills</a>.
-</p>
-<p>Or try without installing (Codex example; same <code>--agent</code> values):</p>
-<pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>
 
 <h2>How to use the skill</h2>
-<p>The agent loads global or project-local skills (including the installed <code>code-trace-tree</code>).
-  Use it in your agent chat:</p>
+<p>Once the skill is installed, use it in your agent chat:</p>
 <pre><code>Help me generate some simple trace points related to the current topic.
 </code></pre>
 <pre><code>Add simple trace points along the call path of method `test`.
