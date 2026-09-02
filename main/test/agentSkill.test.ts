@@ -135,5 +135,18 @@ describe('global settings xml skill notice', () => {
     assert.strictEqual(parsed?.highlightLineBackgroundDark, '#236C60')
     assert.strictEqual(parsed?.agentSkillVersion, '1.3.5')
     assert.strictEqual(parsed?.agentSkillNoticeStatus, 'dismissed')
+    const openedXml = serializeGlobalSettingsXml({
+      highlightLineBackgroundLight: '#FFFFC8',
+      highlightLineBackgroundDark: '#236C60',
+      agentSkillVersion: '1',
+      agentSkillNoticeStatus: 'opened'
+    })
+    assert.strictEqual(parseGlobalSettingsXml(openedXml)?.agentSkillNoticeStatus, 'opened')
+    assert.strictEqual(
+      parseGlobalSettingsXml(
+        openedXml.replace('<noticeStatus>opened</noticeStatus>', '<noticeStatus>installed</noticeStatus>')
+      )?.agentSkillNoticeStatus,
+      'opened'
+    )
   })
 })

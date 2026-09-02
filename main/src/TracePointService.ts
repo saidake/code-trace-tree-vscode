@@ -395,7 +395,7 @@ export class TracePointService {
     return { ...this._advancedSettings }
   }
 
-  /** Last bundled skill version the user dismissed or installed from the plugin. */
+  /** Last bundled skill version whose Agent Skill notice was dismissed or whose status page was opened. */
   getAgentSkillNoticeVersion(): string | undefined {
     return readGlobalSettingsFile()?.agentSkillVersion
   }

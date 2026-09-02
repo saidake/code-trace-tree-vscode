@@ -56,7 +56,11 @@ export function parseGlobalSettingsXml(xml: string): GlobalSettingsFile | undefi
   const version = xmlText(skill?.version)?.trim() || undefined
   const statusRaw = xmlText(skill?.noticeStatus)?.trim()
   const status: AgentSkillNoticeStatus | undefined =
-    statusRaw === 'dismissed' || statusRaw === 'installed' ? statusRaw : undefined
+    statusRaw === 'dismissed' || statusRaw === 'opened'
+      ? statusRaw
+      : statusRaw === 'installed'
+        ? 'opened'
+        : undefined
   return {
     highlightLineBackgroundLight: colors.highlightLineBackgroundLight,
     highlightLineBackgroundDark: colors.highlightLineBackgroundDark,

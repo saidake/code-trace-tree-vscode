@@ -34,6 +34,9 @@ Python commands by absolute path.
 Open `scripts/` or `references/` only if you hit a **critical problem** while using the skill
 (script missing or crashing, storage corrupt, or an error this file does not cover).
 
+**Chat replies:** Script stdout and tree JSON are long. Do not paste them into the user-visible
+message. Summarize the result (created/skipped counts, names, errors).
+
 ## Skill scripts location
 
 Helper scripts live under `<Agent Skill Path>/code-trace-tree/scripts/`.

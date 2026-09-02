@@ -10,7 +10,7 @@ import * as path from 'path'
 
 export const SKILL_FOLDER_NAME = 'code-trace-tree'
 
-export type AgentSkillNoticeStatus = 'dismissed' | 'installed'
+export type AgentSkillNoticeStatus = 'dismissed' | 'opened'
 
 export type AgentSkillState = 'missing' | 'outdated' | 'latest' | 'newer'
 
@@ -290,6 +290,7 @@ export function scanAgentStatuses(
   })
 }
 
+/** True when a detected agent is missing/outdated and this bundled version has not been dismissed or opened. */
 export function shouldOfferSkillNotice(
   bundledVersion: string | undefined,
   statuses: AgentSkillStatus[],

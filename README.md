@@ -120,8 +120,8 @@
 </p>
 <p>
   On first project open, if a detected agent is missing the skill or is behind the bundled
-  version, the extension shows a notification (once per skill version; <b>Later</b> or a
-  successful install is remembered in global <code>settings.xml</code>).
+  version, the extension shows a notification (once per skill version; <b>Dismiss</b> or
+  opening the status page is remembered in global <code>settings.xml</code>).
 </p>
 <p>
   ZIP and <code>npx skills</code> (including a project-local copy) remain on

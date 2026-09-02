@@ -51,15 +51,15 @@ export function maybeNotifyAgentSkill(
   void vscode.window
     .showInformationMessage(
       `${verb} the Code Trace Tree agent skill (v${bundled}) for your coding agents.`,
-      'Install…',
-      'Later'
+      'Install',
+      'Dismiss'
     )
     .then((choice) => {
-      if (choice === 'Later') {
+      if (choice === 'Dismiss') {
         upsertAgentSkillNotice(bundled, 'dismissed', service.getAdvancedSettings())
         return
       }
-      if (choice === 'Install…') {
+      if (choice === 'Install') {
         openAgentSkillPanel(context, service)
       }
     })
@@ -69,6 +69,10 @@ function openAgentSkillPanel(
   context: vscode.ExtensionContext,
   service: TracePointService
 ) {
+  const bundled = bundledSkillVersion(context.extensionPath)
+  if (bundled) {
+    upsertAgentSkillNotice(bundled, 'opened', service.getAdvancedSettings())
+  }
   if (panel) {
     panel.reveal(vscode.ViewColumn.Beside)
     postState(panel, context)
@@ -89,11 +93,11 @@ function openAgentSkillPanel(
         return
       }
       if (msg?.command === 'choose') {
-        void runInstall(context, service, 'choose')
+        void runInstall(context, 'choose')
         return
       }
       if (msg?.command === 'install') {
-        void runInstall(context, service, 'table')
+        void runInstall(context, 'table')
         return
       }
       if (msg?.command === 'remove') {
@@ -115,7 +119,6 @@ function openAgentSkillPanel(
 
 async function runInstall(
   context: vscode.ExtensionContext,
-  service: TracePointService,
   mode: 'table' | 'choose'
 ): Promise<void> {
   const bundledDir = resolveBundledSkillDir(context.extensionPath)
@@ -155,7 +158,6 @@ async function runInstall(
   }
   try {
     const installed = installSkillForAgents(bundledDir, ids)
-    upsertAgentSkillNotice(bundled, 'installed', service.getAdvancedSettings())
     vscode.window.showInformationMessage(
       `Installed code-trace-tree v${bundled} for ${installed.map((i) => labelFor(i.id)).join(', ')}.`
     )
