@@ -17,19 +17,94 @@ export type AgentSkillState = 'missing' | 'outdated' | 'latest' | 'newer'
 export interface AgentDef {
   id: string
   label: string
-  /** Directory under the user home that indicates the agent is installed. */
-  homeMarker: string
-  /** Skills directory relative to the user home (global). */
-  globalSkillsRel: string
+  /** Home-relative, `xdg:`-prefixed, or absolute. Detected if any path exists. */
+  detect: readonly string[]
+  /** Global skills directory (same spec rules as detect). */
+  globalSkills: string
 }
 
+/** Same agents and global paths as `npx skills` (https://github.com/vercel-labs/skills/blob/main/src/agents.ts). */
 export const AGENT_DEFS: readonly AgentDef[] = [
-  { id: 'claude-code', label: 'Claude Code', homeMarker: '.claude', globalSkillsRel: path.join('.claude', 'skills') },
-  { id: 'cursor', label: 'Cursor', homeMarker: '.cursor', globalSkillsRel: path.join('.cursor', 'skills') },
-  { id: 'github-copilot', label: 'GitHub Copilot', homeMarker: '.copilot', globalSkillsRel: path.join('.copilot', 'skills') },
-  { id: 'codex', label: 'Codex', homeMarker: '.agents', globalSkillsRel: path.join('.agents', 'skills') },
-  { id: 'gemini-cli', label: 'Gemini CLI', homeMarker: '.gemini', globalSkillsRel: path.join('.gemini', 'skills') }
+  ag('aider-desk', 'AiderDesk', ['.aider-desk'], '.aider-desk/skills'),
+  ag('amp', 'Amp', ['xdg:amp'], 'xdg:agents/skills'),
+  ag('antigravity', 'Antigravity', ['.gemini/antigravity'], '.gemini/antigravity/skills'),
+  ag('antigravity-cli', 'Antigravity CLI', ['.gemini/antigravity-cli'], '.gemini/antigravity-cli/skills'),
+  ag('astrbot', 'AstrBot', ['.astrbot'], '.astrbot/data/skills'),
+  ag('autohand-code', 'Autohand Code CLI', ['.autohand'], '.autohand/skills'),
+  ag('augment', 'Augment', ['.augment'], '.augment/skills'),
+  ag('bob', 'IBM Bob', ['.bob'], '.bob/skills'),
+  ag('claude-code', 'Claude Code', ['.claude'], '.claude/skills'),
+  ag('openclaw', 'OpenClaw', ['.openclaw', '.clawdbot', '.moltbot'], '.openclaw/skills'),
+  ag('cline', 'Cline', ['.cline'], '.agents/skills'),
+  ag('codearts-agent', 'CodeArts Agent', ['.codeartsdoer'], '.codeartsdoer/skills'),
+  ag('codebuddy', 'CodeBuddy', ['.codebuddy'], '.codebuddy/skills'),
+  ag('codemaker', 'Codemaker', ['.codemaker'], '.codemaker/skills'),
+  ag('codestudio', 'Code Studio', ['.codestudio'], '.codestudio/skills'),
+  ag('codex', 'Codex', ['.codex'], '.codex/skills'),
+  ag('command-code', 'Command Code', ['.commandcode'], '.commandcode/skills'),
+  ag('continue', 'Continue', ['.continue'], '.continue/skills'),
+  ag('cortex', 'Cortex Code', ['.snowflake/cortex'], '.snowflake/cortex/skills'),
+  ag('crush', 'Crush', ['.config/crush'], '.config/crush/skills'),
+  ag('cursor', 'Cursor', ['.cursor'], '.cursor/skills'),
+  ag('deepagents', 'Deep Agents', ['.deepagents'], '.deepagents/agent/skills'),
+  ag('devin', 'Devin for Terminal', ['xdg:devin'], 'xdg:devin/skills'),
+  ag('dexto', 'Dexto', ['.dexto'], '.agents/skills'),
+  ag('droid', 'Droid', ['.factory'], '.factory/skills'),
+  ag('firebender', 'Firebender', ['.firebender'], '.firebender/skills'),
+  ag('forgecode', 'ForgeCode', ['.forge'], '.forge/skills'),
+  ag('gemini-cli', 'Gemini CLI', ['.gemini'], '.gemini/skills'),
+  ag('github-copilot', 'GitHub Copilot', ['.copilot'], '.copilot/skills'),
+  ag('goose', 'Goose', ['xdg:goose'], 'xdg:goose/skills'),
+  ag('grok', 'Grok Build', ['.grok'], '.grok/skills'),
+  ag('hermes-agent', 'Hermes Agent', ['.hermes'], '.hermes/skills'),
+  ag('inference-sh', 'inference.sh', ['.inferencesh'], '.inferencesh/skills'),
+  ag('jazz', 'Jazz', ['.jazz'], '.jazz/skills'),
+  ag('junie', 'Junie', ['.junie'], '.junie/skills'),
+  ag('iflow-cli', 'iFlow CLI', ['.iflow'], '.iflow/skills'),
+  ag('kilo', 'Kilo Code', ['.kilocode'], '.kilocode/skills'),
+  ag('kimchi', 'Kimchi', ['.config/kimchi'], '.config/kimchi/harness/skills'),
+  ag('kimi-code-cli', 'Kimi Code CLI', ['.kimi-code', '.kimi'], '.agents/skills'),
+  ag('kiro-cli', 'Kiro CLI', ['.kiro'], '.kiro/skills'),
+  ag('kode', 'Kode', ['.kode'], '.kode/skills'),
+  ag('lingma', 'Lingma', ['.lingma'], '.lingma/skills'),
+  ag('loaf', 'Loaf', ['.loaf'], '.agents/skills'),
+  ag('mcpjam', 'MCPJam', ['.mcpjam'], '.mcpjam/skills'),
+  ag('minimax-code', 'MiniMax Code', ['.minimax'], '.minimax/skills'),
+  ag('mistral-vibe', 'Mistral Vibe', ['.vibe'], '.vibe/skills'),
+  ag('moxby', 'Moxby', ['.moxby'], '.moxby/skills'),
+  ag('mux', 'Mux', ['.mux'], '.mux/skills'),
+  ag('opencode', 'OpenCode', ['xdg:opencode'], 'xdg:opencode/skills'),
+  ag('openhands', 'OpenHands', ['.openhands'], '.openhands/skills'),
+  ag('ona', 'Ona', ['.ona'], '.ona/skills'),
+  ag('pi', 'Pi', ['.pi/agent'], '.pi/agent/skills'),
+  ag('posit-assistant', 'Posit Assistant', ['.posit/assistant', '.positai'], '.posit/assistant/skills'),
+  ag('qoder', 'Qoder', ['.qoder'], '.qoder/skills'),
+  ag('qoder-cn', 'Qoder CN', ['.qoder-cn'], '.qoder-cn/skills'),
+  ag('qwen-code', 'Qwen Code', ['.qwen'], '.qwen/skills'),
+  ag('replit', 'Replit', [], 'xdg:agents/skills'),
+  ag('reasonix', 'Reasonix', ['.reasonix'], '.reasonix/skills'),
+  ag('rovodev', 'Rovo Dev', ['.rovodev'], '.rovodev/skills'),
+  ag('roo', 'Roo Code', ['.roo'], '.roo/skills'),
+  ag('tabnine-cli', 'Tabnine CLI', ['.tabnine'], '.tabnine/agent/skills'),
+  ag('terramind', 'Terramind', ['.terramind'], '.terramind/skills'),
+  ag('tinycloud', 'Tinycloud', ['.tinycloud'], '.tinycloud/skills'),
+  ag('trae', 'Trae', ['.trae'], '.trae/skills'),
+  ag('trae-cn', 'Trae CN', ['.trae-cn'], '.trae-cn/skills'),
+  ag('warp', 'Warp', ['.warp'], '.agents/skills'),
+  ag('windsurf', 'Windsurf', ['.codeium/windsurf'], '.codeium/windsurf/skills'),
+  ag('zed', 'Zed', ['xdg:zed'], '.agents/skills'),
+  ag('zcode', 'ZCode', ['.zcode'], '.zcode/skills'),
+  ag('zencoder', 'Zencoder', ['.zencoder'], '.zencoder/skills'),
+  ag('zenflow', 'Zenflow', ['.zencoder'], '.zencoder/skills'),
+  ag('neovate', 'Neovate', ['.neovate'], '.neovate/skills'),
+  ag('pochi', 'Pochi', ['.pochi'], '.pochi/skills'),
+  ag('adal', 'AdaL', ['.adal'], '.adal/skills'),
+  ag('universal', 'Universal', [], 'xdg:agents/skills')
 ]
+
+function ag(id: string, label: string, detect: string[], globalSkills: string): AgentDef {
+  return { id, label, detect, globalSkills }
+}
 
 export interface AgentSkillStatus {
   id: string
@@ -53,27 +128,14 @@ export function parseSkillVersion(skillMd: string): string | undefined {
   return m?.[1]
 }
 
-/** Negative if a < b, 0 if equal, positive if a > b. Missing/empty is 0.0.0. */
+/** Missing, empty, or non-integer values count as 0. Integers compare as-is. */
 export function compareSkillVersions(a: string | undefined, b: string | undefined): number {
-  const pa = parseVersionParts(a)
-  const pb = parseVersionParts(b)
-  const len = Math.max(pa.length, pb.length)
-  for (let i = 0; i < len; i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0)
-    if (d) return d
-  }
-  return 0
+  return skillVersionRank(a) - skillVersionRank(b)
 }
 
-function parseVersionParts(raw: string | undefined): number[] {
-  if (!raw || !raw.trim()) return [0]
-  return raw
-    .trim()
-    .split('.')
-    .map((p) => {
-      const n = parseInt(p, 10)
-      return Number.isFinite(n) ? n : 0
-    })
+function skillVersionRank(raw: string | undefined): number {
+  if (!raw || !/^\d+$/.test(raw.trim())) return 0
+  return parseInt(raw.trim(), 10)
 }
 
 export function readInstalledSkillVersion(skillDir: string): string | undefined {
@@ -107,14 +169,108 @@ export function bundledSkillVersion(extensionPath: string): string | undefined {
   }
 }
 
+export function xdgConfigHome(homeDir: string = os.homedir()): string {
+  return process.env.XDG_CONFIG_HOME?.trim() || path.join(homeDir, '.config')
+}
+
+export function resolveAgentLayout(
+  def: AgentDef,
+  homeDir: string = os.homedir()
+): { detectPaths: string[]; skillsDir: string } {
+  const resolveSpec = (spec: string): string => {
+    if (spec.startsWith('xdg:')) return joinRel(xdgConfigHome(homeDir), spec.slice(4))
+    if (path.isAbsolute(spec)) return spec
+    return joinRel(homeDir, spec)
+  }
+  let detectPaths = def.detect.map(resolveSpec)
+  let skillsDir = resolveSpec(def.globalSkills)
+
+  const envHome = (envName: string, fallbackRel: string): string =>
+    process.env[envName]?.trim() || joinRel(homeDir, fallbackRel)
+
+  switch (def.id) {
+    case 'claude-code': {
+      const h = envHome('CLAUDE_CONFIG_DIR', '.claude')
+      detectPaths = [h]
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'codex': {
+      const h = envHome('CODEX_HOME', '.codex')
+      detectPaths = [h, '/etc/codex']
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'autohand-code': {
+      const h = envHome('AUTOHAND_HOME', '.autohand')
+      detectPaths = [h]
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'grok': {
+      const h = envHome('GROK_HOME', '.grok')
+      detectPaths = [h]
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'hermes-agent': {
+      const h = envHome('HERMES_HOME', '.hermes')
+      detectPaths = [h]
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'mistral-vibe': {
+      const h = envHome('VIBE_HOME', '.vibe')
+      detectPaths = [h]
+      skillsDir = path.join(h, 'skills')
+      break
+    }
+    case 'openclaw': {
+      const candidates = ['.openclaw', '.clawdbot', '.moltbot'].map((d) => joinRel(homeDir, d))
+      detectPaths = candidates
+      const found = candidates.find(pathExists)
+      skillsDir = path.join(found || joinRel(homeDir, '.openclaw'), 'skills')
+      break
+    }
+    case 'zed': {
+      detectPaths = [joinRel(xdgConfigHome(homeDir), 'zed')]
+      if (process.env.APPDATA?.trim()) detectPaths.push(path.join(process.env.APPDATA.trim(), 'Zed'))
+      if (process.env.FLATPAK_XDG_CONFIG_HOME?.trim()) {
+        detectPaths.push(path.join(process.env.FLATPAK_XDG_CONFIG_HOME.trim(), 'zed'))
+      }
+      break
+    }
+    case 'minimax-code':
+      detectPaths = [...detectPaths, '/Applications/MiniMax Code.app']
+      break
+    case 'zcode':
+      detectPaths = [...detectPaths, '/Applications/ZCode.app']
+      break
+    default:
+      break
+  }
+  return { detectPaths, skillsDir }
+}
+
+function joinRel(base: string, rel: string): string {
+  return path.join(base, ...rel.split('/').filter(Boolean))
+}
+
+function pathExists(p: string): boolean {
+  try {
+    return fs.existsSync(p)
+  } catch {
+    return false
+  }
+}
+
 export function scanAgentStatuses(
   bundledVersion: string,
   homeDir: string = os.homedir()
 ): AgentSkillStatus[] {
   return AGENT_DEFS.map((def) => {
-    const marker = path.join(homeDir, def.homeMarker)
-    const skillsDir = path.join(homeDir, def.globalSkillsRel)
-    const detected = isDir(marker) || isDir(skillsDir)
+    const { detectPaths, skillsDir } = resolveAgentLayout(def, homeDir)
+    const detected = detectPaths.some(pathExists)
     const skillDir = path.join(skillsDir, SKILL_FOLDER_NAME)
     const hasSkill = fs.existsSync(path.join(skillDir, 'SKILL.md'))
     const installedVersion = hasSkill ? readInstalledSkillVersion(skillDir) : undefined
@@ -167,11 +323,32 @@ export function installSkillForAgents(
   for (const id of agentIds) {
     const def = AGENT_DEFS.find((a) => a.id === id)
     if (!def) continue
-    const dest = path.join(homeDir, def.globalSkillsRel, SKILL_FOLDER_NAME)
+    const dest = path.join(resolveAgentLayout(def, homeDir).skillsDir, SKILL_FOLDER_NAME)
     copySkillDir(bundledDir, dest)
     results.push({ id, dest })
   }
   return results
+}
+
+/** Delete the bundled skill folder from each listed agent's global skills directory. */
+export function removeSkillForAgents(
+  agentIds: string[],
+  homeDir: string = os.homedir()
+): { id: string; dest: string }[] {
+  const results: { id: string; dest: string }[] = []
+  for (const id of agentIds) {
+    const def = AGENT_DEFS.find((a) => a.id === id)
+    if (!def) continue
+    const dest = path.join(resolveAgentLayout(def, homeDir).skillsDir, SKILL_FOLDER_NAME)
+    if (!fs.existsSync(dest)) continue
+    fs.rmSync(dest, { recursive: true, force: true })
+    results.push({ id, dest })
+  }
+  return results
+}
+
+export function agentsWithInstalledSkill(statuses: AgentSkillStatus[]): AgentSkillStatus[] {
+  return statuses.filter((s) => s.state !== 'missing')
 }
 
 export function detectPython3(): PythonStatus {
@@ -200,14 +377,6 @@ export function detectPython3(): PythonStatus {
     return { ready: true, command, version: m[1] }
   }
   return { ready: false }
-}
-
-function isDir(p: string): boolean {
-  try {
-    return fs.existsSync(p) && fs.statSync(p).isDirectory()
-  } catch {
-    return false
-  }
 }
 
 function copyDir(src: string, dest: string): void {

@@ -1,6 +1,6 @@
 ---
 name: code-trace-tree
-version: 1.3.5
+version: 1
 description: >
   Read, edit, and refresh Code Trace Tree plugin data (VS Code and JetBrains).
   Use when the user asks to add/update/remove trace points (line, file, or directory), inspect or
@@ -38,15 +38,15 @@ Open `scripts/` or `references/` only if you hit a **critical problem** while us
 
 Helper scripts live under `<Agent Skill Path>/code-trace-tree/scripts/`.
 
-**Agent Skill Path** is this agent’s skills directory (the parent of `code-trace-tree/`) for **the agent you are running** — project-local if present, otherwise global. It ends at `skills`, not at `code-trace-tree`. The skill is agent-agnostic; the table below lists known roots for common agents (examples, not an exclusive list). Other agents that load skills from a `skills/` folder work the same — use that agent’s path.
+**Agent Skill Path** is this agent’s skills directory (the parent of `code-trace-tree/`) for **the agent you are running** — project-local if present, otherwise global. It ends at `skills`, not at `code-trace-tree`. Paths match [`npx skills`](https://github.com/vercel-labs/skills/blob/main/src/agents.ts). The table lists common examples; other listed agents work the same.
 
 | Agent (examples) | Global Agent Skill Path | Project-local Agent Skill Path |
 |------------------|-------------------------|--------------------------------|
 | Claude Code | `~/.claude/skills` | `<repo>/.claude/skills` |
-| Cursor | `~/.cursor/skills` | `<repo>/.cursor/skills` |
-| GitHub Copilot | `~/.copilot/skills` | `<repo>/.github/skills` |
-| Codex | `~/.agents/skills` | `<repo>/.agents/skills` |
-| Gemini CLI | `~/.gemini/skills` | `<repo>/.gemini/skills` |
+| Cursor | `~/.cursor/skills` | `<repo>/.agents/skills` |
+| GitHub Copilot | `~/.copilot/skills` | `<repo>/.agents/skills` |
+| Codex | `~/.codex/skills` | `<repo>/.agents/skills` |
+| Gemini CLI | `~/.gemini/skills` | `<repo>/.agents/skills` |
 
 On Windows, `~` is `%USERPROFILE%`. Resolve **Agent Skill Path** once per session. Invoke scripts with absolute paths via `python` (or `python3` if that is what is on PATH). Keep the process CWD in the IDE project (do not `cd` into the skill folder). Direct invocations: [Trace Tree OPs](#trace-tree-ops). On PowerShell, also see [Windows PowerShell](#windows-powershell).
 

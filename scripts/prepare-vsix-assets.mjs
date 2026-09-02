@@ -8,11 +8,12 @@
  * - rewrites `main/assets/` paths for packaging from main/
  *
  * Run via `yarn prepare-vsix` / `yarn package` at release time; do not commit
- * main/README.md (see .gitignore).
+ * main/README.md, main/LICENSE, main/docs/, or main/skills/ (see .gitignore).
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { copyBundledSkill } from './copy-bundled-skill.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const mainDir = path.join(root, 'main')
@@ -44,20 +45,6 @@ if (fs.existsSync(legacyPreview)) {
   fs.unlinkSync(legacyPreview)
 }
 
-const skillSrc = path.join(root, 'skills', 'code-trace-tree')
-const skillDest = path.join(mainDir, 'skills', 'code-trace-tree')
-fs.rmSync(skillDest, { recursive: true, force: true })
-copyDir(skillSrc, skillDest)
+copyBundledSkill()
 
 console.log('Prepared main/README.md, main/LICENSE, docs assets, and bundled skill for vsce packaging')
-
-function copyDir(src, dest) {
-  fs.mkdirSync(dest, { recursive: true })
-  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
-    if (ent.name === '__pycache__' || ent.name.endsWith('.pyc')) continue
-    const from = path.join(src, ent.name)
-    const to = path.join(dest, ent.name)
-    if (ent.isDirectory()) copyDir(from, to)
-    else fs.copyFileSync(from, to)
-  }
-}

@@ -63,10 +63,11 @@ web_modules/
 *.tgz
 *.vsix
 
-# Generated copies for @vscode/vsce packaging (see scripts/prepare-vsix-assets.mjs)
+# Generated copies: compile/F5 copies skills; prepare-vsix also copies README/LICENSE/docs
 /main/README.md
 /main/LICENSE
 /main/docs/
+/main/skills/
 
 # Yarn Integrity file
 .yarn-integrity

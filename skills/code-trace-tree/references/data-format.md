@@ -61,13 +61,13 @@ Read path: `settings.xml` if present; else this project’s leftover `<advancedS
     <dark>#236C60</dark>
   </highlightLineBackground>
   <agentSkill>
-    <version>1.3.5</version>
+    <version>1</version>
     <noticeStatus>installed</noticeStatus>
   </agentSkill>
 </settings>
 ```
 
-`agentSkill` is optional. `version` is the last bundled skill version the user dismissed (`noticeStatus` `dismissed`) or installed from the IDE (`installed`). A newer bundled version may prompt again.
+`agentSkill` is optional. `version` is the last bundled skill version the user dismissed (`noticeStatus` `dismissed`) or installed from the IDE (`installed`). Skill versions are positive integers (`1`, `2`, …). Missing or empty counts as `0`. A newer bundled version may prompt again.
 
 Do not treat `settings.xml` as a project document when scanning `*.xml`. After `settings.xml` exists, ignore leftover `<advancedSettings>` in project XML.
 

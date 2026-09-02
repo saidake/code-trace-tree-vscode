@@ -8,10 +8,11 @@ import { TracePointService } from '../TracePointService'
 import { upsertAgentSkillNotice } from '../storage/globalSettingsXml'
 import {
   AGENT_DEFS,
-  AgentSkillStatus,
   bundledSkillVersion,
   detectPython3,
   installSkillForAgents,
+  removeSkillForAgents,
+  agentsWithInstalledSkill,
   resolveBundledSkillDir,
   scanAgentStatuses,
   shouldOfferSkillNotice
@@ -87,8 +88,16 @@ function openAgentSkillPanel(
         postState(panel!, context)
         return
       }
+      if (msg?.command === 'choose') {
+        void runInstall(context, service, 'choose')
+        return
+      }
       if (msg?.command === 'install') {
-        void runInstall(context, service)
+        void runInstall(context, service, 'table')
+        return
+      }
+      if (msg?.command === 'remove') {
+        void runRemove(context)
       }
     },
     undefined,
@@ -106,7 +115,8 @@ function openAgentSkillPanel(
 
 async function runInstall(
   context: vscode.ExtensionContext,
-  service: TracePointService
+  service: TracePointService,
+  mode: 'table' | 'choose'
 ): Promise<void> {
   const bundledDir = resolveBundledSkillDir(context.extensionPath)
   const bundled = bundledSkillVersion(context.extensionPath)
@@ -115,25 +125,36 @@ async function runInstall(
     return
   }
   const statuses = scanAgentStatuses(bundled)
-  const picked = await vscode.window.showQuickPick(
-    statuses.map((s) => ({
-      label: s.label,
-      description: statusLabel(s),
-      picked: s.detected && (s.state === 'missing' || s.state === 'outdated'),
-      id: s.id
-    })),
-    {
-      canPickMany: true,
-      title: 'Install code-trace-tree skill for which agents?',
-      placeHolder: 'Select one or more agents (global skills directory)'
+  let ids: string[]
+  if (mode === 'table') {
+    ids = agentsWithInstalledSkill(statuses).map((s) => s.id)
+    if (ids.length === 0) {
+      vscode.window.showWarningMessage('No agents are listed. Use Choose agents to install.')
+      return
     }
-  )
-  if (!picked || picked.length === 0) return
-  try {
-    const installed = installSkillForAgents(
-      bundledDir,
-      picked.map((p) => p.id)
+  } else {
+    const extra = statuses.filter((s) => s.state === 'missing')
+    if (extra.length === 0) {
+      vscode.window.showInformationMessage('The skill is already installed for all known agents.')
+      return
+    }
+    const picked = await vscode.window.showQuickPick(
+      extra.map((s) => ({
+        label: s.label,
+        description: s.detected ? 'detected' : 'not detected',
+        id: s.id
+      })),
+      {
+        canPickMany: true,
+        title: 'Choose agents to install',
+        placeHolder: 'Select one or more agents (global skills directory)'
+      }
     )
+    if (!picked || picked.length === 0) return
+    ids = picked.map((p) => p.id)
+  }
+  try {
+    const installed = installSkillForAgents(bundledDir, ids)
     upsertAgentSkillNotice(bundled, 'installed', service.getAdvancedSettings())
     vscode.window.showInformationMessage(
       `Installed code-trace-tree v${bundled} for ${installed.map((i) => labelFor(i.id)).join(', ')}.`
@@ -141,6 +162,31 @@ async function runInstall(
     if (panel) postState(panel, context)
   } catch (e) {
     vscode.window.showErrorMessage(`Failed to install the agent skill: ${e}`)
+  }
+}
+
+async function runRemove(context: vscode.ExtensionContext): Promise<void> {
+  const bundled = bundledSkillVersion(context.extensionPath) || '0'
+  const installed = agentsWithInstalledSkill(scanAgentStatuses(bundled))
+  if (installed.length === 0) {
+    vscode.window.showInformationMessage('The skill is not installed for any known agent.')
+    return
+  }
+  const names = installed.map((s) => s.label).join(', ')
+  const choice = await vscode.window.showWarningMessage(
+    `Remove the code-trace-tree skill from ${names}? This deletes each agent's global code-trace-tree folder.`,
+    { modal: true },
+    'Remove'
+  )
+  if (choice !== 'Remove') return
+  try {
+    const removed = removeSkillForAgents(installed.map((s) => s.id))
+    vscode.window.showInformationMessage(
+      `Removed code-trace-tree from ${removed.map((i) => labelFor(i.id)).join(', ')}.`
+    )
+    if (panel) postState(panel, context)
+  } catch (e) {
+    vscode.window.showErrorMessage(`Failed to remove the agent skill: ${e}`)
   }
 }
 
@@ -152,17 +198,15 @@ function postState(p: vscode.WebviewPanel, context: vscode.ExtensionContext) {
   const bundled = bundledSkillVersion(context.extensionPath) || 'unknown'
   const python = detectPython3()
   const agents = scanAgentStatuses(bundled === 'unknown' ? '0' : bundled)
-  p.webview.postMessage({ command: 'state', bundled, python, agents })
-}
-
-function statusLabel(s: AgentSkillStatus): string {
-  if (!s.detected) {
-    return s.state === 'missing' ? 'agent not detected' : `installed ${s.installedVersion || '?'}`
-  }
-  if (s.state === 'missing') return 'not installed'
-  if (s.state === 'outdated') return `outdated (${s.installedVersion || 'no version'})`
-  if (s.state === 'newer') return `newer (${s.installedVersion})`
-  return `latest (${s.installedVersion})`
+  const installed = agentsWithInstalledSkill(agents)
+  p.webview.postMessage({
+    command: 'state',
+    bundled,
+    python,
+    agents: installed,
+    canChoose: agents.some((a) => a.state === 'missing'),
+    canRemove: installed.length > 0
+  })
 }
 
 function getHtml(): string {
@@ -184,17 +228,35 @@ function getHtml(): string {
     table { border-collapse: collapse; width: 100%; font-size: 12px; }
     th, td { text-align: left; padding: 6px 8px 6px 0; vertical-align: top; }
     th { color: var(--vscode-descriptionForeground); font-weight: 600; }
+    .actions { margin-top: 16px; }
     button {
+      display: inline-block;
+      padding: 6px 14px;
+      margin: 0 8px 8px 0;
+      border-radius: 2px;
+      border: 1px solid var(--vscode-button-border, transparent);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: inherit;
       color: var(--vscode-button-foreground);
       background: var(--vscode-button-background);
-      border: none;
-      padding: 6px 14px;
-      cursor: pointer;
-      margin-right: 8px;
     }
+    button:hover { background: var(--vscode-button-hoverBackground); }
     button.secondary {
-      color: var(--vscode-button-secondaryForeground);
-      background: var(--vscode-button-secondaryBackground);
+      background: var(--vscode-button-secondaryBackground, #5a5a5a);
+      color: var(--vscode-button-secondaryForeground, #ffffff);
+    }
+    button.secondary:hover {
+      background: var(--vscode-button-secondaryHoverBackground, #6e6e6e);
+    }
+    button:focus {
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: 2px;
+    }
+    button:disabled { opacity: 0.55; cursor: default; }
+    button:disabled:hover { background: var(--vscode-button-background); }
+    button.secondary:disabled:hover {
+      background: var(--vscode-button-secondaryBackground, #5a5a5a);
     }
     .ok { color: var(--vscode-testing-iconPassed, #4caf50); }
     .warn { color: var(--vscode-editorWarning-foreground, #d7ba7d); }
@@ -209,16 +271,26 @@ function getHtml(): string {
   <p class="hint">Python is required when an agent runs skill scripts, not to copy the files.</p>
   <h2>Agents (global)</h2>
   <table>
-    <thead><tr><th>Agent</th><th>Detected</th><th>Installed</th><th>Status</th></tr></thead>
+    <thead><tr><th>Agent</th><th>Installed</th></tr></thead>
     <tbody id="agents"></tbody>
   </table>
-  <p class="hint" style="margin-top:16px">Install replaces <code>code-trace-tree</code> in the selected agents' global skills directories.</p>
-  <button id="install">Install / Update…</button>
-  <button id="refresh" class="secondary">Refresh</button>
+  <p class="hint" style="margin-top:16px">The table lists agents that already have this skill. Choose agents to install adds it; Install / Update refreshes the listed agents.</p>
+  <div class="actions">
+    <button type="button" id="choose">Choose agents to install</button>
+    <button type="button" class="secondary" id="install">Install / Update</button>
+    <button type="button" class="secondary" id="remove">Remove from installed agents</button>
+    <button type="button" class="secondary" id="refresh">Refresh</button>
+  </div>
   <script>
     const vscode = acquireVsCodeApi();
+    document.getElementById('choose').addEventListener('click', () => {
+      vscode.postMessage({ command: 'choose' });
+    });
     document.getElementById('install').addEventListener('click', () => {
       vscode.postMessage({ command: 'install' });
+    });
+    document.getElementById('remove').addEventListener('click', () => {
+      vscode.postMessage({ command: 'remove' });
     });
     document.getElementById('refresh').addEventListener('click', () => {
       vscode.postMessage({ command: 'refresh' });
@@ -240,14 +312,23 @@ function getHtml(): string {
         pyEl.textContent = 'Python 3 not found on PATH. Skill ops will fail until python3 or python is available.';
       }
       const body = document.getElementById('agents');
-      body.innerHTML = (msg.agents || []).map((a) => {
-        const installed = a.installedVersion || (a.state === 'missing' ? '—' : 'unknown');
-        const status =
-          a.state === 'missing' ? 'not installed' :
-          a.state === 'outdated' ? 'outdated' :
-          a.state === 'newer' ? 'newer than bundle' : 'latest';
-        return '<tr><td>' + esc(a.label) + '</td><td>' + (a.detected ? 'yes' : 'no') +
-          '</td><td>' + esc(installed) + '</td><td>' + status + '</td></tr>';
+      const agents = msg.agents || [];
+      document.getElementById('choose').disabled = !msg.canChoose;
+      document.getElementById('install').disabled = agents.length === 0;
+      document.getElementById('remove').disabled = !msg.canRemove;
+      if (agents.length === 0) {
+        body.innerHTML = '<tr><td colspan="2">The skill is not installed for any agent.</td></tr>';
+        return;
+      }
+      body.innerHTML = agents.map((a) => {
+        const installed =
+          a.state === 'missing' || !a.installedVersion
+            ? '—'
+            : a.installedVersion + ' (' + (
+                a.state === 'outdated' ? 'outdated' :
+                a.state === 'newer' ? 'newer than bundle' : 'latest'
+              ) + ')';
+        return '<tr><td>' + esc(a.label) + '</td><td>' + esc(installed) + '</td></tr>';
       }).join('');
     });
   </script>

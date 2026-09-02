@@ -8,9 +8,13 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import {
+  AGENT_DEFS,
   compareSkillVersions,
   copySkillDir,
   parseSkillVersion,
+  removeSkillForAgents,
+  resolveAgentLayout,
+  resolveBundledSkillDir,
   scanAgentStatuses,
   shouldOfferSkillNotice
 } from '../src/skill/agentSkill'
@@ -22,17 +26,36 @@ import { skillScriptsDir } from './helpers/skillSpawn'
 
 describe('agent skill version', () => {
   it('reads version from SKILL frontmatter', () => {
-    const md = `---\nname: code-trace-tree\nversion: 1.3.5\ndescription: test\n---\n\n# Hi\n`
-    assert.strictEqual(parseSkillVersion(md), '1.3.5')
+    const md = `---\nname: code-trace-tree\nversion: 1\ndescription: test\n---\n\n# Hi\n`
+    assert.strictEqual(parseSkillVersion(md), '1')
     const bundled = fs.readFileSync(path.join(skillScriptsDir(), '..', 'SKILL.md'), 'utf8')
-    assert.strictEqual(parseSkillVersion(bundled), '1.3.5')
+    assert.strictEqual(parseSkillVersion(bundled), '1')
   })
 
-  it('treats a missing version as older', () => {
-    assert.ok(compareSkillVersions(undefined, '1.3.5') < 0)
-    assert.ok(compareSkillVersions('1.3.4', '1.3.5') < 0)
-    assert.strictEqual(compareSkillVersions('1.3.5', '1.3.5'), 0)
-    assert.ok(compareSkillVersions('1.4.0', '1.3.5') > 0)
+  it('resolves the repo-root skill when main/skills is not present (F5 / unpackaged)', () => {
+    const extensionPath = path.resolve(__dirname, '..')
+    const dir = resolveBundledSkillDir(extensionPath)
+    assert.ok(dir)
+    assert.ok(fs.existsSync(path.join(dir, 'SKILL.md')))
+  })
+
+  it('uses npx skills agent ids and Codex ~/.codex/skills', () => {
+    assert.ok(AGENT_DEFS.length > 50)
+    assert.ok(AGENT_DEFS.some((a) => a.id === 'cursor'))
+    assert.ok(AGENT_DEFS.some((a) => a.id === 'codex'))
+    const home = path.join(os.tmpdir(), 'ctt-home')
+    const cursor = resolveAgentLayout(AGENT_DEFS.find((a) => a.id === 'cursor')!, home)
+    const codex = resolveAgentLayout(AGENT_DEFS.find((a) => a.id === 'codex')!, home)
+    assert.ok(cursor.skillsDir.endsWith(path.join('.cursor', 'skills')))
+    assert.ok(codex.skillsDir.endsWith(path.join('.codex', 'skills')))
+  })
+
+  it('treats missing and non-integer versions as 0', () => {
+    assert.ok(compareSkillVersions(undefined, '1') < 0)
+    assert.ok(compareSkillVersions('1.3.5', '1') < 0)
+    assert.ok(compareSkillVersions('', '1') < 0)
+    assert.strictEqual(compareSkillVersions('1', '1'), 0)
+    assert.ok(compareSkillVersions('2', '1') > 0)
   })
 })
 
@@ -47,7 +70,7 @@ describe('agent skill scan', () => {
         '---\nname: code-trace-tree\nversion: 1.3.4\n---\n',
         'utf8'
       )
-      const statuses = scanAgentStatuses('1.3.5', home)
+      const statuses = scanAgentStatuses('1', home)
       const cursor = statuses.find((s) => s.id === 'cursor')
       const claude = statuses.find((s) => s.id === 'claude-code')
       assert.ok(cursor?.detected)
@@ -55,8 +78,9 @@ describe('agent skill scan', () => {
       assert.strictEqual(cursor?.installedVersion, '1.3.4')
       assert.strictEqual(claude?.detected, false)
       assert.strictEqual(claude?.state, 'missing')
-      assert.strictEqual(shouldOfferSkillNotice('1.3.5', statuses, undefined), true)
-      assert.strictEqual(shouldOfferSkillNotice('1.3.5', statuses, '1.3.5'), false)
+      assert.strictEqual(shouldOfferSkillNotice('1', statuses, undefined), true)
+      assert.strictEqual(shouldOfferSkillNotice('1', statuses, '1.3.5'), true)
+      assert.strictEqual(shouldOfferSkillNotice('1', statuses, '1'), false)
     } finally {
       fs.rmSync(home, { recursive: true, force: true })
     }
@@ -79,6 +103,21 @@ describe('agent skill scan', () => {
       assert.ok(fs.existsSync(path.join(dest, 'scripts', 'trace_tree.py')))
     } finally {
       fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('removes the installed skill folder for listed agents', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ctt-remove-'))
+    try {
+      const dest = path.join(home, '.cursor', 'skills', 'code-trace-tree')
+      fs.mkdirSync(dest, { recursive: true })
+      fs.writeFileSync(path.join(dest, 'SKILL.md'), '---\nversion: 1.3.5\n---\n', 'utf8')
+      const removed = removeSkillForAgents(['cursor', 'claude-code'], home)
+      assert.strictEqual(removed.length, 1)
+      assert.strictEqual(removed[0].id, 'cursor')
+      assert.strictEqual(fs.existsSync(dest), false)
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
     }
   })
 })

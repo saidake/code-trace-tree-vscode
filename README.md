@@ -77,7 +77,7 @@
   request is relevant, and the IDE syncs the agent's trace-point changes as they are written.
   The skill is general — any agent that can load skill folders can use it.
 </p>
-<p>Example agents:</p>
+<p>Same agents as <a href="https://github.com/vercel-labs/skills">npx skills</a> (global install). Examples:</p>
 <ul>
   <li><a href="https://claude.com/claude-code">Claude Code</a></li>
   <li><a href="https://cursor.com">Cursor</a></li>
@@ -103,9 +103,10 @@
 <p>
   Open the <b>Code Trace Tree</b> view and click <b>Agent Skill</b> on the toolbar.
   The status page shows Python 3 and which agents have the skill (missing, outdated, or latest).
-  Click <b>Install / Update…</b> and choose agents. The extension copies the bundled
+  Click <b>Choose agents to install</b> and pick agents. The extension copies the bundled
   <code>code-trace-tree</code> skill into each agent's global skills folder
-  (for example <code>~/.cursor/skills/code-trace-tree</code>).
+  (for example <code>~/.cursor/skills/code-trace-tree</code>). Agent names and paths match
+  <a href="https://github.com/vercel-labs/skills">npx skills</a>.
 </p>
 <p>
   On first project open, if a detected agent is missing the skill or is behind the bundled
@@ -130,9 +131,9 @@
   </thead>
   <tbody>
     <tr><td>Claude Code</td><td><code>~/.claude/skills/</code></td><td><code>.claude/skills/</code></td></tr>
-    <tr><td>Cursor</td><td><code>~/.cursor/skills/</code></td><td><code>.cursor/skills/</code></td></tr>
-    <tr><td>GitHub Copilot</td><td><code>~/.copilot/skills/</code></td><td><code>.github/skills/</code></td></tr>
-    <tr><td>Codex</td><td><code>~/.agents/skills/</code></td><td><code>.agents/skills/</code></td></tr>
+    <tr><td>Cursor</td><td><code>~/.cursor/skills/</code></td><td><code>.agents/skills/</code></td></tr>
+    <tr><td>GitHub Copilot</td><td><code>~/.copilot/skills/</code></td><td><code>.agents/skills/</code></td></tr>
+    <tr><td>Codex</td><td><code>~/.codex/skills/</code></td><td><code>.agents/skills/</code></td></tr>
     <tr><td>Gemini CLI</td><td><code>~/.gemini/skills/</code></td><td><code>.gemini/skills/</code></td></tr>
   </tbody>
 </table>
@@ -176,9 +177,8 @@ npx skills add saidake/code-trace-tree-skill -g</code></pre>
 <pre><code>npx -y skills remove code-trace-tree --agent cursor --global --yes
 npx -y skills add saidake/code-trace-tree-skill --skill code-trace-tree --agent cursor --global --copy --yes</code></pre>
 <p>
-  Set <code>--agent</code> to your current agent, for example
-  <code>cursor</code>, <code>claude-code</code>, <code>github-copilot</code>,
-  <code>codex</code>, or <code>gemini-cli</code>.
+  Set <code>--agent</code> to any agent supported by
+  <a href="https://github.com/vercel-labs/skills">npx skills</a>.
 </p>
 <p>Or try without installing (Codex example; same <code>--agent</code> values):</p>
 <pre><code>npx skills use saidake/code-trace-tree-skill@code-trace-tree --agent codex</code></pre>

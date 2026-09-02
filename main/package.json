@@ -325,8 +325,8 @@
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "node ../scripts/copy-bundled-skill.mjs && tsc -p ./",
+    "watch": "node ../scripts/copy-bundled-skill.mjs && tsc -watch -p ./",
     "prepare-vsix": "node ../scripts/prepare-vsix-assets.mjs",
     "package": "yarn run prepare-vsix && npx --yes @vscode/vsce package",
     "package:open-vsx": "node ../scripts/package-open-vsx.mjs",
