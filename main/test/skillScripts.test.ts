@@ -81,6 +81,48 @@ describe('skill scripts execute and notify the IDE', function () {
     assert.ok(fs.existsSync(ready))
   })
 
+  it('trace_tree rename updates traceName and notifies the IDE', () => {
+    const add = runSkill(
+      python,
+      'trace_tree.py',
+      [
+        'add',
+        '--project',
+        projectRoot,
+        '--file',
+        'src/app.py',
+        '--line',
+        '1',
+        '--content',
+        'def alpha():',
+        '--trace-name',
+        'alpha'
+      ],
+      { cwd: projectRoot, appDirBase }
+    )
+    assert.strictEqual(add.status, 0, add.stderr || add.stdout)
+    const added = parseJson(add.stdout)
+    const nodeId = (added.node as { id: string }).id
+    const storageXml = String(added.storage_xml)
+    projectId = projectIdFromXml(storageXml)
+
+    const rename = runSkill(
+      python,
+      'trace_tree.py',
+      ['rename', '--project', projectRoot, '--id', nodeId, '--trace-name', 'alpha-renamed'],
+      { cwd: projectRoot, appDirBase }
+    )
+    assert.strictEqual(rename.status, 0, rename.stderr || rename.stdout)
+    const json = parseJson(rename.stdout)
+    assert.strictEqual(json.action, 'rename')
+    assert.strictEqual(json.name, 'alpha-renamed')
+    assert.strictEqual((json.node as { name: string }).name, 'alpha-renamed')
+    assert.strictEqual(json.refreshed, true)
+    const xml = fs.readFileSync(storageXml, 'utf8')
+    assert.ok(xml.includes('<traceName>alpha-renamed</traceName>'), xml)
+    assert.ok(fs.existsSync(path.join(signalsDir(), `${projectId}.request_refresh_profile`)))
+  })
+
   it('trace_tree rebind updates the line after an external disk edit and notifies the IDE', () => {
     const add = runSkill(
       python,

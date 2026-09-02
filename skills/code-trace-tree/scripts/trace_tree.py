@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code Trace Tree ops for Claude: search / add / ensure / move / delete / rebind.
+Code Trace Tree ops for Claude: search / add / ensure / move / delete / rename / rebind.
 
 LINE nodes are stored as [file, line, full-trimmed-line-content].
 Callers must pass --file, --line, and --content (a substring of that line is OK).
@@ -1491,6 +1491,54 @@ def cmd_delete(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rename(args: argparse.Namespace) -> int:
+    project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
+        args.project, args.profile, ensure=True
+    )
+    node, _container, parent_id = resolve_target_node(roots_el, args, project_root)
+    tp = node_trace(node)
+    new_name = args.trace_name
+
+    if args.dry_run:
+        print(
+            json.dumps(
+                {
+                    "action": "rename",
+                    "dry_run": True,
+                    "profile": profile_name,
+                    "id": child_text(node, "id"),
+                    "name": new_name,
+                    "node": {**node_to_row(node, 0, parent_id), "name": new_name},
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    set_child_text(tp, "traceName", new_name)
+    bump_updated_at(root)
+    write_atomic(tree, storage_xml)
+    if not args.no_refresh:
+        request_refresh_profile(project_root, profile_name)
+
+    print(
+        json.dumps(
+            {
+                "action": "rename",
+                "profile": profile_name,
+                "id": child_text(node, "id"),
+                "name": new_name,
+                "node": node_to_row(node, 0, parent_id),
+                "refreshed": not args.no_refresh,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
 def cmd_rebind(args: argparse.Namespace) -> int:
     project_root, storage_xml, tree, root, profile_name, roots_el = load_context(
         args.project, args.profile, ensure=True
@@ -1670,7 +1718,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_shared_flags(shared_sub, suppress_defaults=True)
 
     parser = argparse.ArgumentParser(
-        description="Search / add / ensure / move / delete / rebind Code Trace Tree nodes (no occurrence args).",
+        description="Search / add / ensure / move / delete / rename / rebind Code Trace Tree nodes (no occurrence args).",
         parents=[shared_root],
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1739,6 +1787,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_locator_flags(p_delete)
     p_delete.set_defaults(func=cmd_delete)
+
+    p_rename = sub.add_parser(
+        "rename",
+        parents=[shared_sub],
+        help="Set a node's traceName (empty string clears the label)",
+    )
+    add_locator_flags(p_rename)
+    p_rename.add_argument(
+        "--trace-name",
+        required=True,
+        help="New traceName. Pass an empty string to clear the label.",
+    )
+    p_rename.set_defaults(func=cmd_rename)
 
     p_rebind = sub.add_parser(
         "rebind",
