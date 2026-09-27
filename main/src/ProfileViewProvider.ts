@@ -8,7 +8,7 @@ import { TracePointService } from './TracePointService'
 
 /**
  * Profile selector shown above the Trace Points tree: select + Add button.
- * Expanded dropdown rows show a delete control (except when only one profile remains).
+ * Expanded dropdown rows show rename and delete controls (delete hidden when only one profile remains).
  */
 export class ProfileViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView
@@ -32,6 +32,9 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
           break
         case 'addProfile':
           await this.promptAddProfile()
+          break
+        case 'renameProfile':
+          await this.promptRenameProfile(msg.name)
           break
         case 'deleteProfile':
           await this.confirmDeleteProfile(msg.name)
@@ -67,6 +70,25 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
     const ok = await this.service.addProfile(name)
     if (!ok) {
       vscode.window.showWarningMessage(`A profile named "${name.trim()}" already exists.`)
+    }
+  }
+
+  private async promptRenameProfile(oldName: string) {
+    const name = await vscode.window.showInputBox({
+      title: 'Rename Trace Profile',
+      prompt: 'Enter a new name for this trace profile:',
+      value: oldName,
+      validateInput: (value) => {
+        if (!value.trim()) return 'Profile name cannot be empty.'
+        return null
+      }
+    })
+    if (name == null) return
+    const trimmed = name.trim()
+    if (trimmed === oldName) return
+    const ok = await this.service.renameProfile(oldName, trimmed)
+    if (!ok) {
+      vscode.window.showWarningMessage(`A profile named "${trimmed}" already exists.`)
     }
   }
 
@@ -174,7 +196,13 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
       white-space: nowrap;
       flex: 1 1 auto;
     }
-    .delete-btn {
+    .item-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex: 0 0 auto;
+    }
+    .action-btn {
       flex: 0 0 auto;
       border: none;
       background: transparent;
@@ -183,9 +211,10 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
       padding: 0 2px;
       opacity: 0.55;
       line-height: 1;
-      font-size: 14px;
+      font-size: 13px;
     }
-    .delete-btn:hover { opacity: 1; color: var(--vscode-errorForeground); }
+    .action-btn:hover { opacity: 1; }
+    .delete-btn:hover { color: var(--vscode-errorForeground); }
     .add-btn {
       flex: 0 0 auto;
       width: 24px;
@@ -239,10 +268,25 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
         label.textContent = name;
         row.appendChild(label);
 
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+
+        const rename = document.createElement('button');
+        rename.type = 'button';
+        rename.className = 'action-btn rename-btn';
+        rename.title = 'Rename profile';
+        rename.textContent = '✎';
+        rename.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setOpen(false);
+          vscode.postMessage({ command: 'renameProfile', name });
+        });
+        actions.appendChild(rename);
+
         if (profiles.length > 1) {
           const del = document.createElement('button');
           del.type = 'button';
-          del.className = 'delete-btn';
+          del.className = 'action-btn delete-btn';
           del.title = 'Delete profile';
           del.textContent = '×';
           del.addEventListener('click', (e) => {
@@ -250,8 +294,10 @@ export class ProfileViewProvider implements vscode.WebviewViewProvider {
             setOpen(false);
             vscode.postMessage({ command: 'deleteProfile', name });
           });
-          row.appendChild(del);
+          actions.appendChild(del);
         }
+
+        row.appendChild(actions);
 
         row.addEventListener('click', () => {
           setOpen(false);

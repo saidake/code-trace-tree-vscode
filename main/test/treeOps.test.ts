@@ -8,6 +8,7 @@ import {
   moveSiblingsDown,
   moveSiblingsUp,
   pruneInvalidNodes,
+  selectionRoots,
   toggleToolbarFlag,
   TreeOpNode
 } from '../src/domain/treeOps'
@@ -77,5 +78,41 @@ describe('toolbar toggles', () => {
     flags = toggleToolbarFlag(flags, 'descriptionAreaOpened')
     assert.strictEqual(flags.descriptionAreaOpened, true)
     assert.strictEqual(flags.highlightingEnabled, false)
+  })
+})
+
+describe('selectionRoots (DnD)', () => {
+  // A
+  //   B
+  //     D
+  //   C
+  // E
+  //   F
+  //   G
+  // H
+  const parents: Record<string, string | undefined> = {
+    A: undefined,
+    B: 'A',
+    C: 'A',
+    D: 'B',
+    E: undefined,
+    F: 'E',
+    G: 'E',
+    H: undefined
+  }
+
+  it('keeps only topmost selected nodes when a whole subtree is selected', () => {
+    const roots = selectionRoots(['A', 'B', 'C', 'D', 'E', 'F', 'G'], (id) => parents[id])
+    assert.deepStrictEqual(roots.sort(), ['A', 'E'])
+  })
+
+  it('excludes a deep selection when an ancestor is also selected', () => {
+    const roots = selectionRoots(['A', 'D'], (id) => parents[id])
+    assert.deepStrictEqual(roots, ['A'])
+  })
+
+  it('keeps disjoint selections', () => {
+    const roots = selectionRoots(['B', 'E'], (id) => parents[id])
+    assert.deepStrictEqual(roots.sort(), ['B', 'E'])
   })
 })

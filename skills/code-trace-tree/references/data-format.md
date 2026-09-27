@@ -29,7 +29,7 @@ its global XML (do not create a second project). If the id exists but XML is mis
 recreate XML with **that same** projectId (do not mint a new id). Else bind by XML
 `<path>`. **Case C** (nothing found): create initial global XML with `<path>` only —
 never create/write the `.idea` id file. Pass / resolve the project root so `<path>` is
-correct; IDE binds via path match + `storage-ready`. Scripts: `resolve_storage.py`
+correct; IDE binds via Case A (`.idea` id when present) or path match + `storage-ready`. Scripts: `resolve_storage.py`
 (creates if missing); mutating `create_tree.py` and `trace_tree` (`add` / `ensure` / `move` / `delete` / `rename` / `rebind`) auto-inits.
 
 ## Signals

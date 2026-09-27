@@ -66,6 +66,31 @@ export function pruneInvalidNodes<T extends TreeOpNode>(
   return removed
 }
 
+/**
+ * Drag-and-drop: keep only selection roots — selected nodes with no selected ancestor.
+ * Moving a parent already moves its descendants; re-moving nested selections would flatten the tree.
+ */
+export function selectionRoots(
+  selectedIds: Iterable<string>,
+  parentIdOf: (id: string) => string | undefined
+): string[] {
+  const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds)
+  const roots: string[] = []
+  for (const id of selected) {
+    let parentId = parentIdOf(id)
+    let hasSelectedAncestor = false
+    while (parentId) {
+      if (selected.has(parentId)) {
+        hasSelectedAncestor = true
+        break
+      }
+      parentId = parentIdOf(parentId)
+    }
+    if (!hasSelectedAncestor) roots.push(id)
+  }
+  return roots
+}
+
 export interface ToolbarFlags {
   highlightingEnabled: boolean
   namePromptEnabled: boolean

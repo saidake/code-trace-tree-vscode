@@ -43,7 +43,7 @@
 <h1>How to use</h1>
 <ol>
   <li>Open the <b>Code Trace Tree</b> activity bar view.</li>
-  <li>Use the <b>Profile</b> webview above the tree to switch trees, add a profile, or delete one.</li>
+  <li>Use the <b>Profile</b> webview above the tree to switch trees, add a profile, rename one, or delete one.</li>
   <li>In the editor, right-click a line in a <b>workspace file</b> and choose:
     <ul>
       <li><b>Create a Root Code Trace Point</b> — start a new line-level trace tree (selects the new node; does not jump)</li>

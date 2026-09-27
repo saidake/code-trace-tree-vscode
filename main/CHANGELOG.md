@@ -1,4 +1,10 @@
-﻿## v1.3.6
+﻿## v1.3.7
+
+- Rename profiles from the Profile dropdown (edit control next to delete)
+- Prefer `.idea/code-trace-tree.project.id` when present so the extension binds the same storage as the agent skill
+- Multi-select drag-and-drop moves only selection roots (nested selections stay under their parent)
+
+## v1.3.6
 
 - Bundle the Agent Skill in the extension; toolbar **Agent Skill** opens a status page to install or update it per coding agent
 - Prompt once per bundled skill version when a detected agent is missing or outdated; **Dismiss** or opening the status page skips it until the next skill version

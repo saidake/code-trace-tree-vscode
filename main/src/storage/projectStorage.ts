@@ -6,7 +6,12 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_PROFILE_NAME, PROJECT_DOCUMENT_VERSION, GLOBAL_SETTINGS_FILE_NAME } from '../domain/constants'
+import {
+  DEFAULT_PROFILE_NAME,
+  PROJECT_DOCUMENT_VERSION,
+  GLOBAL_SETTINGS_FILE_NAME,
+  LOCAL_PROJECT_ID_FILE_NAME
+} from '../domain/constants'
 import { AdvancedSettings, ProjectDocument, TraceProfile } from '../domain/types'
 import { resolveAppDir } from './globalStoragePaths'
 import { globalSettingsExist } from './globalSettingsXml'
@@ -23,14 +28,15 @@ export interface StoredProjectSummary {
 }
 
 /**
- * Resolves and persists global XML project storage bound by workspace path.
+ * Resolves and persists global XML project storage.
  *
  * Resolution on project open:
+ * - Case A: `.idea/code-trace-tree.project.id` → that project's XML (when present)
  * - Case B: match global XML `<path>` to workspace → bind in place (reuse `<projectId>`)
  * - Case C: no match → return undefined (lazy; no disk writes until first real use)
  *
  * Lazy create ({@link ensureCreated}): `<ProjectFolderName>.xml` (or `Name1.xml`, …)
- * with a new UUID `<projectId>`.
+ * with a new UUID `<projectId>`. Does not create/overwrite the `.idea` id file.
  */
 export class ProjectStorage {
   private boundFile: string | undefined
@@ -91,12 +97,22 @@ export class ProjectStorage {
   }
 
   /**
-   * Resolve existing storage (Case B). Returns undefined when nothing exists yet
+   * Resolve existing storage (Case A / B). Returns undefined when nothing exists yet
    * (lazy Case C — no disk writes).
    */
   resolveAndLoad(): ProjectDocument | undefined {
     fs.mkdirSync(resolveAppDir(), { recursive: true })
 
+    // Case A: prefer local `.idea/code-trace-tree.project.id` when its XML exists
+    const localId = this.readLocalProjectId()
+    if (localId) {
+      const byId = this.findDocumentByProjectId(localId)
+      if (byId) {
+        return this.bindExistingDocument(byId)
+      }
+    }
+
+    // Case B: match by path
     const matches = this.findDocumentsByPath(this.projectBase)
     if (matches.length === 0) return undefined
 
@@ -273,6 +289,18 @@ export class ProjectStorage {
       }
     }
     return matches
+  }
+
+  /** Read `.idea/code-trace-tree.project.id` when present. Never creates/overwrites it. */
+  private readLocalProjectId(): string | undefined {
+    const idPath = path.join(this.projectBase, '.idea', LOCAL_PROJECT_ID_FILE_NAME)
+    if (!fs.existsSync(idPath) || !fs.statSync(idPath).isFile()) return undefined
+    try {
+      const id = fs.readFileSync(idPath, 'utf8').trim()
+      return id || undefined
+    } catch {
+      return undefined
+    }
   }
 
   private normalizePath(p: string): string {

@@ -30,3 +30,6 @@ export const SIGNAL_TTL_MS = 60_000
 export const GLOBAL_APP_DIR_NAME = 'code-trace-tree'
 
 export const GLOBAL_SETTINGS_FILE_NAME = 'settings.xml'
+
+/** Local project id cache (JetBrains / shared); agents never write this file. */
+export const LOCAL_PROJECT_ID_FILE_NAME = 'code-trace-tree.project.id'

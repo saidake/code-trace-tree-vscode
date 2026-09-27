@@ -5,6 +5,7 @@
  */
 import * as vscode from 'vscode'
 import { TracePointService } from './TracePointService'
+import { selectionRoots } from './domain/treeOps'
 import { TracePoint, TracePointNode } from './domain/types'
 
 export class TracePointTreeDataProvider
@@ -91,7 +92,10 @@ export class TracePointTreeDataProvider
       | string[]
       | undefined
     if (!transferred) return
-    const draggedIds = transferred
+    // Only move selection roots (no selected ancestor); nested picks move with their parent.
+    const draggedIds = selectionRoots(transferred, (id) => {
+      return this.service.getTracePointNodeById(id)?.parentId
+    })
     const affectedParentNodes: Set<TracePointNode | null> = new Set<TracePointNode | null>()
     const dropTargets = new Set<TracePointNode>()
     console.log('handleDrop - draggedIds: ', draggedIds)

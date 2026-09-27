@@ -757,6 +757,29 @@ export class TracePointService {
     return true
   }
 
+  async renameProfile(oldName: string, newName: string): Promise<boolean> {
+    const trimmed = newName.trim()
+    if (!trimmed) return false
+    const profile = this.profiles.find((p) => p.name === oldName)
+    if (!profile) return false
+    if (trimmed === oldName) return true
+    if (
+      this.profiles.some(
+        (p) => p.name !== oldName && p.name.toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      return false
+    }
+    this.ensureStorage()
+    profile.name = trimmed
+    if (this.activeProfileName === oldName) {
+      this.activeProfileName = trimmed
+    }
+    this.notifyProfileListeners()
+    this.scheduleFullPeerPersist()
+    return true
+  }
+
   async replaceActiveProfileTree(nodes: TracePointNode[], expandedIds: string[]) {
     this.ensureStorage()
     this.clearAllHighlights()
