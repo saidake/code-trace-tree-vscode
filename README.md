@@ -154,6 +154,10 @@
 - Press **F5** to launch an Extension Development Host
 - Shared agent skill: `https://github.com/saidake/code-trace-tree-skill` (copy in `skills/code-trace-tree/` for zip packaging)
 
+# Contributing
+
+If you would like to contribute to the code base or fix an issue, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 # License
 
 This project is licensed under the [MIT License](./LICENSE).
