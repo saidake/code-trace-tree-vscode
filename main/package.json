@@ -325,6 +325,7 @@
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
+    "list": "node ../scripts/yarn-list.mjs",
     "compile": "node ../scripts/copy-bundled-skill.mjs && tsc -p ./",
     "watch": "node ../scripts/copy-bundled-skill.mjs && tsc -watch -p ./",
     "prepare-vsix": "node ../scripts/prepare-vsix-assets.mjs",

@@ -9,7 +9,7 @@
 #   bash scripts/build.sh                 # install deps if missing, then package
 #   bash scripts/build.sh --skip-install  # reuse existing main/node_modules
 #
-# Requires Node.js (node / npx), Yarn 1.x, and network access the first time
+# Requires Node.js (node / npx), Yarn 4.x, and network access the first time
 # `npx @vscode/vsce` runs (it is downloaded on demand, not a dependency).
 # On Windows run it from Git Bash (or WSL): bash scripts/build.sh
 set -euo pipefail
@@ -62,7 +62,7 @@ require_tool() {
 
 require_tool node "Install Node.js: https://nodejs.org/"
 require_tool npx "npm ships npx; reinstall Node.js: https://nodejs.org/"
-require_tool yarn "Install Yarn 1.x: https://classic.yarnpkg.com/"
+require_tool yarn "Install Yarn 4.x: https://yarnpkg.com/"
 
 if [ ! -f "$MAIN_DIR/package.json" ]; then
   echo "error: $MAIN_DIR/package.json not found" >&2
@@ -92,6 +92,8 @@ fi
 echo "==> Removing stale v$VERSION VSIX files"
 rm -f "$MARKETPLACE_VSIX" "$OPEN_VSX_VSIX"
 
+echo "==> Install Dependency (yarn install)"
+yarn install
 echo "==> Compiling TypeScript (yarn run compile)"
 yarn run compile
 
