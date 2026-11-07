@@ -3,9 +3,11 @@
   "tasks": [
     {
       "label": "compile",
-      "type": "npm",
-      "script": "compile",
-      "path": "main/",
+      "type": "shell",
+      "command": "bash /mnt/c/Users/saidake/Desktop/DevProjects/code-trace-tree-vscode/.vscode/compile-wsl.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/main"
+      },
       "problemMatcher": "$tsc",
       "group": {
         "kind": "build",
@@ -19,9 +21,11 @@
     },
     {
       "label": "watch",
-      "type": "npm",
-      "script": "watch",
-      "path": "main/",
+      "type": "shell",
+      "command": "bash /mnt/c/Users/saidake/Desktop/DevProjects/code-trace-tree-vscode/.vscode/watch-wsl.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/main"
+      },
       "problemMatcher": "$tsc-watch",
       "isBackground": true,
       "presentation": {
