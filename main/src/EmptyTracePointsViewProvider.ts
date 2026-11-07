@@ -93,7 +93,7 @@ export class EmptyTracePointsViewProvider implements vscode.WebviewViewProvider 
 
     return this.shellHtml(`
   <p><strong>No trace points yet.</strong></p>
-  <p class="hint">Put the caret on a line in the editor, then create a root trace point to start a workflow map (editor context menu or Command Palette).</p>
+  <p class="hint">Place the caret on a line in the editor, right-click to open the context menu, and select <strong>"Create a Root Trace Point"</strong> to create your first trace point.</p>
   ${importSection}`)
   }
 

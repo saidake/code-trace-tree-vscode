@@ -475,12 +475,8 @@ export class TracePointService {
   }
 
   private isTreeEmptyForEmptyState(): boolean {
-    const hasNodes = this.profiles.some((p) => p.tracePointNodes.length > 0)
-    if (hasNodes) return false
-    if (this.profiles.length === 0) return true
-    return (
-      this.profiles.length === 1 && this.profiles[0].name === DEFAULT_PROFILE_NAME
-    )
+    const profile = this.profiles.find((p) => p.name === this.activeProfileName)
+    return !profile || profile.tracePointNodes.length === 0
   }
 
   async syncWorkspaceFolderContextKey(): Promise<void> {
