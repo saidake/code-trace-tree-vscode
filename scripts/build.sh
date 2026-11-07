@@ -1,17 +1,35 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# ************************************************************************************
+# Copyright (C) 2022-2026 rhctl Contributors
 #
+# SPDX-License-Identifier: Apache-2.0
+# ************************************************************************************
 # Build both release VSIX packages for Code Trace Tree.
 #
-#   main/code-trace-tree-vscode-<version>.vsix     VS Code Marketplace
-#   main/code-trace-tree-open-vsx-<version>.vsix   Open VSX
+# Packages the extension for the VS Code Marketplace and Open VSX.
 #
-# Usage (from anywhere):
-#   bash scripts/build.sh                 # install deps if missing, then package
-#   bash scripts/build.sh --skip-install  # reuse existing main/node_modules
+# If exists, skip — safe to re-run.
 #
-# Requires Node.js (node / npx), Yarn 4.x, and network access the first time
-# `npx @vscode/vsce` runs (it is downloaded on demand, not a dependency).
-# On Windows run it from Git Bash (or WSL): bash scripts/build.sh
+# Usage:
+#   ./scripts/build.sh \
+#     [--skip-install]
+#
+# Optional Parameters:
+#   --skip-install
+#       Do not run `yarn install`, even if main/node_modules is missing (default: off).
+#         Example values: (none)
+#   -h, --help
+#       Show this help (default: off).
+#         Example values: (none)
+#
+# Override Parameters:
+#   (none)
+#
+# Since : 1.3.7
+# Date  : Mon Nov 9, 2026
+# ************************************************************************************
+
+# ========================================================================= Parameter
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,6 +39,7 @@ EXPECTED_NAME="code-trace-tree-vscode"
 
 SKIP_INSTALL=0
 
+# ========================================================================= Methods
 usage() {
   cat <<'EOF'
 Usage: bash scripts/build.sh [--skip-install]
@@ -35,6 +54,18 @@ Options:
 EOF
 }
 
+require_tool() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "error: '$1' not found on PATH. $2" >&2
+    exit 1
+  fi
+}
+
+file_size() {
+  node -e "const s = require('node:fs').statSync(process.argv[1]).size; process.stdout.write((s / 1024 / 1024).toFixed(2) + ' MB')" "$1"
+}
+
+# ========================================================================= Argument parsing
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --skip-install)
@@ -53,13 +84,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-require_tool() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "error: '$1' not found on PATH. $2" >&2
-    exit 1
-  fi
-}
-
+# ========================================================================= Environment checks
 require_tool node "Install Node.js: https://nodejs.org/"
 require_tool npx "npm ships npx; reinstall Node.js: https://nodejs.org/"
 require_tool yarn "Install Yarn 4.x: https://yarnpkg.com/"
@@ -75,6 +100,7 @@ VERSION="$(node -e "process.stdout.write(require('./package.json').version)")"
 MARKETPLACE_VSIX="$MAIN_DIR/$EXPECTED_NAME-$VERSION.vsix"
 OPEN_VSX_VSIX="$MAIN_DIR/code-trace-tree-open-vsx-$VERSION.vsix"
 
+# ========================================================================= Install / compile
 echo "==> Code Trace Tree v$VERSION"
 
 if [ "$SKIP_INSTALL" -eq 0 ]; then
@@ -97,6 +123,7 @@ yarn install
 echo "==> Compiling TypeScript (yarn run compile)"
 yarn run compile
 
+# ========================================================================= Package
 echo "==> Packaging VS Code Marketplace VSIX (yarn run package)"
 yarn run package
 
@@ -111,10 +138,7 @@ if [ "$CURRENT_NAME" != "$EXPECTED_NAME" ]; then
   echo "         Restore it with: git checkout -- main/package.json" >&2
 fi
 
-file_size() {
-  node -e "const s = require('node:fs').statSync(process.argv[1]).size; process.stdout.write((s / 1024 / 1024).toFixed(2) + ' MB')" "$1"
-}
-
+# ========================================================================= Final output
 echo
 MISSING=0
 for vsix in "$MARKETPLACE_VSIX" "$OPEN_VSX_VSIX"; do
