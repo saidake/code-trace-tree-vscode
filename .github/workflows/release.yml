@@ -27,25 +27,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: main/yarn.lock
 
-      - name: Enable Corepack and prepare Yarn 4
+      - name: Prepare Yarn 4
         run: |
-          corepack enable
           corepack prepare yarn@4.12.0 --activate
+          corepack yarn --version
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: main/.yarn/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('main/yarn.lock') }}
+          restore-keys: |
+            yarn-${{ runner.os }}-
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: corepack yarn install --immutable
         working-directory: main
 
       - name: Sync version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          yarn version --new-version "$VERSION" --no-git-tag-version
+          npm pkg set "version=$VERSION"
+        working-directory: main
 
       - name: Package extension
-        run: yarn run package
+        run: corepack yarn run package
 
       - name: Package agent skill ZIP
         working-directory: .
